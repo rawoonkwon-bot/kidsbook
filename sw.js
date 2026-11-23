@@ -1,5 +1,5 @@
 // 앱 파일과 바코드 엔진을 기기에 저장해 두 번째 방문부터 즉시 실행
-const CACHE = "kbc-v2";
+const CACHE = "kbc-v3";
 const ASSETS = ["/", "/index.html", "/styles.css", "/app.js", "/scanner.js", "/lookup.js", "/isbn.js",
   "/icon.svg", "/manifest.webmanifest"];
 self.addEventListener("install", (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS))); self.skipWaiting(); });
@@ -16,7 +16,7 @@ self.addEventListener("fetch", (e) => {
       fetch(e.request).then((res) => { if (res.ok) c.put(e.request, res.clone()); return res; }))));
     return;
   }
-  if (url.origin !== location.origin) return; // 도서 API는 항상 네트워크
+  if (url.origin !== location.origin || url.pathname.startsWith("/api/")) return; // 도서 조회는 항상 네트워크
   // 앱 코드는 네트워크 우선(업데이트 반영), 실패 시 캐시
   e.respondWith(fetch(e.request).then((res) => {
     const copy = res.clone(); caches.open(CACHE).then((c) => c.put(e.request, copy)); return res;

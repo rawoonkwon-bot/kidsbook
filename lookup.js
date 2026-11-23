@@ -1,7 +1,7 @@
 // 도서 정보 조회
 // 속도 개선 핵심:
 //  1) 로컬 캐시 우선 (같은 책 재조회 0ms)
-//  2) 여러 DB에 동시에 요청하고, 먼저 '찾음'으로 응답한 곳을 바로 사용 (Promise.any)
+//  2) 여러 DB(카카오 · Google Books · Open Library)에 동시에 요청하고, 먼저 '찾음'으로 응답한 곳을 바로 사용 (Promise.any)
 //  3) 요청마다 타임아웃 → 느린 서버 하나 때문에 전체가 멈추지 않음
 import { isbn13to10 } from "./isbn.js";
 
@@ -58,6 +58,18 @@ async function fromGoogleBooks(isbn, signal) {
   };
 }
 
+// 한글책: 카카오 책 검색 (우리 서버 /api/book 경유, 키 숨김)
+async function fromKakao(isbn, signal) {
+  const res = await fetch(`/api/book?isbn=${isbn}`, { signal });
+  if (!res.ok) throw new Error(`kakao ${res.status}`);
+  const b = await res.json();
+  if (!b.title) throw new Error("not found");
+  return b;
+}
+
+// 979-11, 978-89로 시작하면 한국에서 발행된 책
+const isKorean = (isbn) => isbn.startsWith("97911") || isbn.startsWith("97889");
+
 /** @returns {Promise<{book: object|null, ms: number, cached: boolean}>} */
 export async function lookupBook(isbn) {
   const t0 = performance.now();
@@ -68,10 +80,14 @@ export async function lookupBook(isbn) {
   const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
   let book = null;
   try {
-    book = await Promise.any([
-      fromGoogleBooks(isbn, ctrl.signal),
-      fromOpenLibrary(isbn, ctrl.signal),
-    ]);
+    // 세 곳에 동시에 묻고 먼저 찾은 결과 사용.
+    // 한국 책은 카카오 정보가 가장 정확하므로 카카오를 먼저 기다려 보고, 없으면 나머지 결과 사용
+    const kakao = fromKakao(isbn, ctrl.signal);
+    const others = [fromGoogleBooks(isbn, ctrl.signal), fromOpenLibrary(isbn, ctrl.signal)];
+    others.forEach((p) => p.catch(() => {})); // 취소된 요청 경고 방지
+    book = isKorean(isbn)
+      ? await kakao.catch(() => Promise.any(others))
+      : await Promise.any([kakao, ...others]);
   } catch { /* 모든 소스에서 못 찾음 */ }
   finally {
     clearTimeout(timer);
