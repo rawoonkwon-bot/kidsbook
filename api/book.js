@@ -4,11 +4,7 @@ export default async function handler(req, res) {
   const isbn = String(req.query.isbn || "").replace(/[^0-9X]/gi, "");
   if (!/^(\d{9}[\dX]|\d{13})$/i.test(isbn)) return res.status(400).json({ error: "bad isbn" });
   const key = (process.env.KAKAO_REST_KEY || "").trim();
-  if (!key) {
-    // 키 값은 절대 보내지 않고, 비슷한 이름의 변수가 있는지만 알려줌 (설정 확인용)
-    const names = Object.keys(process.env).filter((k) => /kakao/i.test(k));
-    return res.status(501).json({ error: "KAKAO_REST_KEY not set", similarNames: names, env: process.env.VERCEL_ENV || null });
-  }
+  if (!key) return res.status(501).json({ error: "KAKAO_REST_KEY not set" });
 
   const r = await fetch(
     `https://dapi.kakao.com/v3/search/book?target=isbn&size=1&query=${isbn}`,
