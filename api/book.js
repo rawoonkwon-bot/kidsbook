@@ -21,6 +21,8 @@ export default async function handler(req, res) {
     publisher: doc.publisher || "",
     pages: null,
     cover: (doc.thumbnail || "").replace(/^http:\/\//, "https://"),
+    description: doc.contents || "",
+    link: doc.url || "",
     source: "카카오 책",
   });
 }
