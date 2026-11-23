@@ -78,7 +78,7 @@ main { max-width: 720px; margin: 0 auto; padding: 0 18px 40px; }
 .shelf-head select { font: inherit; border: 1px solid #E6D8CB; background: #fff; border-radius: 10px; padding: 6px 8px; }
 .shelf {
   list-style: none; padding: 0; margin: 14px 0 0;
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 10px;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(66px, 1fr)); gap: 8px;
 }
 .shelf li {
   background: var(--card); border-radius: 12px; padding: 6px; box-shadow: var(--shadow);
