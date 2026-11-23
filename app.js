@@ -66,7 +66,7 @@ function setupDate(inputId) {
     input.value = daysAgo(Number(b.dataset.ago)); paint();
   });
   input.addEventListener("input", paint);
-  return () => { input.max = localDay(); input.value = localDay(); paint(); };
+  return (day) => { input.max = localDay(); input.value = day || localDay(); paint(); };
 }
 const resetBDate = setupDate("bDate");
 const resetMDate = setupDate("mDate");
@@ -97,12 +97,9 @@ const shelfOf = (r) => r.shelf || (hasHangul(r.title) ? "ko" : "en");
 const cardHtml = (r) => `
     <li data-id="${r.id}" tabindex="0" role="button" aria-label="${esc(r.title)} 기록 보기">
       ${r.cover ? `<img class="cover" src="${esc(r.cover)}" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'cover',textContent:'📘'}))">` : `<div class="cover">📘</div>`}
-      ${r.score ? `<span class="s score-badge">★ ${r.score}</span>` : r.sticker ? `<span class="s">${r.sticker}</span>` : ""}
+      ${r.score ? `<span class="s score-badge">★${r.score}</span>` : r.sticker ? `<span class="s">${r.sticker}</span>` : ""}
       <div class="t">${esc(r.title)}</div>
-      <div class="a">${esc(r.authors)}</div>
-      ${progressText(r) ? `<div class="p">📖 ${progressText(r)}</div>` : ""}
-      ${r.totalPages ? `<div class="bar"><i style="width:${pct(r)}%"></i></div>` : ""}
-      <div class="d">${lastDay(r).replaceAll("-", ".")} · ${r.sessions.length}번 읽음</div>
+      ${r.totalPages ? `<div class="bar" title="${readTo(r)}/${r.totalPages}쪽"><i style="width:${pct(r)}%"></i></div>` : `<div class="bar none" title="전체 쪽수를 모르는 책"></div>`}
     </li>`;
 
 function render() {
@@ -124,6 +121,8 @@ function render() {
 
   const thisMonth = records.filter((r) => inMonth(r, localDay().slice(0, 7))).length;
   $("stats").innerHTML = `이번 달 <b>${thisMonth}</b>권<br>모두 <b>${records.length}</b>권`;
+  renderCalendar();
+  if ($("dayDialog").open && openDayKey) fillDay(openDayKey);
 }
 
 $("monthFilter").addEventListener("change", render);
@@ -133,6 +132,10 @@ let viewing = null;
 function openView(id) {
   const r = records.find((x) => x.id === id); if (!r) return;
   viewing = r;
+  fillView(r);
+  $("viewDialog").showModal();
+}
+function fillView(r) {
   if (r.cover) $("vCover").src = r.cover; else $("vCover").removeAttribute("src");
   $("vTitle").textContent = r.title;
   $("vAuthor").textContent = r.authors || "";
@@ -144,8 +147,16 @@ function openView(id) {
   $("vMore").hidden = !!(r.totalPages && readTo(r) >= r.totalPages);
   $("vScore").textContent = r.score ? `${"★".repeat(r.score)}${"☆".repeat(5 - r.score)}  ${r.score}점` : (r.sticker || "주지 않았어요");
   $("vNote").textContent = r.note || "적지 않았어요";
-  $("viewDialog").showModal();
+  $("vTotalRow").hidden = !!r.totalPages;
+  $("vTotal").value = "";
 }
+$("vTotalSave").addEventListener("click", () => {
+  const t = parseInt($("vTotal").value, 10);
+  if (!viewing || !t) return;
+  viewing.totalPages = t;
+  saveRecords(records); render(); fillView(viewing);
+  toast(`전체 ${t}쪽으로 저장했어요`);
+});
 for (const id of ["shelfKo", "shelfEn"]) {
   $(id).addEventListener("click", (e) => { const li = e.target.closest("li[data-id]"); if (li) openView(li.dataset.id); });
   $(id).addEventListener("keydown", (e) => { if (e.key === "Enter") { const li = e.target.closest("li[data-id]"); if (li) openView(li.dataset.id); } });
@@ -172,7 +183,7 @@ function openMore(r) {
   $("mSoFar").textContent = to ? `지난번까지 ${to}쪽 읽었어요${r.totalPages ? ` · 전체 ${r.totalPages}쪽` : ""}` : "이어서 읽은 쪽수를 적어 주세요";
   $("mPageFrom").value = to ? to + 1 : 1;
   $("mPageTo").value = r.totalPages && r.totalPages > to ? r.totalPages : "";
-  resetMDate();
+  resetMDate(returnDay);
   $("moreDialog").showModal();
 }
 $("moreDialog").addEventListener("close", () => {
@@ -215,7 +226,7 @@ async function openBook(isbn, scanInfo, preset) {
   $("bTitle").value = ""; $("bAuthor").value = ""; $("bNote").value = "";
   $("bPageFrom").value = 1; $("bPageTo").value = ""; $("bTotal").value = "";
   $("bTotalHint").textContent = "(책 마지막 쪽 번호)";
-  resetBDate();
+  resetBDate(returnDay);
   chosenShelf = isbn.startsWith("97911") || isbn.startsWith("97889") ? "ko" : "en";
   paintShelf();
   $("bMeta").textContent = `ISBN ${isbn}`;
@@ -332,6 +343,158 @@ $("infoDialog").addEventListener("close", () => {
   infoBook = null;
 });
 
+// ---------- 포트폴리오 (캘린더 + 날짜별 기록) ----------
+const JOURNAL_KEY = "kbc:journal:v1";
+const CATS = [
+  { key: "ko", icon: "📕", name: "한글책", book: true },
+  { key: "en", icon: "📘", name: "영어책", book: true },
+  { key: "listen", icon: "🎧", name: "흘려듣기", what: "무엇을 들었나요?", whatPh: "예: Peppa Pig 3화", amount: "몇 분 들었나요?", unit: "분" },
+  { key: "focus", icon: "👂", name: "집중듣기", what: "무엇을 들었나요?", whatPh: "예: Magic Tree House 1권", amount: "몇 분 들었나요?", unit: "분" },
+  { key: "math", icon: "➗", name: "수학", what: "무엇을 했나요?", whatPh: "예: 연산 문제집 12~15쪽", amount: "몇 분 했나요?", unit: "분" },
+  { key: "etc", icon: "⭐", name: "기타", what: "무엇을 했나요?", whatPh: "예: 피아노 연습", amount: "몇 분 했나요?", unit: "분" },
+  { key: "memo", icon: "📝", name: "메모", text: "메모", textPh: "오늘 있었던 일, 칭찬할 점 등" },
+];
+const CAT = Object.fromEntries(CATS.map((c) => [c.key, c]));
+const loadJournal = () => { try { return JSON.parse(localStorage.getItem(JOURNAL_KEY)) || []; } catch { return []; } };
+const saveJournal = () => localStorage.setItem(JOURNAL_KEY, JSON.stringify(journal));
+let journal = loadJournal();
+
+// 그날 읽은 책 (책장 기록에서 자동으로 가져옴)
+const booksOn = (day, shelf) => records.flatMap((r) =>
+  r.sessions.filter((s) => s.day === day && shelfOf(r) === shelf).map((s) => ({ r, s })));
+const catsOn = (day) => CATS.filter((c) => (c.book ? booksOn(day, c.key).length : journal.some((j) => j.day === day && j.cat === c.key)));
+
+// 캘린더
+let calYM = localDay().slice(0, 7);
+function renderCalendar() {
+  const [y, m] = calYM.split("-").map(Number);
+  $("calTitle").textContent = `${y}.${String(m).padStart(2, "0")}.`;
+  const first = new Date(y, m - 1, 1);
+  const start = new Date(y, m - 1, 1 - first.getDay());
+  const today = localDay();
+  let html = "";
+  for (let i = 0; i < 42; i++) {
+    const d = new Date(start); d.setDate(start.getDate() + i);
+    const day = localDay(d);
+    if (i >= 35 && d.getMonth() !== m - 1) break; // 필요 없는 마지막 줄 생략
+    const cats = catsOn(day);
+    const cls = [d.getMonth() !== m - 1 && "out", day === today && "today", cats.length && "has"].filter(Boolean).join(" ");
+    const dots = cats.slice(0, 4).map((c) => c.icon).join("") + (cats.length > 4 ? "+" : "");
+    html += `<button type="button" class="${cls}" data-day="${day}" ${day > today ? "disabled" : ""} aria-label="${prettyDay(day)} 기록">
+      <span class="num">${d.getDate()}</span><span class="dots">${dots}</span></button>`;
+  }
+  $("calGrid").innerHTML = html;
+  $("calLegend").textContent = CATS.map((c) => `${c.icon}${c.name}`).join("  ");
+}
+$("calPrev").addEventListener("click", () => { const [y, m] = calYM.split("-").map(Number); calYM = localDay(new Date(y, m - 2, 1)).slice(0, 7); renderCalendar(); });
+$("calNext").addEventListener("click", () => { const [y, m] = calYM.split("-").map(Number); calYM = localDay(new Date(y, m, 1)).slice(0, 7); renderCalendar(); });
+$("calGrid").addEventListener("click", (e) => { const b = e.target.closest("button[data-day]"); if (b && !b.disabled) openDay(b.dataset.day); });
+
+// 날짜 화면
+let openDayKey = null;  // 지금 열려 있는 날짜 화면
+let returnDay = null;   // 다른 창을 다 쓰고 나면 돌아올 날짜 화면 (기록 날짜 기본값으로도 사용)
+let dayPanel = null;    // 한글책/영어책 버튼을 눌렀을 때 펼치는 패널
+function openDay(day) {
+  openDayKey = day; returnDay = day; dayPanel = null;
+  fillDay(day);
+  if (!$("dayDialog").open) $("dayDialog").showModal();
+}
+function fillDay(day) {
+  const [, m, d] = day.split("-").map(Number);
+  $("dayTitle").innerHTML = `${m}월 ${d}일에<br>무엇을 기록할까요?`;
+  $("dayCats").innerHTML = CATS.map((c) => {
+    const n = c.book ? booksOn(day, c.key).length : journal.filter((j) => j.day === day && j.cat === c.key).length;
+    return `<button type="button" data-cat="${c.key}"><span class="ic">${c.icon}</span>${c.name}${n ? `<span class="cnt">${n}</span>` : ""}</button>`;
+  }).join("");
+
+  let html = "";
+  if (dayPanel) {
+    const c = CAT[dayPanel];
+    const ongoing = records.filter((r) => shelfOf(r) === dayPanel && !(r.totalPages && readTo(r) >= r.totalPages));
+    html += `<div class="day-actions">
+        <button type="button" class="btn primary" data-act="scan">📷 바코드로 새 책</button>
+        <button type="button" class="btn ghost" data-act="isbn" style="background:#2A2838;color:#F2EEF8">ISBN 입력</button>
+      </div>`;
+    html += ongoing.length ? `<small style="color:#B9B5CC">읽고 있는 ${c.name} (눌러서 이 날 읽은 쪽수 기록)</small>` +
+      ongoing.map((r) => `<div class="day-item link" data-more="${r.id}">
+        ${r.cover ? `<img src="${esc(r.cover)}" alt="">` : `<span>${c.icon}</span>`}
+        <div class="grow"><b>${esc(r.title)}</b><small>${progressText(r) || "아직 쪽수 기록 없음"}</small></div><span>➕</span></div>`).join("")
+      : `<small style="color:#B9B5CC">읽고 있는 ${c.name}이 아직 없어요. 바코드로 새 책을 기록해 보세요.</small>`;
+  } else {
+    for (const c of CATS) {
+      if (c.book) {
+        for (const { r, s } of booksOn(day, c.key)) {
+          html += `<div class="day-item link" data-view="${r.id}">
+            ${r.cover ? `<img src="${esc(r.cover)}" alt="">` : `<span>${c.icon}</span>`}
+            <div class="grow"><b>${c.icon} ${esc(r.title)}</b><small>${sessionText(s)}</small></div></div>`;
+        }
+      } else {
+        for (const j of journal.filter((x) => x.day === day && x.cat === c.key)) {
+          const sub = [j.minutes ? `${j.minutes}${c.unit}` : "", j.text || ""].filter(Boolean).join(" · ");
+          html += `<div class="day-item"><span>${c.icon}</span>
+            <div class="grow"><b>${esc(j.what || c.name)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}</div>
+            <button type="button" class="x" data-del="${j.id}" aria-label="지우기">✕</button></div>`;
+        }
+      }
+    }
+    if (!html) html = `<small style="color:#8E8AA3;text-align:center">아직 이 날의 기록이 없어요. 위 카테고리를 눌러 기록해 보세요.</small>`;
+  }
+  $("dayList").innerHTML = html;
+}
+$("dayCats").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-cat]"); if (!b) return;
+  const c = CAT[b.dataset.cat];
+  if (c.book) { dayPanel = dayPanel === c.key ? null : c.key; fillDay(openDayKey); return; }
+  openEntry(c.key);
+});
+$("dayList").addEventListener("click", (e) => {
+  const t = e.target.closest("[data-act],[data-more],[data-view],[data-del]"); if (!t) return;
+  const day = openDayKey;
+  if (t.dataset.del) {
+    if (!confirm("이 기록을 지울까요?")) return;
+    journal = journal.filter((j) => j.id !== t.dataset.del); saveJournal(); render(); return;
+  }
+  // 다른 창을 열기 전에 날짜 화면을 잠시 닫고, 끝나면 다시 돌아옴
+  $("dayDialog").close("away"); returnDay = day;
+  if (t.dataset.act === "scan") { mode = "record"; openScanner(); }
+  else if (t.dataset.act === "isbn") { mode = "record"; openManual(); }
+  else if (t.dataset.more) openMore(records.find((r) => r.id === t.dataset.more));
+  else if (t.dataset.view) openView(t.dataset.view);
+});
+$("dayDialog").addEventListener("close", () => {
+  if ($("dayDialog").returnValue !== "away") { returnDay = null; }
+  openDayKey = null;
+});
+// 다른 창이 모두 닫히면 날짜 화면으로 돌아오기
+function maybeReturn() {
+  setTimeout(() => {
+    if (returnDay && !document.querySelector("dialog[open]") && $("scanner").hidden) openDay(returnDay);
+  }, 60);
+}
+["bookDialog", "moreDialog", "viewDialog", "manualDialog", "entryDialog", "infoDialog"].forEach((id) => $(id).addEventListener("close", maybeReturn));
+
+// 카테고리 기록 입력
+let entryCat = null;
+function openEntry(cat) {
+  const c = CAT[cat]; entryCat = cat;
+  $("eTitle").textContent = `${c.icon} ${c.name} · ${prettyDay(openDayKey)}`;
+  $("eWhatWrap").hidden = !c.what; $("eWhatLabel").textContent = c.what || ""; $("eWhat").placeholder = c.whatPh || ""; $("eWhat").value = "";
+  $("eAmountWrap").hidden = !c.amount; $("eAmountLabel").textContent = c.amount || ""; $("eUnit").textContent = c.unit || ""; $("eAmount").value = "";
+  $("eTextWrap").hidden = false; $("eTextLabel").textContent = c.text || "한 줄 메모 (선택)"; $("eText").placeholder = c.textPh || ""; $("eText").value = "";
+  $("eText").rows = c.text ? 5 : 2;
+  $("dayDialog").close("away"); returnDay = openDayKey || returnDay;
+  $("entryDialog").showModal();
+}
+$("entryDialog").addEventListener("close", () => {
+  if ($("entryDialog").returnValue !== "save" || !entryCat) return;
+  const what = $("eWhat").value.trim(), text = $("eText").value.trim(), minutes = parseInt($("eAmount").value, 10) || null;
+  if (!what && !text && !minutes) { toast("내용을 적어 주세요"); return; }
+  journal.push({ id: crypto.randomUUID?.() || String(Date.now()), day: returnDay || localDay(), cat: entryCat, what, minutes, text });
+  saveJournal(); render();
+  toast(`${CAT[entryCat].icon} ${CAT[entryCat].name} 기록했어요`);
+  entryCat = null;
+});
+
 // 모드에 따라 결과 화면 분기
 const handleIsbn = (isbn, scanInfo) => (mode === "search" ? openInfo(isbn, scanInfo) : openBook(isbn, scanInfo));
 
@@ -364,7 +527,7 @@ async function openScanner() {
       $("zoomWrap").hidden = false;
     } else $("zoomWrap").hidden = true;
   } catch (e) {
-    closeScanner();
+    closeScanner(); maybeReturn();
     toast(e.name === "NotAllowedError" ? "카메라 권한을 허용해 주세요." : "카메라를 열 수 없어요. ISBN을 직접 입력해 주세요.", 3200);
   }
 }
@@ -374,8 +537,8 @@ function closeScanner() {
   $("torchBtn").classList.remove("on");
 }
 
-document.querySelectorAll("[data-scan]").forEach((b) => b.addEventListener("click", () => { mode = b.dataset.scan; openScanner(); }));
-$("closeScan").addEventListener("click", closeScanner);
+document.querySelectorAll("[data-scan]").forEach((b) => b.addEventListener("click", () => { mode = b.dataset.scan; returnDay = null; openScanner(); }));
+$("closeScan").addEventListener("click", () => { closeScanner(); maybeReturn(); });
 $("zoom").addEventListener("input", (e) => scanner.setZoom(Number(e.target.value)));
 $("torchBtn").addEventListener("click", async () => {
   const on = !$("torchBtn").classList.contains("on");
@@ -384,12 +547,12 @@ $("torchBtn").addEventListener("click", async () => {
 document.addEventListener("visibilitychange", () => { if (document.hidden && !$("scanner").hidden) closeScanner(); });
 
 // ---------- 직접 입력 ----------
-document.querySelectorAll("[data-manual]").forEach((b) => b.addEventListener("click", () => {
-  mode = b.dataset.manual;
+function openManual() {
   $("manualTitle").textContent = `${MODE_LABEL[mode]} · ISBN 입력`;
   $("manualIsbn").value = ""; $("manualErr").textContent = "";
   $("manualDialog").showModal();
-}));
+}
+document.querySelectorAll("[data-manual]").forEach((b) => b.addEventListener("click", () => { mode = b.dataset.manual; returnDay = null; openManual(); }));
 $("manualDialog").addEventListener("close", () => {
   if ($("manualDialog").returnValue !== "ok") return;
   const isbn = toIsbn13($("manualIsbn").value);

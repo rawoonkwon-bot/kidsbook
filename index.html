@@ -66,6 +66,18 @@
       <ul class="shelf" id="shelfEn"></ul>
       <p class="empty" id="emptyEn">아직 영어책 기록이 없어요.</p>
     </section>
+
+    <section class="portfolio">
+      <h3>📅 포트폴리오</h3>
+      <div class="cal-head">
+        <button class="cal-nav" id="calPrev" aria-label="이전 달">◀</button>
+        <b id="calTitle"></b>
+        <button class="cal-nav" id="calNext" aria-label="다음 달">▶</button>
+      </div>
+      <div class="cal-week"><span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span></div>
+      <div class="cal-grid" id="calGrid"></div>
+      <p class="cal-legend" id="calLegend"></p>
+    </section>
   </main>
 
   <!-- 스캐너 -->
@@ -180,6 +192,12 @@
         </div>
       </div>
       <div class="progress" id="vProgress"></div>
+      <div class="total-row" id="vTotalRow" hidden>
+        <span>책 전체</span>
+        <input id="vTotal" type="number" inputmode="numeric" min="1" placeholder="?" aria-label="책 전체 쪽수" />
+        <span>쪽</span>
+        <button type="button" class="btn mini" id="vTotalSave">저장</button>
+      </div>
       <div class="sessions">
         <h4>📖 읽은 기록</h4>
         <ol id="vSessions"></ol>
@@ -229,6 +247,42 @@
       <div class="row">
         <button class="btn ghost" value="cancel" formnovalidate>취소</button>
         <button class="btn primary" value="save">기록하기</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 포트폴리오: 날짜를 눌렀을 때 -->
+  <dialog id="dayDialog" class="dark">
+    <form method="dialog" class="sheet">
+      <h2 class="day-title" id="dayTitle"></h2>
+      <p class="day-sub">카테고리</p>
+      <div class="cats" id="dayCats"></div>
+      <div class="day-list" id="dayList"></div>
+      <div class="row">
+        <button class="btn primary" value="close">닫기</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 포트폴리오: 카테고리 기록 입력 -->
+  <dialog id="entryDialog">
+    <form method="dialog" class="sheet">
+      <h3 id="eTitle"></h3>
+      <label class="field" id="eWhatWrap">
+        <span id="eWhatLabel"></span>
+        <input id="eWhat" class="sub-input" />
+      </label>
+      <label class="field" id="eAmountWrap">
+        <span id="eAmountLabel"></span>
+        <div class="pages-row"><input id="eAmount" type="number" inputmode="numeric" min="0" /><span id="eUnit"></span></div>
+      </label>
+      <label class="field" id="eTextWrap">
+        <span id="eTextLabel"></span>
+        <textarea id="eText" rows="4"></textarea>
+      </label>
+      <div class="row">
+        <button class="btn ghost" value="cancel" formnovalidate>취소</button>
+        <button class="btn primary" value="save">저장</button>
       </div>
     </form>
   </dialog>

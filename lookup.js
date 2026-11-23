@@ -5,7 +5,7 @@
 //  3) 요청마다 타임아웃 → 느린 서버 하나 때문에 전체가 멈추지 않음
 import { isbn13to10 } from "./isbn.js";
 
-const CACHE_KEY = "kbc:bookcache:v2";
+const CACHE_KEY = "kbc:bookcache:v3";
 const TIMEOUT_MS = 5000;
 
 function readCache() {
@@ -75,7 +75,7 @@ async function olDescription(isbn, signal) {
   if (!d) throw new Error("no description");
   return { description: cleanOL(d), source: "Open Library", link: `https://openlibrary.org/isbn/${isbn}` };
 }
-const DESC_PRIORITY = ["카카오 책", "Google Books", "Open Library"];
+const DESC_PRIORITY = ["카카오 책", "알라딘", "Google Books", "Open Library"];
 
 // 한글책: 카카오 책 검색 (우리 서버 /api/book 경유, 키 숨김)
 async function fromKakao(isbn, signal) {
@@ -119,7 +119,8 @@ export async function lookupBook(isbn, { needDescription = false } = {}) {
       : await Promise.any(all);
     // 카카오는 쪽수를 안 주므로, 이미 도착한 다른 결과에 쪽수가 있으면 빌려 옴
     if (book && !book.pages) {
-      await sleep(needDescription ? 0 : 300);
+      // 쪽수 정보가 있는 다른 결과를 최대 1.5초 더 기다림
+      await Promise.race([Promise.allSettled(all), sleep(1500)]);
       const withPages = done.find((b) => b.pages);
       if (withPages) book = { ...book, pages: withPages.pages };
     }
