@@ -64,6 +64,19 @@ async function fromGoogleBooks(isbn, signal) {
   };
 }
 
+// 책 소개 보강용: Open Library 판(edition) → 작품(work) 순서로 소개글 찾기
+const cleanOL = (t) => t.split(/\n-{3,}/)[0]
+  .replace(/\(\[source\]\[\d+\]\)/gi, "").replace(/\[([^\]]+)\]\[\d+\]/g, "$1").replace(/\[([^\]]+)\]\([^)]+\)/g, "$1").trim();
+async function olDescription(isbn, signal) {
+  const ed = await fetchJson(`https://openlibrary.org/isbn/${isbn}.json`, signal);
+  let d = ed.description;
+  if (!d && ed.works?.[0]?.key) d = (await fetchJson(`https://openlibrary.org${ed.works[0].key}.json`, signal)).description;
+  d = typeof d === "string" ? d : d?.value;
+  if (!d) throw new Error("no description");
+  return { description: cleanOL(d), source: "Open Library", link: `https://openlibrary.org/isbn/${isbn}` };
+}
+const DESC_PRIORITY = ["카카오 책", "Google Books", "Open Library"];
+
 // 한글책: 카카오 책 검색 (우리 서버 /api/book 경유, 키 숨김)
 async function fromKakao(isbn, signal) {
   const res = await fetch(`/api/book?isbn=${isbn}`, { signal });
@@ -98,15 +111,17 @@ export async function lookupBook(isbn, { needDescription = false } = {}) {
     const others = [fromGoogleBooks(isbn, ctrl.signal), fromOpenLibrary(isbn, ctrl.signal)];
     others.forEach((p) => p.catch(() => {})); // 취소된 요청 경고 방지
     const all = [kakao, ...others];
+    const extra = needDescription ? [olDescription(isbn, ctrl.signal)] : [];
     const done = [];
-    all.forEach((p) => p.then((b) => done.push(b), () => {}));
+    [...all, ...extra].forEach((p) => p.then((b) => done.push(b), () => {}));
     book = isKorean(isbn)
       ? await kakao.catch(() => Promise.any(others))
       : await Promise.any(all);
-    // 책 검색: 먼저 온 결과에 설명이 없으면 다른 곳의 설명을 최대 1.5초 더 기다려 채움
+    // 책 검색: 먼저 온 결과에 설명이 없으면 다른 곳의 설명을 최대 2.5초 더 기다려 채움
     if (needDescription && book && !book.description) {
-      await Promise.race([Promise.allSettled(all), sleep(1500)]);
-      const withDesc = done.find((b) => b.description);
+      await Promise.race([Promise.allSettled([...all, ...extra]), sleep(2500)]);
+      const withDesc = done.filter((b) => b.description)
+        .sort((a, b) => DESC_PRIORITY.indexOf(a.source) - DESC_PRIORITY.indexOf(b.source))[0];
       if (withDesc) book = { ...book, description: withDesc.description, descSource: withDesc.source, link: book.link || withDesc.link };
     }
   } catch { /* 모든 소스에서 못 찾음 */ }
