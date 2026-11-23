@@ -4,7 +4,9 @@ import { toIsbn13 } from "./isbn.js";
 
 const $ = (id) => document.getElementById(id);
 const REC_KEY = "kbc:records:v1";
-const STICKERS = ["🌟", "👍", "😂", "🦄", "❤️"];
+const SCORES = [5, 4, 3, 2, 1];
+const MODE_LABEL = { search: "🔍 책 검색", record: "📚 책 기록" };
+let mode = "record"; // 지금 스캔/입력이 어느 박스에서 시작됐는지
 
 // ---------- 저장소 ----------
 const loadRecords = () => { try { return JSON.parse(localStorage.getItem(REC_KEY)) || []; } catch { return []; } };
@@ -45,7 +47,7 @@ function render() {
   $("shelf").innerHTML = list.map((r) => `
     <li data-id="${r.id}">
       ${r.cover ? `<img class="cover" src="${esc(r.cover)}" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'cover',textContent:'📘'}))">` : `<div class="cover">📘</div>`}
-      ${r.sticker ? `<span class="s">${r.sticker}</span>` : ""}
+      ${r.score ? `<span class="s score-badge">★ ${r.score}</span>` : r.sticker ? `<span class="s">${r.sticker}</span>` : ""}
       <div class="t">${esc(r.title)}</div>
       <div class="a">${esc(r.authors)}</div>
       ${r.note ? `<div class="n">${esc(r.note)}</div>` : ""}
@@ -71,24 +73,26 @@ $("shelf").addEventListener("click", (e) => {
 
 // ---------- 기록 다이얼로그 ----------
 let pending = null;
-let chosenSticker = "";
-$("stickers").innerHTML = STICKERS.map((s) => `<button type="button" role="radio" aria-checked="false" data-s="${s}">${s}</button>`).join("");
-$("stickers").addEventListener("click", (e) => {
+let chosenScore = 0;
+$("scores").innerHTML = SCORES.map((n) => `<button type="button" role="radio" aria-checked="false" data-n="${n}"><b>${n}</b><small>점</small></button>`).join("");
+const paintScores = () => [...$("scores").children].forEach((x) => x.setAttribute("aria-checked", String(Number(x.dataset.n) === chosenScore)));
+$("scores").addEventListener("click", (e) => {
   const b = e.target.closest("button"); if (!b) return;
-  chosenSticker = chosenSticker === b.dataset.s ? "" : b.dataset.s;
-  [...$("stickers").children].forEach((x) => x.setAttribute("aria-checked", String(x.dataset.s === chosenSticker)));
+  const n = Number(b.dataset.n);
+  chosenScore = chosenScore === n ? 0 : n;
+  paintScores();
 });
 
-async function openBook(isbn, scanInfo) {
+async function openBook(isbn, scanInfo, preset) {
   $("bTiming").textContent = "책 정보를 찾는 중…";
   $("bTitle").value = ""; $("bAuthor").value = ""; $("bNote").value = "";
   $("bMeta").textContent = `ISBN ${isbn}`;
   $("bCover").removeAttribute("src");
-  chosenSticker = "";
-  [...$("stickers").children].forEach((x) => x.setAttribute("aria-checked", "false"));
+  chosenScore = 0;
+  paintScores();
   $("bookDialog").showModal();
 
-  const { book, ms, cached } = await lookupBook(isbn);
+  const { book, ms, cached } = preset || await lookupBook(isbn);
   pending = { isbn, book };
   const parts = [];
   if (scanInfo) parts.push(`인식 ${(scanInfo.ms / 1000).toFixed(2)}초 (${scanInfo.engine})`);
@@ -118,15 +122,64 @@ $("bookDialog").addEventListener("close", () => {
     authors: $("bAuthor").value.trim(),
     cover: $("bCover").getAttribute("src") || "",
     note: $("bNote").value.trim(),
-    sticker: chosenSticker,
+    score: chosenScore || null,
     date: new Date().toISOString(),
   });
   saveRecords(records);
   $("monthFilter").value = "all";
   render();
-  toast(chosenSticker ? `${chosenSticker} 칭찬 스티커와 함께 기록했어요!` : "기록했어요!");
+  toast(chosenScore ? `★ ${chosenScore}점으로 책장에 꽂았어요!` : "책장에 꽂았어요!");
   pending = null;
 });
+
+// ---------- 책 검색 결과 ----------
+let infoBook = null;
+async function openInfo(isbn, scanInfo) {
+  $("iTitle").textContent = "책 정보를 찾는 중…";
+  $("iAuthor").textContent = ""; $("iMeta").textContent = `ISBN ${isbn}`;
+  $("iDesc").textContent = ""; $("iTiming").textContent = "";
+  $("iLink").hidden = true; $("iRecord").hidden = true;
+  $("iCover").removeAttribute("src");
+  $("infoDialog").showModal();
+
+  const res = await lookupBook(isbn, { needDescription: true });
+  const { book, ms, cached } = res;
+  infoBook = { isbn, res };
+  const parts = [];
+  if (scanInfo) parts.push(`인식 ${(scanInfo.ms / 1000).toFixed(2)}초`);
+  parts.push(cached ? "조회 캐시 즉시" : `조회 ${(ms / 1000).toFixed(2)}초`);
+  $("iTiming").textContent = parts.join(" · ");
+
+  if (!book) {
+    $("iTitle").textContent = "책 정보를 찾지 못했어요";
+    $("iDesc").textContent = "연결된 도서 정보(카카오 책, Google Books, Open Library)에 이 ISBN이 없어요. 바코드 숫자를 다시 확인해 주세요.";
+    return;
+  }
+  $("iTitle").textContent = book.title;
+  $("iAuthor").textContent = book.authors.join(", ");
+  $("iMeta").textContent = [book.publisher, book.pages && `${book.pages}쪽`, `ISBN ${isbn}`].filter(Boolean).join(" · ");
+  if (book.cover) $("iCover").src = book.cover;
+  $("iDesc").textContent = book.description || "이 책은 연결된 사이트에 소개글이 없어요.";
+  const src = book.descSource || book.source;
+  if (book.link) {
+    $("iLink").href = book.link;
+    $("iLink").textContent = `${book.source}에서 자세히 보기 ↗`;
+    $("iLink").hidden = false;
+  }
+  $("iTiming").textContent += ` · 소개: ${book.description ? src : "없음"}`;
+  $("iRecord").hidden = false;
+  if (records.some((r) => r.isbn === isbn)) $("iTiming").textContent += " · 이미 내 책장에 있어요";
+}
+$("infoDialog").addEventListener("close", () => {
+  if ($("infoDialog").returnValue === "record" && infoBook) {
+    const { isbn, res } = infoBook;
+    openBook(isbn, null, { ...res, cached: true });
+  }
+  infoBook = null;
+});
+
+// 모드에 따라 결과 화면 분기
+const handleIsbn = (isbn, scanInfo) => (mode === "search" ? openInfo(isbn, scanInfo) : openBook(isbn, scanInfo));
 
 // ---------- 스캐너 ----------
 const scanner = new Scanner({
@@ -136,11 +189,12 @@ const scanner = new Scanner({
   onDetect: (info) => {
     beep();
     $("roi").classList.add("hit");
-    setTimeout(() => { closeScanner(); openBook(info.isbn, info); }, 120);
+    setTimeout(() => { closeScanner(); handleIsbn(info.isbn, info); }, 120);
   },
 });
 
 async function openScanner() {
+  $("scanMode").textContent = MODE_LABEL[mode];
   $("scanner").hidden = false;
   $("roi").classList.remove("hit");
   $("scanHint").textContent = "바코드를 네모 안에 맞춰 주세요";
@@ -166,7 +220,7 @@ function closeScanner() {
   $("torchBtn").classList.remove("on");
 }
 
-$("scanBtn").addEventListener("click", openScanner);
+document.querySelectorAll("[data-scan]").forEach((b) => b.addEventListener("click", () => { mode = b.dataset.scan; openScanner(); }));
 $("closeScan").addEventListener("click", closeScanner);
 $("zoom").addEventListener("input", (e) => scanner.setZoom(Number(e.target.value)));
 $("torchBtn").addEventListener("click", async () => {
@@ -176,15 +230,17 @@ $("torchBtn").addEventListener("click", async () => {
 document.addEventListener("visibilitychange", () => { if (document.hidden && !$("scanner").hidden) closeScanner(); });
 
 // ---------- 직접 입력 ----------
-$("manualBtn").addEventListener("click", () => {
+document.querySelectorAll("[data-manual]").forEach((b) => b.addEventListener("click", () => {
+  mode = b.dataset.manual;
+  $("manualTitle").textContent = `${MODE_LABEL[mode]} · ISBN 입력`;
   $("manualIsbn").value = ""; $("manualErr").textContent = "";
   $("manualDialog").showModal();
-});
+}));
 $("manualDialog").addEventListener("close", () => {
   if ($("manualDialog").returnValue !== "ok") return;
   const isbn = toIsbn13($("manualIsbn").value);
   if (!isbn) { toast("올바른 ISBN이 아니에요. 숫자를 다시 확인해 주세요."); return; }
-  openBook(isbn, null);
+  handleIsbn(isbn, null);
 });
 
 // ---------- 시작 ----------

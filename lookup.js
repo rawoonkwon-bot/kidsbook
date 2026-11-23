@@ -5,7 +5,7 @@
 //  3) 요청마다 타임아웃 → 느린 서버 하나 때문에 전체가 멈추지 않음
 import { isbn13to10 } from "./isbn.js";
 
-const CACHE_KEY = "kbc:bookcache:v1";
+const CACHE_KEY = "kbc:bookcache:v2";
 const TIMEOUT_MS = 5000;
 
 function readCache() {
@@ -25,6 +25,8 @@ async function fetchJson(url, signal) {
   return res.json();
 }
 
+const stripTags = (h) => h.replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "").trim();
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const https = (u) => (u ? u.replace(/^http:\/\//, "https://") : "");
 
 async function fromOpenLibrary(isbn, signal) {
@@ -39,6 +41,8 @@ async function fromOpenLibrary(isbn, signal) {
     publisher: b.publishers?.[0]?.name || "",
     pages: b.number_of_pages || null,
     cover: https(b.cover?.medium || b.cover?.large || ""),
+    description: "",
+    link: b.url || "",
     source: "Open Library",
   };
 }
@@ -54,6 +58,8 @@ async function fromGoogleBooks(isbn, signal) {
     publisher: v.publisher || "",
     pages: v.pageCount || null,
     cover: https(v.imageLinks?.thumbnail || v.imageLinks?.smallThumbnail || ""),
+    description: stripTags(v.description || ""),
+    link: https(v.infoLink || ""),
     source: "Google Books",
   };
 }
@@ -70,11 +76,17 @@ async function fromKakao(isbn, signal) {
 // 979-11, 978-89로 시작하면 한국에서 발행된 책
 const isKorean = (isbn) => isbn.startsWith("97911") || isbn.startsWith("97889");
 
-/** @returns {Promise<{book: object|null, ms: number, cached: boolean}>} */
-export async function lookupBook(isbn) {
+/**
+ * @param {string} isbn
+ * @param {{needDescription?: boolean}} opts  책 검색 화면이면 true → 설명이 있는 결과를 조금 더 기다림
+ * @returns {Promise<{book: object|null, ms: number, cached: boolean}>}
+ */
+export async function lookupBook(isbn, { needDescription = false } = {}) {
   const t0 = performance.now();
   const cached = readCache()[isbn];
-  if (cached) return { book: cached, ms: performance.now() - t0, cached: true };
+  if (cached && (!needDescription || cached.description)) {
+    return { book: cached, ms: performance.now() - t0, cached: true };
+  }
 
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
@@ -85,9 +97,18 @@ export async function lookupBook(isbn) {
     const kakao = fromKakao(isbn, ctrl.signal);
     const others = [fromGoogleBooks(isbn, ctrl.signal), fromOpenLibrary(isbn, ctrl.signal)];
     others.forEach((p) => p.catch(() => {})); // 취소된 요청 경고 방지
+    const all = [kakao, ...others];
+    const done = [];
+    all.forEach((p) => p.then((b) => done.push(b), () => {}));
     book = isKorean(isbn)
       ? await kakao.catch(() => Promise.any(others))
-      : await Promise.any([kakao, ...others]);
+      : await Promise.any(all);
+    // 책 검색: 먼저 온 결과에 설명이 없으면 다른 곳의 설명을 최대 1.5초 더 기다려 채움
+    if (needDescription && book && !book.description) {
+      await Promise.race([Promise.allSettled(all), sleep(1500)]);
+      const withDesc = done.find((b) => b.description);
+      if (withDesc) book = { ...book, description: withDesc.description, descSource: withDesc.source, link: book.link || withDesc.link };
+    }
   } catch { /* 모든 소스에서 못 찾음 */ }
   finally {
     clearTimeout(timer);

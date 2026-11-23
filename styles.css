@@ -41,13 +41,20 @@ main { max-width: 720px; margin: 0 auto; padding: 0 18px 40px; }
 .stats { font-size: 13px; color: var(--muted); text-align: right; line-height: 1.35; }
 .stats b { color: var(--accent-dark); font-size: 15px; }
 
-/* hero */
-.hero {
-  margin: 8px 0 26px; padding: 28px 22px 22px; border-radius: 26px;
-  background: var(--accent); color: #fff; text-align: center; box-shadow: var(--shadow);
+/* 책 검색 / 책 기록 박스 */
+.mode-card {
+  margin: 8px 0 16px; padding: 22px 20px 16px; border-radius: 26px; color: #fff;
+  box-shadow: var(--shadow); text-align: center;
 }
-.eyebrow { margin: 0; color: var(--gold); font-weight: 800; font-size: 26px; }
-.hero h2 { margin: 6px 0 20px; font-size: 24px; line-height: 1.35; letter-spacing: -.5px; }
+.mode-card.search { background: #3E7CB1; }
+.mode-card.record { background: var(--accent); margin-bottom: 28px; }
+.mode-head { display: flex; align-items: center; gap: 12px; text-align: left; margin-bottom: 16px; }
+.mode-icon { font-size: 34px; width: 54px; height: 54px; border-radius: 16px; background: rgba(255,255,255,.2); display: flex; align-items: center; justify-content: center; flex: none; }
+.mode-head h2 { margin: 0; font-size: 22px; letter-spacing: -.5px; }
+.mode-head p { margin: 2px 0 0; font-size: 14px; opacity: .9; }
+.mode-card .btn.primary { background: #fff; }
+.mode-card.search .btn.primary { color: #2C5F8A; }
+.mode-card.record .btn.primary { color: var(--accent-dark); }
 
 .btn {
   border: 0; border-radius: 999px; padding: 12px 20px; font: inherit; font-weight: 700;
@@ -55,7 +62,6 @@ main { max-width: 720px; margin: 0 auto; padding: 0 18px 40px; }
 }
 .btn:active { transform: scale(.97); }
 .btn.primary { background: var(--ink); color: #fff; }
-.hero .btn.primary { background: #fff; color: var(--accent-dark); }
 .btn.big { display: block; width: 100%; padding: 16px; font-size: 18px; }
 .btn.ghost { background: transparent; color: inherit; opacity: .9; margin-top: 8px; }
 
@@ -129,12 +135,23 @@ dialog::backdrop { background: rgba(30, 18, 10, .5); }
 .timing { font-size: 12px; color: var(--muted); margin: 0; }
 .field { display: flex; flex-direction: column; gap: 6px; font-size: 14px; font-weight: 600; }
 textarea { resize: vertical; font-weight: 400; }
-.stickers { display: flex; gap: 8px; justify-content: space-between; }
-.stickers button {
-  flex: 1; font-size: 26px; padding: 8px 0; border-radius: 14px; border: 2px solid transparent;
-  background: #FBF4EC; cursor: pointer;
+.scores { display: flex; gap: 8px; }
+.scores button {
+  flex: 1; padding: 10px 0; border-radius: 14px; border: 2px solid transparent; background: #FBF4EC;
+  cursor: pointer; display: flex; flex-direction: column; align-items: center; color: var(--ink); font: inherit;
 }
-.stickers button[aria-checked="true"] { border-color: var(--accent); background: #FFE9D9; }
+.scores b { font-size: 22px; line-height: 1.1; }
+.scores small { font-size: 11px; color: var(--muted); }
+.scores button[aria-checked="true"] { border-color: var(--accent); background: #FFE9D9; }
+.scores button[aria-checked="true"] b { color: var(--accent-dark); }
+.score-badge { font-size: 14px !important; font-weight: 800; background: var(--gold); color: #3a2a00; padding: 3px 8px; border-radius: 999px; }
+
+/* 책 검색 결과 */
+.i-title { font-size: 18px; margin: 0 0 4px; line-height: 1.35; }
+.i-author { margin: 0; font-size: 14px; color: var(--muted); }
+.desc { font-size: 14px; line-height: 1.65; white-space: pre-line; max-height: 38vh; overflow-y: auto; background: #FFFCF8; border: 1px solid #F0E4D7; border-radius: 12px; padding: 12px; }
+.desc:empty { display: none; }
+.src-link { font-size: 13px; color: #2C5F8A; font-weight: 700; text-decoration: none; }
 .row { display: flex; gap: 10px; justify-content: flex-end; }
 .row .btn { margin: 0; }
 .err { color: #D23C3C; font-size: 13px; margin: 0; min-height: 1em; }
