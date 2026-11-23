@@ -1,0 +1,9 @@
+# 키즈북코드 웹 (바코드 독서기록)
+
+책 뒤 ISBN 바코드를 찍으면 책 정보를 찾아 독서기록을 남기는 웹앱.
+
+- 바코드 인식: 네이티브 BarcodeDetector(안드로이드 크롬) / zxing-wasm(아이폰 등), EAN-13 전용 + 가이드 영역만 해석
+- 도서 조회: Google Books · Open Library 동시 요청, 먼저 찾은 결과 사용 + 로컬 캐시
+- 기록은 브라우저(localStorage)에 저장
+
+GitHub main 브랜치에 올리면 Vercel이 자동 배포해요.

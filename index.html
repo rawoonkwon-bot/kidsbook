@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#E8834E" />
+  <title>키즈북코드 · 찍으면 끝! 독서기록</title>
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+  <!-- 도서 조회 서버에 미리 연결해 두어 첫 조회 지연을 줄임 -->
+  <link rel="preconnect" href="https://openlibrary.org" crossorigin />
+  <link rel="preconnect" href="https://www.googleapis.com" crossorigin />
+  <link rel="preconnect" href="https://covers.openlibrary.org" />
+  <!-- 바코드 엔진(WASM)을 페이지 로딩과 동시에 미리 받아 둠 -->
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+  <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/barcode-detector@3.2.4/ponyfill/+esm" crossorigin />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <span class="stripes" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+      <h1>키즈북코드</h1>
+    </div>
+    <div class="stats" id="stats"></div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <p class="eyebrow">찍으면 끝!</p>
+      <h2>책 뒤 바코드 한 번이면<br />독서기록 완성</h2>
+      <button class="btn primary big" id="scanBtn">📷 바코드 찍기</button>
+      <button class="btn ghost" id="manualBtn">ISBN 직접 입력</button>
+    </section>
+
+    <section>
+      <div class="shelf-head">
+        <h3>내 책장</h3>
+        <select id="monthFilter" aria-label="월별 보기"></select>
+      </div>
+      <ul class="shelf" id="shelf"></ul>
+      <p class="empty" id="empty">아직 기록이 없어요. 첫 책을 찍어 볼까요?</p>
+    </section>
+  </main>
+
+  <!-- 스캐너 -->
+  <div class="scanner" id="scanner" hidden>
+    <video id="video" playsinline muted autoplay></video>
+    <div class="mask" aria-hidden="true">
+      <div class="roi" id="roi"><div class="laser"></div></div>
+    </div>
+    <div class="scan-top">
+      <button class="icon" id="closeScan" aria-label="닫기">✕</button>
+      <span class="hint" id="scanHint">바코드를 네모 안에 맞춰 주세요</span>
+      <button class="icon" id="torchBtn" aria-label="플래시" hidden>🔦</button>
+    </div>
+    <div class="scan-bottom">
+      <label class="zoom" id="zoomWrap" hidden>
+        <span>확대</span>
+        <input type="range" id="zoom" min="1" max="3" step="0.1" value="1" />
+      </label>
+      <div class="engine" id="engine"></div>
+    </div>
+  </div>
+
+  <!-- 책 확인 / 기록 -->
+  <dialog id="bookDialog">
+    <form method="dialog" class="sheet" id="bookForm">
+      <div class="book-card">
+        <img id="bCover" alt="" />
+        <div>
+          <input id="bTitle" class="title-input" placeholder="책 제목" required />
+          <input id="bAuthor" class="sub-input" placeholder="지은이" />
+          <p class="meta" id="bMeta"></p>
+        </div>
+      </div>
+      <p class="timing" id="bTiming"></p>
+      <label class="field">
+        <span>한 줄 독후감</span>
+        <textarea id="bNote" rows="2" placeholder="어떤 장면이 제일 재미있었어?"></textarea>
+      </label>
+      <div class="stickers" id="stickers" role="radiogroup" aria-label="칭찬 스티커"></div>
+      <div class="row">
+        <button class="btn ghost" value="cancel" formnovalidate>취소</button>
+        <button class="btn primary" value="save" id="saveBtn">기록하기</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- ISBN 직접 입력 -->
+  <dialog id="manualDialog">
+    <form method="dialog" class="sheet">
+      <h3>ISBN 입력</h3>
+      <input id="manualIsbn" inputmode="numeric" placeholder="978로 시작하는 13자리 또는 10자리" />
+      <p class="err" id="manualErr"></p>
+      <div class="row">
+        <button class="btn ghost" value="cancel" formnovalidate>취소</button>
+        <button class="btn primary" value="ok">찾기</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast" hidden></div>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+{
+  "name": "키즈북코드 · 독서기록",
+  "short_name": "키즈북코드",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FBF4EC",
+  "theme_color": "#E8834E",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
