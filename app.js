@@ -8,14 +8,37 @@ const SCORES = [5, 4, 3, 2, 1];
 const MODE_LABEL = { search: "🔍 책 검색", record: "📚 책 기록" };
 let mode = "record"; // 지금 스캔/입력이 어느 박스에서 시작됐는지
 
+// ---------- 날짜 (한국 시간 기준 YYYY-MM-DD) ----------
+const localDay = (d = new Date()) => {
+  const z = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+  return z.toISOString().slice(0, 10);
+};
+const daysAgo = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return localDay(d); };
+const prettyDay = (day) => {
+  const [y, m, d] = day.split("-").map(Number);
+  const w = "일월화수목금토"[new Date(y, m - 1, d).getDay()];
+  const tag = day === daysAgo(0) ? " (오늘)" : day === daysAgo(1) ? " (어제)" : day === daysAgo(2) ? " (그저께)" : "";
+  return `${m}월 ${d}일 ${w}${tag}`;
+};
+
 // ---------- 저장소 ----------
-const loadRecords = () => { try { return JSON.parse(localStorage.getItem(REC_KEY)) || []; } catch { return []; } };
+// 한 권 = 기록 1개, 여러 날 읽은 내용은 sessions [{from, to, day}] 로 쌓임
+function migrate(r) {
+  if (!r.sessions) {
+    const day = r.date ? localDay(new Date(r.date)) : localDay();
+    r.sessions = (r.pageFrom || r.pageTo) ? [{ from: r.pageFrom || null, to: r.pageTo || null, day }] : [{ from: null, to: null, day }];
+    delete r.pageFrom; delete r.pageTo;
+  }
+  return r;
+}
+const loadRecords = () => { try { return (JSON.parse(localStorage.getItem(REC_KEY)) || []).map(migrate); } catch { return []; } };
 const saveRecords = (r) => localStorage.setItem(REC_KEY, JSON.stringify(r));
 let records = loadRecords();
+saveRecords(records);
 
 // ---------- UI 유틸 ----------
 let toastTimer;
-function toast(msg, ms = 2200) {
+function toast(msg, ms = 2400) {
   const t = $("toast");
   t.textContent = msg; t.hidden = false;
   clearTimeout(toastTimer);
@@ -31,38 +54,67 @@ function beep() {
   } catch { /* 무시 */ }
   navigator.vibrate?.(60);
 }
-const ym = (iso) => iso.slice(0, 7);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+// 날짜 입력 + 오늘/어제/그저께 버튼
+function setupDate(inputId) {
+  const input = $(inputId);
+  const chips = document.querySelector(`.date-chips[data-for="${inputId}"]`);
+  const paint = () => [...chips.children].forEach((b) => b.classList.toggle("on", daysAgo(Number(b.dataset.ago)) === input.value));
+  chips.addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    input.value = daysAgo(Number(b.dataset.ago)); paint();
+  });
+  input.addEventListener("input", paint);
+  return () => { input.max = localDay(); input.value = localDay(); paint(); };
+}
+const resetBDate = setupDate("bDate");
+const resetMDate = setupDate("mDate");
+const pickDay = (id) => $(id).value || localDay();
+
+// ---------- 쪽수 계산 ----------
+const readTo = (r) => Math.max(0, ...r.sessions.map((s) => s.to || 0));
+const sessionText = (s) => (s.from && s.to ? `${s.from}~${s.to}쪽` : s.to ? `~${s.to}쪽` : s.from ? `${s.from}쪽부터` : "쪽수 없음");
+const lastDay = (r) => r.sessions.map((s) => s.day).sort().at(-1);
+function progressText(r) {
+  const to = readTo(r);
+  if (!to) return "";
+  if (r.totalPages) return to >= r.totalPages ? `✅ 다 읽었어요! (${r.totalPages}쪽)` : `${to} / ${r.totalPages}쪽`;
+  return `${to}쪽까지 읽었어요`;
+}
+const pct = (r) => (r.totalPages ? Math.min(100, Math.round((readTo(r) / r.totalPages) * 100)) : 0);
+const parsePages = (fromId, toId) => {
+  let from = parseInt($(fromId).value, 10) || null;
+  let to = parseInt($(toId).value, 10) || null;
+  if (from && to && from > to) [from, to] = [to, from];
+  return { from, to };
+};
 
 // ---------- 책장 ----------
 // 한글책/영어책 구분: 기록할 때 고른 책장, 없으면(예전 기록) 제목에 한글이 있는지로 판단
 const hasHangul = (t) => /[가-힣]/.test(t || "");
 const shelfOf = (r) => r.shelf || (hasHangul(r.title) ? "ko" : "en");
-const pagesText = (r) => {
-  if (r.pageFrom && r.pageTo) return `${r.pageFrom}~${r.pageTo}쪽 (${r.pageTo - r.pageFrom + 1}쪽)`;
-  if (r.pageTo) return `~${r.pageTo}쪽`;
-  if (r.pageFrom) return `${r.pageFrom}쪽부터`;
-  return "";
-};
 const cardHtml = (r) => `
     <li data-id="${r.id}" tabindex="0" role="button" aria-label="${esc(r.title)} 기록 보기">
       ${r.cover ? `<img class="cover" src="${esc(r.cover)}" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'cover',textContent:'📘'}))">` : `<div class="cover">📘</div>`}
       ${r.score ? `<span class="s score-badge">★ ${r.score}</span>` : r.sticker ? `<span class="s">${r.sticker}</span>` : ""}
       <div class="t">${esc(r.title)}</div>
       <div class="a">${esc(r.authors)}</div>
-      ${pagesText(r) ? `<div class="p">📖 ${pagesText(r)}</div>` : ""}
-      <div class="d">${r.date.slice(0, 10).replaceAll("-", ".")}</div>
+      ${progressText(r) ? `<div class="p">📖 ${progressText(r)}</div>` : ""}
+      ${r.totalPages ? `<div class="bar"><i style="width:${pct(r)}%"></i></div>` : ""}
+      <div class="d">${lastDay(r).replaceAll("-", ".")} · ${r.sessions.length}번 읽음</div>
     </li>`;
 
 function render() {
   const filter = $("monthFilter");
-  const months = [...new Set(records.map((r) => ym(r.date)))].sort().reverse();
+  const months = [...new Set(records.flatMap((r) => r.sessions.map((s) => s.day.slice(0, 7))))].sort().reverse();
+  const inMonth = (r, m) => r.sessions.some((s) => s.day.startsWith(m));
   const cur = filter.value || "all";
   filter.innerHTML = `<option value="all">전체 (${records.length})</option>` +
-    months.map((m) => `<option value="${m}">${m.replace("-", "년 ")}월 (${records.filter((r) => ym(r.date) === m).length})</option>`).join("");
+    months.map((m) => `<option value="${m}">${m.replace("-", "년 ")}월 (${records.filter((r) => inMonth(r, m)).length})</option>`).join("");
   filter.value = months.includes(cur) ? cur : "all";
 
-  const list = filter.value === "all" ? records : records.filter((r) => ym(r.date) === filter.value);
+  const list = filter.value === "all" ? records : records.filter((r) => inMonth(r, filter.value));
   for (const [key, suffix] of [["ko", "Ko"], ["en", "En"]]) {
     const items = list.filter((r) => shelfOf(r) === key);
     $("shelf" + suffix).innerHTML = items.map(cardHtml).join("");
@@ -70,13 +122,13 @@ function render() {
     $("empty" + suffix).hidden = items.length > 0;
   }
 
-  const thisMonth = records.filter((r) => ym(r.date) === ym(new Date().toISOString())).length;
+  const thisMonth = records.filter((r) => inMonth(r, localDay().slice(0, 7))).length;
   $("stats").innerHTML = `이번 달 <b>${thisMonth}</b>권<br>모두 <b>${records.length}</b>권`;
 }
 
 $("monthFilter").addEventListener("change", render);
 
-// 책장에서 책 누르면 기록 보기
+// ---------- 책장에서 책 누르면: 기록 보기 ----------
 let viewing = null;
 function openView(id) {
   const r = records.find((x) => x.id === id); if (!r) return;
@@ -84,10 +136,13 @@ function openView(id) {
   if (r.cover) $("vCover").src = r.cover; else $("vCover").removeAttribute("src");
   $("vTitle").textContent = r.title;
   $("vAuthor").textContent = r.authors || "";
-  $("vMeta").textContent = [shelfOf(r) === "ko" ? "🇰🇷 한글책" : "🔤 영어책", r.isbn && `ISBN ${r.isbn}`].filter(Boolean).join(" · ");
-  $("vPages").textContent = pagesText(r) || "적지 않았어요";
+  $("vMeta").textContent = [shelfOf(r) === "ko" ? "🇰🇷 한글책" : "🔤 영어책", r.totalPages && `전체 ${r.totalPages}쪽`, r.isbn && `ISBN ${r.isbn}`].filter(Boolean).join(" · ");
+  $("vProgress").innerHTML = progressText(r)
+    ? `<b>${esc(progressText(r))}</b>${r.totalPages ? `<div class="bar"><i style="width:${pct(r)}%"></i></div>` : ""}` : "";
+  $("vSessions").innerHTML = [...r.sessions].sort((a, b) => a.day.localeCompare(b.day))
+    .map((s) => `<li><span>${prettyDay(s.day)}</span><b>${sessionText(s)}</b></li>`).join("");
+  $("vMore").hidden = !!(r.totalPages && readTo(r) >= r.totalPages);
   $("vScore").textContent = r.score ? `${"★".repeat(r.score)}${"☆".repeat(5 - r.score)}  ${r.score}점` : (r.sticker || "주지 않았어요");
-  $("vDate").textContent = new Date(r.date).toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric", weekday: "short" });
   $("vNote").textContent = r.note || "적지 않았어요";
   $("viewDialog").showModal();
 }
@@ -96,15 +151,41 @@ for (const id of ["shelfKo", "shelfEn"]) {
   $(id).addEventListener("keydown", (e) => { if (e.key === "Enter") { const li = e.target.closest("li[data-id]"); if (li) openView(li.dataset.id); } });
 }
 $("viewDialog").addEventListener("close", () => {
-  if ($("viewDialog").returnValue === "delete" && viewing && confirm(`'${viewing.title}' 기록을 지울까요?`)) {
-    records = records.filter((r) => r.id !== viewing.id);
+  const v = $("viewDialog").returnValue;
+  const r = viewing; viewing = null;
+  if (!r) return;
+  if (v === "more") openMore(r);
+  else if (v === "delete" && confirm(`'${r.title}' 기록을 모두 지울까요?`)) {
+    records = records.filter((x) => x.id !== r.id);
     saveRecords(records); render();
     toast("기록을 지웠어요");
   }
-  viewing = null;
 });
 
-// ---------- 기록 다이얼로그 ----------
+// ---------- 이어서 기록하기 (쪽수 + 날짜만) ----------
+let moreTarget = null;
+function openMore(r) {
+  moreTarget = r;
+  if (r.cover) $("mCover").src = r.cover; else $("mCover").removeAttribute("src");
+  $("mTitle").textContent = r.title;
+  const to = readTo(r);
+  $("mSoFar").textContent = to ? `지난번까지 ${to}쪽 읽었어요${r.totalPages ? ` · 전체 ${r.totalPages}쪽` : ""}` : "이어서 읽은 쪽수를 적어 주세요";
+  $("mPageFrom").value = to ? to + 1 : 1;
+  $("mPageTo").value = r.totalPages && r.totalPages > to ? r.totalPages : "";
+  resetMDate();
+  $("moreDialog").showModal();
+}
+$("moreDialog").addEventListener("close", () => {
+  const r = moreTarget; moreTarget = null;
+  if ($("moreDialog").returnValue !== "save" || !r) return;
+  const { from, to } = parsePages("mPageFrom", "mPageTo");
+  r.sessions.push({ from, to, day: pickDay("mDate") });
+  records = [r, ...records.filter((x) => x.id !== r.id)]; // 최근 읽은 책이 앞으로
+  saveRecords(records); render();
+  toast(r.totalPages && readTo(r) >= r.totalPages ? `🎉 '${r.title}' 다 읽었어요!` : `📖 ${sessionText({ from, to })} 추가했어요`);
+});
+
+// ---------- 새 책 기록 ----------
 let pending = null;
 let chosenScore = 0;
 let chosenShelf = "ko";
@@ -123,9 +204,18 @@ $("scores").addEventListener("click", (e) => {
 });
 
 async function openBook(isbn, scanInfo, preset) {
+  // 이미 책장에 있는 책이면 '이어서 기록하기'로
+  const existing = records.find((r) => r.isbn === isbn);
+  if (existing) {
+    toast("이미 책장에 있는 책이에요. 이어서 기록할게요!");
+    openMore(existing);
+    return;
+  }
   $("bTiming").textContent = "책 정보를 찾는 중…";
   $("bTitle").value = ""; $("bAuthor").value = ""; $("bNote").value = "";
-  $("bPageFrom").value = ""; $("bPageTo").value = "";
+  $("bPageFrom").value = 1; $("bPageTo").value = ""; $("bTotal").value = "";
+  $("bTotalHint").textContent = "(책 마지막 쪽 번호)";
+  resetBDate();
   chosenShelf = isbn.startsWith("97911") || isbn.startsWith("97889") ? "ko" : "en";
   paintShelf();
   $("bMeta").textContent = `ISBN ${isbn}`;
@@ -146,6 +236,11 @@ async function openBook(isbn, scanInfo, preset) {
     $("bAuthor").value = book.authors.join(", ");
     $("bMeta").textContent = [book.publisher, book.pages && `${book.pages}쪽`, `ISBN ${isbn}`].filter(Boolean).join(" · ");
     if (book.cover) $("bCover").src = book.cover;
+    // 쪽수 기본값: 1 ~ 책의 마지막 쪽
+    if (book.pages) {
+      $("bTotal").value = book.pages; $("bPageTo").value = book.pages;
+      $("bTotalHint").textContent = "(자동으로 채웠어요)";
+    }
     // 제목에 한글이 있으면 한글책, 없으면 영어책 (기록 전에 직접 바꿀 수 있음)
     chosenShelf = hasHangul(book.title) ? "ko" : "en";
     paintShelf();
@@ -153,16 +248,21 @@ async function openBook(isbn, scanInfo, preset) {
     $("bTiming").textContent += " · 책 정보를 찾지 못했어요. 제목을 직접 적어 주세요.";
     $("bTitle").focus();
   }
-  if (records.some((r) => r.isbn === isbn)) toast("이미 책장에 있는 책이에요. 또 읽었나요? 👏");
 }
+
+// 전체 쪽수를 적으면 '~ 마지막 쪽' 칸도 같이 채움
+$("bTotal").addEventListener("input", () => {
+  const t = parseInt($("bTotal").value, 10);
+  if (t && (!$("bPageTo").value || $("bPageTo").dataset.auto === "1")) { $("bPageTo").value = t; $("bPageTo").dataset.auto = "1"; }
+});
+$("bPageTo").addEventListener("input", () => { $("bPageTo").dataset.auto = ""; });
 
 $("bookDialog").addEventListener("close", () => {
   if ($("bookDialog").returnValue !== "save" || !pending) return;
   const title = $("bTitle").value.trim();
   if (!title) return;
-  let from = parseInt($("bPageFrom").value, 10) || null;
-  let to = parseInt($("bPageTo").value, 10) || null;
-  if (from && to && from > to) [from, to] = [to, from];
+  const { from, to } = parsePages("bPageFrom", "bPageTo");
+  const day = pickDay("bDate");
   records.unshift({
     id: crypto.randomUUID?.() || String(Date.now()),
     isbn: pending.isbn,
@@ -171,9 +271,9 @@ $("bookDialog").addEventListener("close", () => {
     cover: $("bCover").getAttribute("src") || "",
     note: $("bNote").value.trim(),
     score: chosenScore || null,
-    pageFrom: from,
-    pageTo: to,
     shelf: chosenShelf,
+    totalPages: parseInt($("bTotal").value, 10) || null,
+    sessions: [{ from, to, day }],
     date: new Date().toISOString(),
   });
   saveRecords(records);
@@ -219,8 +319,10 @@ async function openInfo(isbn, scanInfo) {
     $("iLink").hidden = false;
   }
   $("iTiming").textContent += ` · 소개: ${book.description ? src : "없음"}`;
+  const mine = records.find((r) => r.isbn === isbn);
+  $("iRecord").textContent = mine ? "이어서 기록하기" : "이 책 기록하기";
   $("iRecord").hidden = false;
-  if (records.some((r) => r.isbn === isbn)) $("iTiming").textContent += " · 이미 내 책장에 있어요";
+  if (mine) $("iTiming").textContent += " · 이미 내 책장에 있어요";
 }
 $("infoDialog").addEventListener("close", () => {
   if ($("infoDialog").returnValue === "record" && infoBook) {

@@ -122,12 +122,28 @@
       </div>
       <p class="timing" id="bTiming"></p>
       <div class="field">
+        <span>읽은 날</span>
+        <div class="date-row">
+          <input id="bDate" type="date" aria-label="읽은 날짜" />
+          <div class="date-chips" data-for="bDate">
+            <button type="button" data-ago="0">오늘</button>
+            <button type="button" data-ago="1">어제</button>
+            <button type="button" data-ago="2">그저께</button>
+          </div>
+        </div>
+      </div>
+      <div class="field">
         <span>읽은 쪽수</span>
         <div class="pages-row">
           <input id="bPageFrom" type="number" inputmode="numeric" min="1" placeholder="1" aria-label="시작 쪽" />
           <span>~</span>
-          <input id="bPageTo" type="number" inputmode="numeric" min="1" placeholder="10" aria-label="끝 쪽" />
+          <input id="bPageTo" type="number" inputmode="numeric" min="1" placeholder="마지막 쪽" aria-label="끝 쪽" />
           <span>쪽</span>
+        </div>
+        <div class="total-row">
+          <span>책 전체</span>
+          <input id="bTotal" type="number" inputmode="numeric" min="1" placeholder="?" aria-label="책 전체 쪽수" />
+          <span>쪽 <small class="hint-sm" id="bTotalHint">(책 마지막 쪽 번호)</small></span>
         </div>
       </div>
       <div class="field">
@@ -163,15 +179,56 @@
           <p class="meta" id="vMeta"></p>
         </div>
       </div>
+      <div class="progress" id="vProgress"></div>
+      <div class="sessions">
+        <h4>📖 읽은 기록</h4>
+        <ol id="vSessions"></ol>
+      </div>
+      <button class="btn more" value="more" id="vMore">➕ 이어서 기록하기</button>
       <dl class="rec-info">
-        <dt>읽은 쪽수</dt><dd id="vPages"></dd>
         <dt>점수</dt><dd id="vScore"></dd>
-        <dt>기록한 날</dt><dd id="vDate"></dd>
         <dt>한 줄 독후감</dt><dd id="vNote"></dd>
       </dl>
       <div class="row spread">
         <button class="btn danger" value="delete" formnovalidate>삭제</button>
-        <button class="btn primary" value="close">닫기</button>
+        <button class="btn ghost" value="close">닫기</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 이어서 기록하기 (쪽수 + 날짜만) -->
+  <dialog id="moreDialog">
+    <form method="dialog" class="sheet">
+      <div class="mini-head">
+        <img id="mCover" alt="" />
+        <div>
+          <h3 id="mTitle"></h3>
+          <p class="meta" id="mSoFar"></p>
+        </div>
+      </div>
+      <div class="field">
+        <span>읽은 날</span>
+        <div class="date-row">
+          <input id="mDate" type="date" aria-label="읽은 날짜" />
+          <div class="date-chips" data-for="mDate">
+            <button type="button" data-ago="0">오늘</button>
+            <button type="button" data-ago="1">어제</button>
+            <button type="button" data-ago="2">그저께</button>
+          </div>
+        </div>
+      </div>
+      <div class="field">
+        <span>오늘 읽은 쪽수</span>
+        <div class="pages-row">
+          <input id="mPageFrom" type="number" inputmode="numeric" min="1" aria-label="시작 쪽" />
+          <span>~</span>
+          <input id="mPageTo" type="number" inputmode="numeric" min="1" placeholder="마지막 쪽" aria-label="끝 쪽" />
+          <span>쪽</span>
+        </div>
+      </div>
+      <div class="row">
+        <button class="btn ghost" value="cancel" formnovalidate>취소</button>
+        <button class="btn primary" value="save">기록하기</button>
       </div>
     </form>
   </dialog>

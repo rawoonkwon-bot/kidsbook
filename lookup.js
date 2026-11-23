@@ -117,6 +117,12 @@ export async function lookupBook(isbn, { needDescription = false } = {}) {
     book = isKorean(isbn)
       ? await kakao.catch(() => Promise.any(others))
       : await Promise.any(all);
+    // 카카오는 쪽수를 안 주므로, 이미 도착한 다른 결과에 쪽수가 있으면 빌려 옴
+    if (book && !book.pages) {
+      await sleep(needDescription ? 0 : 300);
+      const withPages = done.find((b) => b.pages);
+      if (withPages) book = { ...book, pages: withPages.pages };
+    }
     // 책 검색: 먼저 온 결과에 설명이 없으면 다른 곳의 설명을 최대 2.5초 더 기다려 채움
     if (needDescription && book && !book.description) {
       await Promise.race([Promise.allSettled([...all, ...extra]), sleep(2500)]);

@@ -169,6 +169,28 @@ textarea { resize: vertical; font-weight: 400; }
 .rec-info dd { margin: 0; white-space: pre-line; }
 .btn.danger { background: #FDECEC; color: #C23B3B; }
 .row.spread { justify-content: space-between; }
+.date-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-weight: 400; }
+.date-row input[type="date"] { font: inherit; font-size: 16px; border: 1px solid #E6D8CB; border-radius: 10px; padding: 7px 10px; background: #FFFCF8; color: var(--ink); }
+.date-chips { display: flex; gap: 6px; }
+.date-chips button { font: inherit; font-size: 13px; font-weight: 700; padding: 7px 10px; border-radius: 999px; border: 1px solid #E6D8CB; background: #fff; color: var(--muted); cursor: pointer; }
+.date-chips button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.total-row { display: flex; align-items: center; gap: 8px; font-weight: 400; font-size: 14px; color: var(--muted); }
+.total-row input { width: 80px; font: inherit; text-align: center; border: 1px dashed #D9C6B3; border-radius: 10px; padding: 6px; background: #fff; color: var(--ink); }
+.hint-sm { font-weight: 400; color: var(--muted); font-size: 12px; }
+.progress { font-size: 14px; }
+.progress:empty { display: none; }
+.bar { height: 10px; background: #F1E6DA; border-radius: 999px; overflow: hidden; margin-top: 6px; }
+.bar i { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
+.sessions h4 { margin: 0 0 6px; font-size: 14px; }
+.sessions ol { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; max-height: 30vh; overflow-y: auto; }
+.sessions li { display: flex; justify-content: space-between; font-size: 14px; background: #FFFCF8; border: 1px solid #F0E4D7; border-radius: 10px; padding: 8px 10px; }
+.sessions li span:first-child { color: var(--muted); }
+.sessions li b { color: var(--accent-dark); }
+.btn.more { background: #FFE9D9; color: var(--accent-dark); width: 100%; }
+.mini-head { display: grid; grid-template-columns: 56px 1fr; gap: 12px; align-items: center; }
+.mini-head img { width: 56px; aspect-ratio: 2/3; object-fit: cover; border-radius: 8px; background: #F1E6DA; }
+.mini-head h3 { font-size: 16px; margin: 0; }
+.shelf .bar { height: 6px; margin-top: 0; }
 .row { display: flex; gap: 10px; justify-content: flex-end; }
 .row .btn { margin: 0; }
 .err { color: #D23C3C; font-size: 13px; margin: 0; min-height: 1em; }
