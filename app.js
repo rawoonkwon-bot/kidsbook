@@ -35,6 +35,25 @@ const ym = (iso) => iso.slice(0, 7);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
 // ---------- 책장 ----------
+// 한글책/영어책 구분: 기록할 때 고른 책장, 없으면(예전 기록) 제목에 한글이 있는지로 판단
+const hasHangul = (t) => /[가-힣]/.test(t || "");
+const shelfOf = (r) => r.shelf || (hasHangul(r.title) ? "ko" : "en");
+const pagesText = (r) => {
+  if (r.pageFrom && r.pageTo) return `${r.pageFrom}~${r.pageTo}쪽 (${r.pageTo - r.pageFrom + 1}쪽)`;
+  if (r.pageTo) return `~${r.pageTo}쪽`;
+  if (r.pageFrom) return `${r.pageFrom}쪽부터`;
+  return "";
+};
+const cardHtml = (r) => `
+    <li data-id="${r.id}" tabindex="0" role="button" aria-label="${esc(r.title)} 기록 보기">
+      ${r.cover ? `<img class="cover" src="${esc(r.cover)}" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'cover',textContent:'📘'}))">` : `<div class="cover">📘</div>`}
+      ${r.score ? `<span class="s score-badge">★ ${r.score}</span>` : r.sticker ? `<span class="s">${r.sticker}</span>` : ""}
+      <div class="t">${esc(r.title)}</div>
+      <div class="a">${esc(r.authors)}</div>
+      ${pagesText(r) ? `<div class="p">📖 ${pagesText(r)}</div>` : ""}
+      <div class="d">${r.date.slice(0, 10).replaceAll("-", ".")}</div>
+    </li>`;
+
 function render() {
   const filter = $("monthFilter");
   const months = [...new Set(records.map((r) => ym(r.date)))].sort().reverse();
@@ -44,36 +63,56 @@ function render() {
   filter.value = months.includes(cur) ? cur : "all";
 
   const list = filter.value === "all" ? records : records.filter((r) => ym(r.date) === filter.value);
-  $("shelf").innerHTML = list.map((r) => `
-    <li data-id="${r.id}">
-      ${r.cover ? `<img class="cover" src="${esc(r.cover)}" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'cover',textContent:'📘'}))">` : `<div class="cover">📘</div>`}
-      ${r.score ? `<span class="s score-badge">★ ${r.score}</span>` : r.sticker ? `<span class="s">${r.sticker}</span>` : ""}
-      <div class="t">${esc(r.title)}</div>
-      <div class="a">${esc(r.authors)}</div>
-      ${r.note ? `<div class="n">${esc(r.note)}</div>` : ""}
-      <div class="d">${r.date.slice(0, 10).replaceAll("-", ".")}</div>
-      <button class="del" data-del="${r.id}">삭제</button>
-    </li>`).join("");
-  $("empty").hidden = records.length > 0;
+  for (const [key, suffix] of [["ko", "Ko"], ["en", "En"]]) {
+    const items = list.filter((r) => shelfOf(r) === key);
+    $("shelf" + suffix).innerHTML = items.map(cardHtml).join("");
+    $("count" + suffix).textContent = `${items.length}권`;
+    $("empty" + suffix).hidden = items.length > 0;
+  }
 
   const thisMonth = records.filter((r) => ym(r.date) === ym(new Date().toISOString())).length;
   $("stats").innerHTML = `이번 달 <b>${thisMonth}</b>권<br>모두 <b>${records.length}</b>권`;
 }
 
 $("monthFilter").addEventListener("change", render);
-$("shelf").addEventListener("click", (e) => {
-  const id = e.target.dataset?.del;
-  if (!id) return;
-  const rec = records.find((r) => r.id === id);
-  if (rec && confirm(`'${rec.title}' 기록을 지울까요?`)) {
-    records = records.filter((r) => r.id !== id);
+
+// 책장에서 책 누르면 기록 보기
+let viewing = null;
+function openView(id) {
+  const r = records.find((x) => x.id === id); if (!r) return;
+  viewing = r;
+  if (r.cover) $("vCover").src = r.cover; else $("vCover").removeAttribute("src");
+  $("vTitle").textContent = r.title;
+  $("vAuthor").textContent = r.authors || "";
+  $("vMeta").textContent = [shelfOf(r) === "ko" ? "🇰🇷 한글책" : "🔤 영어책", r.isbn && `ISBN ${r.isbn}`].filter(Boolean).join(" · ");
+  $("vPages").textContent = pagesText(r) || "적지 않았어요";
+  $("vScore").textContent = r.score ? `${"★".repeat(r.score)}${"☆".repeat(5 - r.score)}  ${r.score}점` : (r.sticker || "주지 않았어요");
+  $("vDate").textContent = new Date(r.date).toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric", weekday: "short" });
+  $("vNote").textContent = r.note || "적지 않았어요";
+  $("viewDialog").showModal();
+}
+for (const id of ["shelfKo", "shelfEn"]) {
+  $(id).addEventListener("click", (e) => { const li = e.target.closest("li[data-id]"); if (li) openView(li.dataset.id); });
+  $(id).addEventListener("keydown", (e) => { if (e.key === "Enter") { const li = e.target.closest("li[data-id]"); if (li) openView(li.dataset.id); } });
+}
+$("viewDialog").addEventListener("close", () => {
+  if ($("viewDialog").returnValue === "delete" && viewing && confirm(`'${viewing.title}' 기록을 지울까요?`)) {
+    records = records.filter((r) => r.id !== viewing.id);
     saveRecords(records); render();
+    toast("기록을 지웠어요");
   }
+  viewing = null;
 });
 
 // ---------- 기록 다이얼로그 ----------
 let pending = null;
 let chosenScore = 0;
+let chosenShelf = "ko";
+const paintShelf = () => [...$("shelfPick").children].forEach((x) => x.setAttribute("aria-checked", String(x.dataset.shelf === chosenShelf)));
+$("shelfPick").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  chosenShelf = b.dataset.shelf; paintShelf();
+});
 $("scores").innerHTML = SCORES.map((n) => `<button type="button" role="radio" aria-checked="false" data-n="${n}"><b>${n}</b><small>점</small></button>`).join("");
 const paintScores = () => [...$("scores").children].forEach((x) => x.setAttribute("aria-checked", String(Number(x.dataset.n) === chosenScore)));
 $("scores").addEventListener("click", (e) => {
@@ -86,6 +125,9 @@ $("scores").addEventListener("click", (e) => {
 async function openBook(isbn, scanInfo, preset) {
   $("bTiming").textContent = "책 정보를 찾는 중…";
   $("bTitle").value = ""; $("bAuthor").value = ""; $("bNote").value = "";
+  $("bPageFrom").value = ""; $("bPageTo").value = "";
+  chosenShelf = isbn.startsWith("97911") || isbn.startsWith("97889") ? "ko" : "en";
+  paintShelf();
   $("bMeta").textContent = `ISBN ${isbn}`;
   $("bCover").removeAttribute("src");
   chosenScore = 0;
@@ -104,6 +146,9 @@ async function openBook(isbn, scanInfo, preset) {
     $("bAuthor").value = book.authors.join(", ");
     $("bMeta").textContent = [book.publisher, book.pages && `${book.pages}쪽`, `ISBN ${isbn}`].filter(Boolean).join(" · ");
     if (book.cover) $("bCover").src = book.cover;
+    // 제목에 한글이 있으면 한글책, 없으면 영어책 (기록 전에 직접 바꿀 수 있음)
+    chosenShelf = hasHangul(book.title) ? "ko" : "en";
+    paintShelf();
   } else {
     $("bTiming").textContent += " · 책 정보를 찾지 못했어요. 제목을 직접 적어 주세요.";
     $("bTitle").focus();
@@ -115,6 +160,9 @@ $("bookDialog").addEventListener("close", () => {
   if ($("bookDialog").returnValue !== "save" || !pending) return;
   const title = $("bTitle").value.trim();
   if (!title) return;
+  let from = parseInt($("bPageFrom").value, 10) || null;
+  let to = parseInt($("bPageTo").value, 10) || null;
+  if (from && to && from > to) [from, to] = [to, from];
   records.unshift({
     id: crypto.randomUUID?.() || String(Date.now()),
     isbn: pending.isbn,
@@ -123,12 +171,16 @@ $("bookDialog").addEventListener("close", () => {
     cover: $("bCover").getAttribute("src") || "",
     note: $("bNote").value.trim(),
     score: chosenScore || null,
+    pageFrom: from,
+    pageTo: to,
+    shelf: chosenShelf,
     date: new Date().toISOString(),
   });
   saveRecords(records);
   $("monthFilter").value = "all";
   render();
-  toast(chosenScore ? `★ ${chosenScore}점으로 책장에 꽂았어요!` : "책장에 꽂았어요!");
+  const shelfName = chosenShelf === "ko" ? "한글책" : "영어책";
+  toast(chosenScore ? `★ ${chosenScore}점으로 ${shelfName} 책장에 꽂았어요!` : `${shelfName} 책장에 꽂았어요!`);
   pending = null;
 });
 

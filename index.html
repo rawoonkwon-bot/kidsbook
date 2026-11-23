@@ -50,13 +50,21 @@
       <button class="btn ghost" data-manual="record">ISBN 직접 입력</button>
     </section>
 
-    <section>
-      <div class="shelf-head">
-        <h3>내 책장</h3>
-        <select id="monthFilter" aria-label="월별 보기"></select>
-      </div>
-      <ul class="shelf" id="shelf"></ul>
-      <p class="empty" id="empty">아직 기록이 없어요. 첫 책을 찍어 볼까요?</p>
+    <div class="shelf-head">
+      <h3>내 책장</h3>
+      <select id="monthFilter" aria-label="월별 보기"></select>
+    </div>
+
+    <section class="shelf-sec">
+      <h4 class="shelf-title ko">🇰🇷 한글책 <span id="countKo"></span></h4>
+      <ul class="shelf" id="shelfKo"></ul>
+      <p class="empty" id="emptyKo">아직 한글책 기록이 없어요.</p>
+    </section>
+
+    <section class="shelf-sec">
+      <h4 class="shelf-title en">🔤 영어책 <span id="countEn"></span></h4>
+      <ul class="shelf" id="shelfEn"></ul>
+      <p class="empty" id="emptyEn">아직 영어책 기록이 없어요.</p>
     </section>
   </main>
 
@@ -113,6 +121,22 @@
         </div>
       </div>
       <p class="timing" id="bTiming"></p>
+      <div class="field">
+        <span>읽은 쪽수</span>
+        <div class="pages-row">
+          <input id="bPageFrom" type="number" inputmode="numeric" min="1" placeholder="1" aria-label="시작 쪽" />
+          <span>~</span>
+          <input id="bPageTo" type="number" inputmode="numeric" min="1" placeholder="10" aria-label="끝 쪽" />
+          <span>쪽</span>
+        </div>
+      </div>
+      <div class="field">
+        <span>어느 책장에 꽂을까요?</span>
+        <div class="seg" id="shelfPick" role="radiogroup" aria-label="책장">
+          <button type="button" role="radio" data-shelf="ko">🇰🇷 한글책</button>
+          <button type="button" role="radio" data-shelf="en">🔤 영어책</button>
+        </div>
+      </div>
       <label class="field">
         <span>한 줄 독후감</span>
         <textarea id="bNote" rows="2" placeholder="어떤 장면이 제일 재미있었어?"></textarea>
@@ -124,6 +148,30 @@
       <div class="row">
         <button class="btn ghost" value="cancel" formnovalidate>취소</button>
         <button class="btn primary" value="save" id="saveBtn">기록하기</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 책장에서 책 눌렀을 때: 기록 보기 -->
+  <dialog id="viewDialog">
+    <form method="dialog" class="sheet">
+      <div class="book-card">
+        <img id="vCover" alt="" />
+        <div>
+          <h3 class="i-title" id="vTitle"></h3>
+          <p class="i-author" id="vAuthor"></p>
+          <p class="meta" id="vMeta"></p>
+        </div>
+      </div>
+      <dl class="rec-info">
+        <dt>읽은 쪽수</dt><dd id="vPages"></dd>
+        <dt>점수</dt><dd id="vScore"></dd>
+        <dt>기록한 날</dt><dd id="vDate"></dd>
+        <dt>한 줄 독후감</dt><dd id="vNote"></dd>
+      </dl>
+      <div class="row spread">
+        <button class="btn danger" value="delete" formnovalidate>삭제</button>
+        <button class="btn primary" value="close">닫기</button>
       </div>
     </form>
   </dialog>
