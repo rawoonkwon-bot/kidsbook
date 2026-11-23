@@ -9,5 +9,6 @@
 
 ## 설정
 Vercel 환경변수 `KAKAO_REST_KEY`에 카카오 REST API 키를 넣어야 한글책 조회가 동작해요.
+환경변수를 바꾼 뒤에는 다시 배포해야 적용돼요.
 
 GitHub main 브랜치에 올리면 Vercel이 자동 배포해요.
