@@ -397,6 +397,13 @@ $("manualDialog").addEventListener("close", () => {
   handleIsbn(isbn, null);
 });
 
+// 키보드 Enter(이동)를 누르면 '취소'가 아니라 '찾기/기록하기'가 눌리도록:
+// 취소·닫기 버튼은 제출 버튼에서 빼고 직접 창을 닫게 함
+document.querySelectorAll('dialog button[value="cancel"], dialog button[value="close"]').forEach((b) => {
+  b.type = "button";
+  b.addEventListener("click", () => b.closest("dialog").close(b.value));
+});
+
 // ---------- 시작 ----------
 render();
 warmUpDetector(); // 엔진 미리 준비
