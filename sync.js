@@ -49,7 +49,7 @@ function mergeData(base, extra) {
   }
   if (out.cats && extra.cats) for (const c of extra.cats) if (!out.cats.some((x) => x.key === c.key)) out.cats.push({ ...c });
   const kidOf = (id) => (id && kidMap[id]) || id;
-  const sKey = (s) => `${s.day}|${s.from ?? ""}|${s.to ?? ""}`;
+  const sKey = (s) => `${s.day}|${s.from ?? ""}|${s.to ?? ""}|${s.round || 1}`;
   for (const r of extra.records || []) {
     const kid = kidOf(r.kid);
     const same = out.records.find((x) => x.id === r.id) || out.records.find((x) => x.isbn && x.isbn === r.isbn && x.kid === kid);
@@ -57,7 +57,10 @@ function mergeData(base, extra) {
     const have = new Set(same.sessions.map(sKey));
     for (const s of r.sessions || []) if (!have.has(sKey(s))) same.sessions.push(s);
     for (const f of ["totalPages", "score", "note", "bonus", "category", "cover", "description"]) if (!same[f] && r[f]) same[f] = r[f];
-    if (r.done && !same.done) { same.done = true; same.doneAt = r.doneAt; same.doneDay = r.doneDay; }
+    for (const f of r.finishes || []) if (!(same.finishes || []).some((x) => x.round === f.round)) same.finishes = [...(same.finishes || []), f];
+    if (r.bonusRounds) same.bonusRounds = [...new Set([...(same.bonusRounds || []), ...r.bonusRounds])];
+    if ((r.round || 1) > (same.round || 1)) { same.round = r.round; same.done = !!r.done; same.doneAt = r.doneAt; same.doneDay = r.doneDay; }
+    else if (r.done && !same.done && (r.round || 1) === (same.round || 1)) { same.done = true; same.doneAt = r.doneAt; same.doneDay = r.doneDay; }
   }
   for (const j of extra.journal || []) if (!out.journal.some((x) => x.id === j.id)) out.journal.push({ ...j, kid: kidOf(j.kid) });
   return out;

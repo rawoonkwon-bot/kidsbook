@@ -575,3 +575,13 @@ body.peek #dayCats, body.peek .day-sub, body.peek .day-actions, body.peek .day-i
 .pv-nav { position: absolute; bottom: calc(env(safe-area-inset-bottom) + 18px); left: 0; right: 0; display: flex; justify-content: center; align-items: center; gap: 24px; color: #fff; font-size: 15px; }
 .pv-nav button { width: 44px; height: 44px; border-radius: 50%; border: 0; background: rgba(255,255,255,.18); color: #fff; font-size: 26px; cursor: pointer; }
 .day-item .grow small { white-space: pre-line; }
+
+/* 다시 읽기: 읽은 횟수 막대 */
+.shelf li { position: relative; }
+.tally-wrap { position: absolute; left: 4px; bottom: 8px; background: rgba(251, 249, 244, .94); border-radius: 999px; padding: 1px 5px; display: flex; box-shadow: 0 1px 3px rgba(0,0,0,.18); }
+.tally { display: block; }
+.v-times { display: flex; align-items: center; gap: 8px; margin: 6px 0 2px; font-size: 14px; font-weight: 700; color: var(--forest); }
+.v-times:empty { display: none; }
+.v-times .tally { height: 20px; width: auto; }
+.sessions li.round-h { display: flex; justify-content: space-between; gap: 8px; background: var(--sage-l); border-radius: 10px; padding: 6px 10px; margin-top: 8px; font-size: 13px; color: var(--forest-d); list-style: none; }
+.s-mine.link { cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }

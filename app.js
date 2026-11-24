@@ -48,11 +48,18 @@ const prettyDay = (day) => {
   const tag = day === daysAgo(0) ? " (오늘)" : day === daysAgo(1) ? " (어제)" : "";
   return `${m}월 ${d}일 ${w}요일${tag}`;
 };
+const shortDay = (day) => { const [, m, d] = day.split("-").map(Number); return `${m}월 ${d}일`; };
 const dayDiff = (a, b) => Math.round((new Date(b) - new Date(a)) / 86400000);
 
 // ---------- 저장소 ----------
 // 한 권 = 기록 1개. 여러 날 읽은 내용은 sessions [{from, to, day}] 로 쌓임
-const readTo = (r) => Math.max(0, ...r.sessions.map((s) => s.to || 0));
+// 같은 책을 여러 번 읽기: round = 지금 몇 번째 읽는지, 기록(session)마다 round, 다 읽은 회차는 finishes 에
+const roundOf = (r) => r.round || 1;
+const roundSessions = (r, n = roundOf(r)) => r.sessions.filter((s) => (s.round || 1) === n);
+const readTo = (r) => Math.max(0, ...roundSessions(r).map((s) => s.to || 0));
+const timesRead = (r) => (r.finishes || []).length;
+const MAX_READS_PER_YEAR = 20;
+const readsThisYear = (r) => (r.finishes || []).filter((f) => (f.day || "").startsWith(localDay().slice(0, 4))).length;
 function migrate(r) {
   if (!r.sessions) {
     const day = r.date ? localDay(new Date(r.date)) : localDay();
@@ -63,6 +70,8 @@ function migrate(r) {
     r.done = !!(r.totalPages && readTo(r) >= r.totalPages);
     if (r.done) r.doneAt = Date.parse(r.date) || Date.now();
   }
+  if (!r.finishes) r.finishes = r.done ? [{ round: roundOf(r), day: r.doneDay || r.sessions.map((x) => x.day).sort().at(-1), at: r.doneAt || 0 }] : [];
+  if (!r.bonusRounds) r.bonusRounds = r.bonus ? [1] : [];
   return r;
 }
 const uid = () => crypto.randomUUID?.() || Date.now().toString(36) + Math.random().toString(36).slice(2);
@@ -97,7 +106,7 @@ saveRecords();
 const sessionPages = (s) => (s.from && s.to ? Math.max(0, s.to - s.from + 1) : s.to || 0);
 const pagesOf = (r) => r.sessions.reduce((a, s) => a + sessionPages(s), 0);
 const minsOf = (r) => r.sessions.reduce((a, s) => a + (s.minutes || 0), 0);
-const pointsOf = (r) => pagesOf(r) + (r.bonus ? BONUS : 0);
+const pointsOf = (r) => pagesOf(r) + BONUS * (r.bonusRounds || (r.bonus ? [1] : [])).length;
 const totalPoints = () => records.reduce((a, r) => a + pointsOf(r), 0);
 const pct = (r) => (r.totalPages ? Math.min(100, Math.round((readTo(r) / r.totalPages) * 100)) : 0);
 const sessionText = (s) => (s.from && s.to ? `${s.from}~${s.to}쪽` : s.to ? `~${s.to}쪽` : "쪽수 없음") + (s.minutes ? ` · ${fmtMin(s.minutes)}` : "");
@@ -105,13 +114,14 @@ const firstDay = (r) => r.sessions.map((s) => s.day).sort()[0];
 const lastDay = (r) => r.sessions.map((s) => s.day).sort().at(-1);
 function progressText(r) {
   const to = readTo(r);
-  if (r.done) return `✅ 다 읽었어요!${r.totalPages ? ` (${r.totalPages}쪽)` : ""}`;
-  if (!to) return "";
-  return r.totalPages ? `진도율 ${pct(r)}% (${to} / ${r.totalPages}쪽)` : `${to}쪽까지 읽었어요`;
+  if (r.done) return `✅ 다 읽었어요!${r.totalPages ? ` (${r.totalPages}쪽)` : ""}${timesRead(r) > 1 ? ` · ${timesRead(r)}번 읽음` : ""}`;
+  const nth = roundOf(r) > 1 ? `${roundOf(r)}번째 읽는 중 · ` : "";
+  if (!to) return nth ? `${roundOf(r)}번째 읽기 시작` : "";
+  return nth + (r.totalPages ? `진도율 ${pct(r)}% (${to} / ${r.totalPages}쪽)` : `${to}쪽까지 읽었어요`);
 }
 const hasHangul = (t) => /[가-힣]/.test(t || "");
 const shelfOf = (r) => r.shelf || (hasHangul(r.title) ? "ko" : "en");
-const stampList = () => records.filter((r) => r.done).sort((a, b) => (a.doneAt || 0) - (b.doneAt || 0));
+const stampList = () => records.flatMap((r) => (r.finishes || []).map((f) => ({ r, at: f.at || 0, round: f.round }))).sort((a, b) => a.at - b.at);
 
 // ---------- UI 유틸 ----------
 let toastTimer;
@@ -170,10 +180,25 @@ const ringSvg = (frac) => {
     ${frac > 0 ? `<circle cx="42" cy="42" r="${r}" fill="none" stroke="#9DBE10" stroke-width="7" stroke-linecap="round" stroke-dasharray="${(c * Math.min(1, frac)).toFixed(1)} ${c.toFixed(1)}"/>` : ""}</svg>`;
 };
 
+// 읽은 횟수 막대: 1~4는 막대, 5번마다 네 막대 + 겨자색 사선 한 묶음 (최대 20)
+function tallySvg(n) {
+  n = Math.min(n, 20);
+  const g = Math.floor(n / 5), rem = n % 5;
+  let x = 3, body = "";
+  for (let i = 0; i < g; i++) {
+    for (let k = 0; k < 4; k++) body += `<path d="M${x + k * 3.2} 3.5v9" stroke="#2F5D3A"/>`;
+    body += `<path d="M${x - 1.5} 11l12.6 -6" stroke="#C89B3C"/>`;
+    x += 16;
+  }
+  for (let k = 0; k < rem; k++) body += `<path d="M${x + k * 3.2} 3.5v9" stroke="#2F5D3A"/>`;
+  const w = Math.round((rem ? x + (rem - 1) * 3.2 : x - 6.4) + 3);
+  return `<svg class="tally" viewBox="0 0 ${w} 16" width="${w}" height="16" fill="none" stroke-width="2" stroke-linecap="round" aria-hidden="true">${body}</svg>`;
+}
 const cardHtml = (r) => `
-    <li data-id="${r.id}" tabindex="0" role="button" aria-label="${esc(r.title)} 기록 보기" title="${esc(r.title)}">
+    <li data-id="${r.id}" tabindex="0" role="button" aria-label="${esc(r.title)} 기록 보기${timesRead(r) ? ` · ${timesRead(r)}번 읽음` : ""}" title="${esc(r.title)}">
       ${imgOr(r.cover, r.title, "cover")}
       ${r.done ? `<span class="done-badge" aria-label="다 읽음">✓</span>` : r.totalPages ? `<div class="pbar"><i style="width:${pct(r)}%"></i></div>` : ""}
+      ${timesRead(r) ? `<span class="tally-wrap">${tallySvg(timesRead(r))}</span>` : ""}
     </li>`;
 
 function render() {
@@ -273,17 +298,28 @@ async function openSheet(isbn, scanInfo) {
   $("sDesc").textContent = b.description || existing?.description || "";
   if (existing) {
     $("sMine").hidden = false;
-    $("sMine").textContent = existing.done ? "📚 내 책장에 있는, 다 읽은 책이에요" : `📚 읽고 있는 책이에요 · ${progressText(existing) || "쪽수 기록 없음"}`;
-    $("sOk").textContent = existing.done ? "기록 보기" : "이어서 기록하기";
+    $("sMine").textContent = existing.done ? `📚 ${timesRead(existing)}번 다 읽은 책이에요 · 기록 보기 ›` : `📚 읽고 있는 책이에요 · ${progressText(existing) || "쪽수 기록 없음"}`;
+    $("sMine").classList.toggle("link", !!existing.done);
+    $("sOk").textContent = existing.done ? `🔁 다시 읽기 (${roundOf(existing) + 1}번째)` : "이어서 기록하기";
   }
 }
 $("sDesc").addEventListener("click", () => $("sDesc").classList.toggle("open"));
 $("sSelf").addEventListener("click", () => $("scanSheet").close("self"));
+$("sMine").addEventListener("click", () => { if ($("sMine").classList.contains("link")) $("scanSheet").close("view"); });
+// 다 읽은 책 다시 읽기 (같은 해에 20번까지)
+function startReread(r) {
+  if (readsThisYear(r) >= MAX_READS_PER_YEAR) {
+    toast(`같은 책은 한 해에 ${MAX_READS_PER_YEAR}번까지 기록할 수 있어요. 내년에 다시 기록해 주세요`, 3800);
+    return;
+  }
+  openRecord({ existing: r, reread: true });
+}
 $("scanSheet").addEventListener("close", () => {
   const v = $("scanSheet").returnValue;
   const s = sheet; sheet = null;
-  if (!s || (v !== "ok" && v !== "self")) return; // ✕ = 검색만 하고 끝
-  if (s.existing) { s.existing.done && v === "ok" ? openView(s.existing.id) : openRecord({ existing: s.existing }); return; }
+  if (!s || (v !== "ok" && v !== "self" && v !== "view")) return; // ✕ = 검색만 하고 끝
+  if (v === "view" && s.existing) { openView(s.existing.id); return; }
+  if (s.existing) { s.existing.done && v === "ok" ? startReread(s.existing) : openRecord({ existing: s.existing }); return; }
   openRecord({ isbn: s.isbn, book: s.book, self: v === "self" || !s.book });
 });
 
@@ -327,8 +363,8 @@ function syncDone() {
 $("rDone").addEventListener("change", syncDone);
 $("rTotal").addEventListener("input", () => { if ($("rDone").checked) $("rTo").value = $("rTotal").value; });
 
-function openRecord({ existing = null, isbn = null, book = null, self = false }) {
-  rec = { existing, isbn: existing?.isbn || isbn, book, self };
+function openRecord({ existing = null, isbn = null, book = null, self = false, reread = false }) {
+  rec = { existing, isbn: existing?.isbn || isbn, book, self, reread };
   const b = book || {};
   const title = existing?.title || b.title || "";
   const authors = existing?.authors || (b.authors || []).join(", ");
@@ -352,14 +388,15 @@ function openRecord({ existing = null, isbn = null, book = null, self = false })
   paintShelf();
   rDay = returnDay || localDay(); paintDate();
 
-  const prev = existing ? readTo(existing) : 0;
-  $("soFar").hidden = !prev;
-  $("soFar").textContent = prev ? `지난번까지 ${prev}쪽 읽었어요 → 오늘은 ${prev + 1}쪽부터` : "";
+  const prev = existing && !reread ? readTo(existing) : 0;
+  $("soFar").hidden = !prev && !reread;
+  $("soFar").textContent = reread ? `🔁 ${roundOf(existing) + 1}번째 읽기를 시작해요! 1쪽부터 다시 기록해요`
+    : prev ? `지난번까지 ${prev}쪽 읽었어요 → 오늘은 ${prev + 1}쪽부터` : "";
   $("rTotal").value = total || "";
   $("rTo").value = ""; $("rMin").value = ""; $("rHour").value = "";
   $("rTo").placeholder = prev ? `${prev + 1}쪽부터 몇 쪽까지?` : "몇 쪽까지";
   // 새 책이고 전체 쪽수를 알면 '다 읽은 책'을 기본으로 (한 번에 다 읽는 그림책이 많아서)
-  $("rDone").checked = !existing && !!total;
+  $("rDone").checked = (!existing || reread) && !!total;
   $("pagesLabel").textContent = prev ? "오늘 몇 쪽까지 읽었나요? / (전체 페이지)" : "읽은 페이지 / (전체 페이지)";
   syncDone();
   $("rTiming").textContent = rec.isbn ? `ISBN ${rec.isbn}` : "";
@@ -400,9 +437,10 @@ $("rFindList").addEventListener("click", (e) => {
 function saveRecord() {
   if (!rec) return;
   const r0 = rec.existing;
-  const prev = r0 ? readTo(r0) : 0;
+  const prev = r0 && !rec.reread ? readTo(r0) : 0;
   const total = parseInt($("rTotal").value, 10) || null;
   const done = $("rDone").checked;
+  if (rec.reread && readsThisYear(r0) >= MAX_READS_PER_YEAR) { toast(`같은 책은 한 해에 ${MAX_READS_PER_YEAR}번까지 기록할 수 있어요`); return; }
   const to = done ? total : parseInt($("rTo").value, 10) || null;
   const title = rec.self ? $("rTitle").value.trim() : (r0?.title || rec.book?.title || "");
   if (!title) { toast("책 제목을 적어 주세요"); $("rTitle").focus(); return; }
@@ -419,6 +457,8 @@ function saveRecord() {
   let r;
   if (r0) {
     r = r0;
+    if (rec.reread) { r.round = roundOf(r) + 1; r.done = false; delete r.doneAt; delete r.doneDay; }
+    if (roundOf(r) > 1) session.round = roundOf(r);
     r.sessions.push(session);
     r.shelf = chosenShelf;
     if (total) r.totalPages = total;
@@ -437,7 +477,7 @@ function saveRecord() {
       shelf: chosenShelf,
       totalPages: total,
       sessions: [session],
-      done: false, score: null, note: "", bonus: false,
+      done: false, score: null, note: "", bonus: false, finishes: [], bonusRounds: [],
       date: new Date().toISOString(),
     };
     records.unshift(r);
@@ -446,7 +486,10 @@ function saveRecord() {
   }
   const gained = to - prev;
   const finished = !!(r.totalPages && to >= r.totalPages);
-  if (finished && !r.done) { r.done = true; r.doneAt = Date.now(); r.doneDay = rDay; }
+  if (finished && !r.done) {
+    r.done = true; r.doneAt = Date.now(); r.doneDay = rDay;
+    r.finishes = [...(r.finishes || []).filter((f) => f.round !== roundOf(r)), { round: roundOf(r), day: rDay, at: r.doneAt }];
+  }
   saveRecords();
   $("monthFilter").value = "all";
   render();
@@ -499,7 +542,8 @@ function finishActivity(kind) {
   let extra = 0;
   if (kind === "done") {
     r.note = text;
-    if (!r.bonus) { r.bonus = true; extra = BONUS; }
+    r.bonusRounds = r.bonusRounds || [];
+    if (!r.bonusRounds.includes(roundOf(r))) { r.bonusRounds.push(roundOf(r)); r.bonus = true; extra = BONUS; }
   }
   saveRecords(); render();
   act = null; flow = null;
@@ -524,9 +568,10 @@ function openStamp(newId) {
   const on = list.slice(board * STAMPS_PER_BOARD, board * STAMPS_PER_BOARD + STAMPS_PER_BOARD);
   $("stampCount").textContent = `(${on.length}/${STAMPS_PER_BOARD})`;
   $("stampGrid").innerHTML = Array.from({ length: STAMPS_PER_BOARD }, (_, i) => {
-    const r = on[i];
-    if (!r) return `<div class="stamp" aria-label="빈 칸">📖</div>`;
-    return `<div class="stamp on${r.id === newId ? " new" : ""}" title="${esc(r.title)}">${r.cover ? `<img src="${esc(r.cover)}" alt="">` : ""}</div>`;
+    const x = on[i];
+    if (!x) return `<div class="stamp" aria-label="빈 칸">📖</div>`;
+    const r = x.r, isNew = r.id === newId && x.round === (r.finishes || []).at(-1)?.round;
+    return `<div class="stamp on${isNew ? " new" : ""}" title="${esc(r.title)}${x.round > 1 ? ` (${x.round}번째)` : ""}">${r.cover ? `<img src="${esc(r.cover)}" alt="">` : ""}</div>`;
   }).join("");
   const boards = Math.floor(n / STAMPS_PER_BOARD);
   $("stampBoards").textContent = boards ? `지금까지 완성한 스탬프판: ${boards}장 🎉` : "";
@@ -549,10 +594,17 @@ function fillView(r) {
   $("vMeta").textContent = [SHELVES[shelfOf(r)], r.totalPages && `${r.totalPages}쪽`, minsOf(r) && `${fmtMin(minsOf(r))} 들음`, `${pointsOf(r)}점`].filter(Boolean).join(" · ");
   $("vProgress").innerHTML = progressText(r)
     ? `<b>${esc(progressText(r))}</b>${r.totalPages ? `<div class="bar"><i style="width:${pct(r)}%"></i></div>` : ""}` : "";
-  $("vSessions").innerHTML = [...r.sessions].sort((a, b) => a.day.localeCompare(b.day))
-    .map((s) => `<li><span>${prettyDay(s.day)}</span><b>${sessionText(s)}</b></li>`).join("");
-  $("vMore").hidden = r.done;
-  $("vActivity").hidden = !(r.done && !r.bonus);
+  const rounds = roundOf(r);
+  $("vSessions").innerHTML = Array.from({ length: rounds }, (_, i) => i + 1).map((n) => {
+    const ss = roundSessions(r, n).sort((a, b) => a.day.localeCompare(b.day));
+    const fin = (r.finishes || []).find((f) => f.round === n);
+    const head = rounds > 1 || fin ? `<li class="round-h"><b>${n}번째</b><span>${ss[0] ? shortDay(ss[0].day) : ""}${fin ? ` ~ ${shortDay(fin.day)} · 다 읽음` : " ~ 읽는 중"}</span></li>` : "";
+    return head + ss.map((s) => `<li><span>${prettyDay(s.day)}</span><b>${sessionText(s)}</b></li>`).join("");
+  }).join("");
+  $("vTimes").innerHTML = timesRead(r) ? `${tallySvg(timesRead(r))}<span>${timesRead(r)}번 읽었어요</span>` : "";
+  $("vMore").hidden = false;
+  $("vMore").textContent = r.done ? `🔁 다시 읽기 (${rounds + 1}번째)` : "➕ 이어서 기록하기";
+  $("vActivity").hidden = !(r.done && !(r.bonusRounds || []).includes(rounds));
   $("vScore").textContent = r.score ? `${"★".repeat(r.score)}${"☆".repeat(5 - r.score)}  ${r.score}점` : "주지 않았어요";
   $("vNote").textContent = r.note || "적지 않았어요";
   $("vCat").value = BOOK_CATS.includes(r.category) ? r.category : "";
@@ -564,7 +616,10 @@ $("vTotalSave").addEventListener("click", () => {
   const t = parseInt($("vTotal").value, 10);
   if (!viewing || !t) return;
   viewing.totalPages = t;
-  if (readTo(viewing) >= t && !viewing.done) { viewing.done = true; viewing.doneAt = Date.now(); }
+  if (readTo(viewing) >= t && !viewing.done) {
+    viewing.done = true; viewing.doneAt = Date.now(); viewing.doneDay = localDay();
+    viewing.finishes = [...(viewing.finishes || []), { round: roundOf(viewing), day: localDay(), at: viewing.doneAt }];
+  }
   saveRecords(); render(); fillView(viewing);
   toast(`전체 ${t}쪽으로 저장했어요`);
 });
@@ -572,7 +627,7 @@ $("viewDialog").addEventListener("close", () => {
   const v = $("viewDialog").returnValue;
   const r = viewing; viewing = null;
   if (!r) return;
-  if (v === "more") openRecord({ existing: r });
+  if (v === "more") r.done ? startReread(r) : openRecord({ existing: r });
   else if (v === "activity") openActivity(r, { pages: 0, fromFlow: false });
   else if (v === "delete" && confirm(`'${r.title}' 기록을 모두 지울까요?`)) {
     records = records.filter((x) => x.id !== r.id);
@@ -885,11 +940,11 @@ $("catFilter").addEventListener("click", (e) => {
 });
 function renderStats() {
   const pages = records.reduce((a, r) => a + pagesOf(r), 0);
-  const done = records.filter((r) => r.done).length;
+  const done = records.reduce((a, r) => a + timesRead(r), 0);
   const focusMins = records.reduce((a, r) => a + minsOf(r), 0) + journal.filter((j) => j.cat === "focus").reduce((a, j) => a + (j.minutes || 0), 0);
   const recDays = new Set([...records.flatMap((r) => r.sessions.map((s) => s.day)), ...journal.map((j) => j.day)]).size;
   $("statTiles").innerHTML = [
-    ["읽은 책", records.length, "권"], ["끝까지 읽은 책", done, "권"],
+    ["읽은 책", records.length, "권"], ["끝까지 읽은 횟수", done, "번"],
     ["읽은 쪽수", pages.toLocaleString(), "쪽"], ["독서 포인트", totalPoints().toLocaleString(), "점"],
     ["집중듣기 시간", fmtMin(focusMins), ""], ["기록한 날", recDays, "일"],
   ].map(([k, v, u]) => `<div class="tile"><small>${k}</small><b>${v}<em>${u}</em></b></div>`).join("");
@@ -1223,7 +1278,7 @@ const ABOUT = {
   "이 파일은": "바나나북코드(아이 독서기록 앱)의 모든 기록을 담은 보관용 파일이에요. 앱의 '설정 → 기록 파일 다시 올리기'로 복원할 수 있어요.",
   kids: "자녀 목록. id, nick(닉네임), grade(학년 번호: 0=3세 … 4=7세, 5=초1 … 10=초6, 11=중1 … 13=중3, 14=고1 … 16=고3, 17=졸업), gradeYear(그 학년이었던 학년도, 3월 시작). 지금 학년 = grade + (올해 학년도 - gradeYear)",
   categories: "포트폴리오 카테고리. kind: book=책장(한글책/영어책), focus=집중듣기(책+시간), time=한 것+시간, note=메모. hidden=숨김",
-  records: "책 기록(책 한 권 = 1개). kid=자녀 id, shelf: ko 한글책 / en 영어책 / focus 집중듣기. sessions=읽은 날(day, YYYY-MM-DD)마다 읽은 쪽(from~to)과 집중듣기 시간(minutes, 분). totalPages=전체 쪽수, done=끝까지 읽음, score=별점(1~5), note=독후활동 글, bonus=독후활동 포인트(+50) 받음, category=분야",
+  records: "책 기록(책 한 권 = 1개). kid=자녀 id, shelf: ko 한글책 / en 영어책 / focus 집중듣기. sessions=읽은 날(day, YYYY-MM-DD)마다 읽은 쪽(from~to)과 집중듣기 시간(minutes, 분), round=몇 번째 읽기였는지(없으면 1). round=지금 몇 번째 읽는 중인지, finishes=끝까지 읽은 회차와 날짜 목록(읽은 횟수), totalPages=전체 쪽수, done=지금 회차를 끝까지 읽음, score=별점(1~5), note=독후활동 글, bonusRounds=독후활동 포인트(+50)를 받은 회차, category=분야",
   journal: "포트폴리오 하루 기록. kid=자녀 id, day=날짜, cat=카테고리 key, what=한 것, minutes=시간(분), text=메모(일기), photos=사진 보관함 경로 목록(사진 파일은 이 백업에 들어 있지 않고 계정 보관함에 있어요)",
   "포인트 규칙": "읽은 쪽수 1쪽 = 1점, 독후활동을 쓰면 +50점. 스탬프는 끝까지 읽은 책 1권에 1개, 8개가 한 판",
 };
@@ -1252,7 +1307,7 @@ function diaryHtml(d) {
     }
     const pages = recs.reduce((a, r) => a + pagesOf(r), 0), pts = recs.reduce((a, r) => a + pointsOf(r), 0);
     return `<section><h2>🍌 ${esc(k.nick)}${gradeOf(k) ? " " + gradeOf(k) : ""}</h2>
-      <p class="sum">책 ${recs.length}권 · 끝까지 읽은 책 ${recs.filter((r) => r.done).length}권 · ${pages.toLocaleString()}쪽 · 독서 포인트 ${pts.toLocaleString()}점</p>
+      <p class="sum">책 ${recs.length}권 · 끝까지 읽은 횟수 ${recs.reduce((a, r) => a + (r.finishes || []).length, 0)}번 · ${pages.toLocaleString()}쪽 · 독서 포인트 ${pts.toLocaleString()}점</p>
       <h3>📅 날짜별 기록</h3>
       ${Object.keys(days).sort().reverse().map((day) => `<div class="day"><h4>${plainDay(day)}</h4><ul>${days[day].join("")}</ul></div>`).join("") || "<p>기록이 없어요</p>"}
       <h3>📚 읽은 책</h3>
@@ -1374,12 +1429,15 @@ function mergeBackup(d) {
     r.kid = kidOf(r0.kid); r.id = r.id || uid();
     const same = allRecords.find((x) => x.id === r.id) || (r.isbn && allRecords.find((x) => x.kid === r.kid && x.isbn === r.isbn));
     if (!same) { allRecords.push(r); n.r++; n.s += r.sessions.length; continue; }
-    const key = (s) => `${s.day}|${s.from}|${s.to}`;
+    const key = (s) => `${s.day}|${s.from}|${s.to}|${s.round || 1}`;
     const have = new Set(same.sessions.map(key));
     for (const s of r.sessions) if (!have.has(key(s))) { same.sessions.push(s); n.s++; }
     for (const f of ["score", "note", "category", "totalPages", "cover", "description", "authors", "publisher"]) if (!same[f] && r[f]) same[f] = r[f];
     if (r.bonus) same.bonus = true;
-    if (r.done && !same.done) { same.done = true; same.doneAt = r.doneAt || Date.now(); }
+    same.bonusRounds = [...new Set([...(same.bonusRounds || []), ...(r.bonusRounds || [])])];
+    for (const f of r.finishes || []) if (!(same.finishes || []).some((x) => x.round === f.round)) same.finishes = [...(same.finishes || []), f];
+    same.round = Math.max(roundOf(same), roundOf(r));
+    if (r.done && !same.done && roundOf(r) === roundOf(same)) { same.done = true; same.doneAt = r.doneAt || Date.now(); }
   }
   for (const j of d.journal || []) {
     if (!j?.day || allJournal.some((x) => x.id === j.id)) continue;
