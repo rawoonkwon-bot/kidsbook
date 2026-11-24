@@ -794,7 +794,7 @@ function fillDay(day) {
         for (const j of journalOn(day, c.key)) {
           n++;
           const sub = [j.minutes ? fmtMin(j.minutes) : "", j.text || ""].filter(Boolean).join(" · ");
-          rows += `<div class="day-item"><span>${c.svg}</span>
+          rows += `<div class="day-item link" data-edit="${j.id}"><span>${c.svg}</span>
             <div class="grow"><b>${esc(j.what || c.name)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}${j.photos?.length ? `<div class="ph-row" data-paths="${esc(j.photos.join("|"))}"></div>` : ""}</div>
             <button type="button" class="x" data-del="${j.id}" aria-label="지우기">✕</button></div>`;
         }
@@ -839,8 +839,15 @@ $("dayCats").addEventListener("click", (e) => {
   openEntry(c.key);
 });
 $("dayList").addEventListener("click", (e) => {
-  const t = e.target.closest("[data-act],[data-more],[data-view],[data-del]"); if (!t) return;
+  if (e.target.closest(".ph-thumb")) return; // 사진은 크게 보기
+  const t = e.target.closest("[data-act],[data-more],[data-view],[data-del],[data-edit]"); if (!t) return;
   const day = openDayKey;
+  if (t.dataset.edit) {
+    if (PEEK) return; // 구경 중에는 보기만
+    const j = journal.find((x) => x.id === t.dataset.edit); if (!j || !CAT[j.cat]) return;
+    openEntry(j.cat, j);
+    return;
+  }
   if (t.dataset.del) {
     if (!confirm("이 기록을 지울까요?")) return;
     const gone = journal.find((j) => j.id === t.dataset.del);
@@ -872,14 +879,27 @@ function maybeReturn() {
 
 // 카테고리 기록 입력
 let entryCat = null;
-function openEntry(cat) {
-  const c = CAT[cat]; entryCat = cat;
-  $("eTitle").textContent = `${c.name} · ${prettyDay(openDayKey)}`;
+// entry 가 있으면 그 기록 고치기
+let editEntry = null;
+function openEntry(cat, entry = null) {
+  const c = CAT[cat]; entryCat = cat; editEntry = entry;
+  $("eTitle").textContent = `${c.name}${entry ? " 고치기" : ""} · ${prettyDay(entry?.day || openDayKey)}`;
   $("eWhatWrap").hidden = !c.what; $("eWhatLabel").textContent = c.what || ""; $("eWhat").placeholder = c.whatPh || ""; $("eWhat").value = "";
   $("eAmountWrap").hidden = !c.amount; $("eAmountLabel").textContent = (c.amount || "").replace("몇 분", "얼마나"); $("eUnit").textContent = c.unit || ""; $("eAmount").value = ""; $("eHour").value = "";
   $("eTextWrap").hidden = false; $("eTextLabel").textContent = c.text || "한 줄 메모 (선택)"; $("eText").placeholder = c.textPh || ""; $("eText").value = "";
   $("eText").rows = c.kind === "note" ? 9 : c.text ? 5 : 2;
-  ePhotos.forEach((p) => URL.revokeObjectURL(p.url)); ePhotos = [];
+  ePhotos.forEach((p) => p.file && URL.revokeObjectURL(p.url)); ePhotos = [];
+  if (entry) {
+    $("eWhat").value = entry.what || ""; $("eText").value = entry.text || "";
+    if (entry.minutes) { $("eHour").value = Math.floor(entry.minutes / 60) || ""; $("eAmount").value = entry.minutes % 60 || ""; }
+    ePhotos = (entry.photos || []).map((path) => ({ path, url: "" }));
+    const paths = entry.photos || [];
+    if (paths.length) sync.photoUrls(paths).then((urls) => {
+      const map = new Map(paths.map((pa, i) => [pa, urls[i]]));
+      ePhotos.forEach((p) => { if (p.path) p.url = map.get(p.path) || ""; });
+      paintPhotos();
+    });
+  }
   $("ePhotoWrap").hidden = c.kind !== "note"; paintPhotos();
   $("dayDialog").close("away"); returnDay = openDayKey || returnDay;
   $("entryDialog").showModal();
@@ -903,7 +923,7 @@ $("ePhotoFile").addEventListener("change", () => {
 });
 $("ePhotos").addEventListener("click", (e) => {
   const b = e.target.closest("[data-rm]"); if (!b) return;
-  const [p] = ePhotos.splice(Number(b.dataset.rm), 1); URL.revokeObjectURL(p.url); paintPhotos();
+  const [p] = ePhotos.splice(Number(b.dataset.rm), 1); if (p.file) URL.revokeObjectURL(p.url); paintPhotos();
 });
 async function shrinkPhoto(file) {
   const bmp = await createImageBitmap(file, { imageOrientation: "from-image" }).catch(() => createImageBitmap(file));
@@ -917,10 +937,19 @@ async function shrinkPhoto(file) {
 $("entryDialog").addEventListener("close", async () => {
   if ($("entryDialog").returnValue !== "save" || !entryCat) return;
   const cat = entryCat; entryCat = null;
+  const old = editEntry; editEntry = null;
   const what = $("eWhat").value.trim(), text = $("eText").value.trim(), minutes = ((parseInt($("eHour").value, 10) || 0) * 60 + (parseInt($("eAmount").value, 10) || 0)) || null;
-  const picked = ePhotos; ePhotos = [];
-  if (!what && !text && !minutes && !picked.length) { toast("내용을 적어 주세요"); return; }
-  const entry = { id: crypto.randomUUID?.() || String(Date.now()), day: returnDay || localDay(), cat, what, minutes, text };
+  const all = ePhotos; ePhotos = [];
+  const kept = all.filter((p) => p.path).map((p) => p.path);
+  const picked = all.filter((p) => p.file);
+  if (!what && !text && !minutes && !all.length) { toast("내용을 적어 주세요"); return; }
+  const entry = old || { id: crypto.randomUUID?.() || String(Date.now()), day: returnDay || localDay(), cat };
+  if (old) {
+    const removed = (old.photos || []).filter((p) => !kept.includes(p));
+    if (removed.length) sync.deletePhotos(removed);
+  }
+  Object.assign(entry, { what, minutes, text });
+  if (kept.length) entry.photos = kept; else delete entry.photos;
   if (picked.length) {
     const paths = [];
     if (!sync.canUpload()) toast("사진은 인터넷에 연결돼 있을 때 올릴 수 있어요. 글만 저장했어요", 3500);
@@ -931,12 +960,12 @@ $("entryDialog").addEventListener("close", async () => {
       }
       if (paths.length < picked.length) toast(`사진 ${picked.length - paths.length}장은 올리지 못했어요`, 3500);
     }
-    if (paths.length) entry.photos = paths;
+    if (paths.length) entry.photos = [...kept, ...paths];
     picked.forEach((p) => URL.revokeObjectURL(p.url));
   }
-  journal.push(entry);
+  if (!old) journal.push(entry);
   saveJournal(); render();
-  if (!picked.length || entry.photos?.length === picked.length) toast(`${CAT[cat].name} 기록했어요${entry.photos ? ` · 사진 ${entry.photos.length}장` : ""}`);
+  if (!picked.length || (entry.photos?.length || 0) === kept.length + picked.length) toast(`${CAT[cat].name} ${old ? "고쳤어요" : "기록했어요"}${entry.photos ? ` · 사진 ${entry.photos.length}장` : ""}`);
 });
 
 // ---------- 소식: 통계 ----------
