@@ -2481,3 +2481,93 @@ if (PEEK) {
   else if (!kids.length) setTimeout(() => { hideWelcome(); openKids(true); }, 900);
   else { welcome.addEventListener("click", hideWelcome); setTimeout(hideWelcome, 1300); }
 }
+
+// ---------- 연산 프린트 ----------
+// 문제는 math.js 가 문제지 번호로 만들어요 (같은 번호 = 같은 문제). 처음 열 때만 불러옴
+let WSM = null;
+const wsLoad = async () => (WSM ||= await import("./math.js"));
+const WS_GRADE_KEY = "kbc:wsGrade";
+let wsSel = null; // { id, mode, count, ans }
+let wsLast = null; // { id, mode, count, ans } — '다른 문제'용
+function wsDefaultGrade() {
+  const saved = localStore.getItem(WS_GRADE_KEY); if (saved) return saved;
+  const k = kids.find((x) => x.id === activeKid); const i = k ? gradeIdx(k) : -1;
+  return i >= 5 && i <= 10 ? `E${i - 4}` : i >= 11 && i <= 13 ? `M${i - 10}` : "E1";
+}
+let wsGrade = null;
+function paintWs() {
+  const M = WSM;
+  $("wsGrades").innerHTML = M.CURRICULUM.map((g) => `<button type="button" role="radio" data-g="${g.g}" aria-checked="${g.g === wsGrade}">${g.label}</button>`).join("");
+  const gr = M.CURRICULUM.find((g) => g.g === wsGrade) || M.CURRICULUM[0];
+  $("wsUnits").innerHTML = gr.units.map((u) => `
+    <section class="ws-unit"><h4>${esc(u.name)}${u.sem ? `<small>${u.sem}학기</small>` : ""}</h4>
+      <ul class="ws-steps">${u.steps.map((st) => `<li><button type="button" data-id="${st.id}"><span class="no">${M.circ(st.no)}</span><span class="t">${esc(st.title)}</span><small>${st.n}문제${st.v ? " · 세로셈" : ""}</small></button></li>`).join("")}</ul>
+    </section>`).join("");
+  $("wsGrades").querySelector('[aria-checked="true"]')?.scrollIntoView({ block: "nearest", inline: "center" });
+}
+async function openWs() {
+  try { await wsLoad(); } catch { toast("연산 프린트를 불러오지 못했어요. 인터넷을 확인해 주세요."); return; }
+  wsGrade ||= wsDefaultGrade();
+  paintWs();
+  $("wsPage").showModal();
+}
+$("wsOpen").addEventListener("click", openWs);
+$("wsClose").addEventListener("click", () => $("wsPage").close());
+$("wsGrades").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-g]"); if (!b) return;
+  wsGrade = b.dataset.g; localStore.setItem(WS_GRADE_KEY, wsGrade); paintWs();
+});
+const wsSeg = (id, attr, val) => [...$(id).children].forEach((x) => x.setAttribute("aria-checked", String(x.dataset[attr] === String(val))));
+$("wsUnits").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-id]"); if (!b) return;
+  const st = WSM.stepOf(b.dataset.id);
+  wsSel = { id: st.id, mode: wsSel?.id === st.id ? wsSel.mode : "h", count: wsSel?.count || 1, ans: wsSel?.ans || false };
+  $("wsOptKick").textContent = `${WSM.kickOf(st)} · ${st.total}단계 중 ${st.no}단계`;
+  $("wsOptTitle").textContent = `${st.no}) ${st.title}`;
+  $("wsModeWrap").hidden = !st.v;
+  wsSeg("wsMode", "m", wsSel.mode); wsSeg("wsCount", "n", wsSel.count);
+  $("wsWithAns").checked = wsSel.ans;
+  $("wsOpt").showModal();
+});
+$("wsMode").addEventListener("click", (e) => { const b = e.target.closest("[data-m]"); if (b && wsSel) { wsSel.mode = b.dataset.m; wsSeg("wsMode", "m", wsSel.mode); } });
+$("wsCount").addEventListener("click", (e) => { const b = e.target.closest("[data-n]"); if (b && wsSel) { wsSel.count = Number(b.dataset.n); wsSeg("wsCount", "n", wsSel.count); } });
+$("wsWithAns").addEventListener("change", () => { if (wsSel) wsSel.ans = $("wsWithAns").checked; });
+$("wsGo").addEventListener("click", () => {
+  if (!wsSel) return;
+  $("wsOpt").close();
+  wsLast = { ...wsSel };
+  wsShow(Array.from({ length: wsSel.count }, () => WSM.makeCode(wsSel.id, wsSel.mode === "v")), wsSel.ans);
+});
+async function wsShow(codes, withAns) {
+  const M = WSM;
+  const sheets = codes.map((c) => M.makeSheet(c)).filter(Boolean);
+  if (!sheets.length) { toast("문제지 번호를 다시 확인해 주세요"); return; }
+  const qrs = await Promise.all(sheets.map((sh) => M.qrSvg(`${location.origin}/ws.html?c=${sh.code}`)));
+  const pages = sheets.map((sh, i) => M.sheetHtml(sh, qrs[i]));
+  if (withAns) pages.push(M.answerPageHtml(sheets));
+  $("wsSheets").innerHTML = pages.map((p) => `<div class="ws-sc">${p}</div>`).join("");
+  if (!$("wsPrev").open) $("wsPrev").showModal();
+  wsScale();
+}
+function wsScale() {
+  const w = $("wsSheets").clientWidth || 360;
+  $("wsSheets").style.setProperty("--s", String(Math.min(1, w / 794)));
+}
+addEventListener("resize", () => { if ($("wsPrev").open) wsScale(); });
+$("wsPrevClose").addEventListener("click", () => $("wsPrev").close());
+$("wsRe").addEventListener("click", () => {
+  if (!wsLast) { toast("단계를 골라 새로 뽑아 주세요"); return; }
+  wsShow(Array.from({ length: wsLast.count }, () => WSM.makeCode(wsLast.id, wsLast.mode === "v")), wsLast.ans);
+});
+$("wsPrint").addEventListener("click", () => {
+  document.body.classList.add("printing-ws");
+  setTimeout(() => { window.print(); setTimeout(() => document.body.classList.remove("printing-ws"), 500); }, 50);
+});
+$("wsCodeForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const code = $("wsCodeIn").value.trim().toUpperCase();
+  if (!WSM.parseCode(code)) { toast("문제지 번호를 다시 확인해 주세요 (예: E31A2-K4PX)"); return; }
+  const c = WSM.parseCode(code);
+  wsLast = { id: c.id, mode: c.vertical ? "v" : "h", count: 1, ans: true };
+  wsShow([code], true);
+});

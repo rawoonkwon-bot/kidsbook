@@ -850,3 +850,52 @@ body.peek .tabbar [data-go="blog"] { display: none; }
 .bl-th { width: 56px; height: 56px; border-radius: 10px; object-fit: cover; flex: none; background: var(--sage-l); }
 .tp-ph.t-none { background: var(--sage-l); color: var(--forest); }
 .blog .pop-card .pop-im { height: 84px; }
+/* 연산 프린트 */
+.ws-entry { width: 100%; display: flex; align-items: center; gap: 12px; margin: 14px 0 4px; padding: 14px 16px; border: 1.5px solid var(--line); border-radius: var(--radius); background: #fff; box-shadow: var(--shadow); cursor: pointer; text-align: left; }
+.ws-ico { font-size: 26px; }
+.ws-et { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.ws-et b { font-size: 17px; }
+.ws-et small { font-size: 13px; color: var(--muted); }
+.ws-go { font-size: 22px; color: var(--muted); }
+.ws-help { margin: -4px 0 0; font-size: 14px; color: var(--muted); line-height: 1.5; }
+.ws-grades { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
+.ws-grades button { flex: none; border: 0; border-radius: 999px; padding: 9px 16px; font-weight: 800; font-size: 15px; background: var(--soft); color: var(--muted); cursor: pointer; }
+.ws-grades button[aria-checked="true"] { background: var(--lime); color: var(--ink); }
+.ws-unit { margin-top: 6px; }
+.ws-unit h4 { margin: 10px 0 6px; font-size: 16px; display: flex; align-items: baseline; gap: 8px; }
+.ws-unit h4 small { font-size: 12px; font-weight: 700; color: var(--forest); background: var(--sage-l); border-radius: 999px; padding: 2px 8px; }
+.ws-steps { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.ws-steps li + li { border-top: 1px solid var(--line); }
+.ws-steps button { width: 100%; display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 0; background: #fff; text-align: left; cursor: pointer; font-size: 15px; }
+.ws-steps button:active { background: var(--soft); }
+.ws-steps .no { font-weight: 800; color: var(--forest); flex: none; }
+.ws-steps .t { flex: 1; line-height: 1.35; }
+.ws-steps small { flex: none; font-size: 12px; color: var(--muted); }
+.ws-codef { display: flex; gap: 8px; margin-top: 18px; }
+.ws-codef input { flex: 1; min-width: 0; font: inherit; font-size: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--soft); padding: 11px 12px; }
+.ws-codef button { border: 0; border-radius: 12px; padding: 0 16px; font: inherit; font-weight: 800; background: var(--ink); color: #fff; cursor: pointer; }
+.ws-opt-h { display: flex; flex-direction: column; gap: 3px; }
+.ws-opt-h small { color: var(--muted); font-size: 13px; }
+.ws-opt-h b { font-size: 19px; line-height: 1.35; }
+.ws-lab { margin: 6px 0 -4px; font-size: 14px; font-weight: 800; color: var(--muted); }
+.ws-prev-in { max-width: 880px; }
+.ws-pbtns { display: flex; gap: 8px; }
+.ws-pbtns .pill-btn { font-size: 15px; padding: 8px 14px; }
+.ws-print { background: var(--ink); color: #fff; border-color: var(--ink); }
+.ws-tip { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.5; }
+#wsSheets { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.ws-sc { width: calc(210mm * var(--s, .45)); height: calc(296.5mm * var(--s, .45)); box-shadow: 0 2px 14px rgba(0,0,0,.14); flex: none; overflow: hidden; }
+.ws-sc > .ws-page { transform: scale(var(--s, .45)); transform-origin: 0 0; }
+@media print {
+  @page { size: A4; margin: 0; }
+  body.printing #certPage { padding: 14mm; }
+  body.printing-ws > *:not(#wsPrev) { display: none !important; }
+  body.printing-ws #wsPrev { position: static; display: block; width: auto; height: auto; max-width: none; max-height: none; margin: 0; padding: 0; background: #fff; overflow: visible; }
+  body.printing-ws #wsPrev .page-in { display: block; padding: 0; max-width: none; }
+  body.printing-ws #wsPrev .no-print { display: none !important; }
+  body.printing-ws #wsSheets { display: block; }
+  body.printing-ws .ws-sc { width: auto; height: auto; box-shadow: none; overflow: visible; }
+  body.printing-ws .ws-sc > .ws-page { transform: none; break-after: page; }
+  body.printing-ws .ws-sc:last-child > .ws-page { break-after: auto; }
+}
+body.peek #wsOpen { display: none; }

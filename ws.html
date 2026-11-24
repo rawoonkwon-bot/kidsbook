@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>정답 · 바나나북코드 연산</title>
+  <link rel="icon" href="/icon.svg" />
+  <link rel="stylesheet" href="/ws.css" />
+  <style>
+    body { margin: 0; background: #F4F5F8; font-family: "Pretendard", -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; color: #15161A; }
+    main { max-width: 560px; margin: 0 auto; padding: calc(env(safe-area-inset-top) + 18px) 18px 40px; }
+    .card { background: #fff; border-radius: 20px; padding: 18px; box-shadow: 0 6px 22px rgba(20, 22, 40, .08); }
+    .kick { font-size: 13px; color: #7C7F8A; margin: 0 0 4px; }
+    h1 { font-size: 22px; margin: 0 0 14px; }
+    .peek { display: block; width: 100%; margin-top: 16px; border: 0; border-radius: 14px; padding: 14px; font: inherit; font-weight: 800; background: #15161A; color: #fff; }
+    .hide .ws-akl li span { filter: blur(6px); }
+    .hint { font-size: 13px; color: #7C7F8A; text-align: center; margin: 14px 0 0; }
+    a.home { display: block; text-align: center; margin-top: 18px; color: #5B4BDB; font-weight: 700; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="card" id="box"><p class="kick">바나나북코드 연산</p><h1>정답을 불러오는 중…</h1></div>
+    <a class="home" href="/">바나나북코드 열기 ›</a>
+  </main>
+  <script type="module">
+    import { makeSheet, kickOf, answersBlock } from "/math.js";
+    const code = new URLSearchParams(location.search).get("c") || "";
+    const sh = makeSheet(code);
+    const box = document.getElementById("box");
+    if (!sh) box.innerHTML = `<p class="kick">바나나북코드 연산</p><h1>문제지 번호를 찾을 수 없어요</h1><p class="hint">QR을 다시 찍어 보세요.</p>`;
+    else {
+      document.title = `정답 · ${sh.step.title}`;
+      box.innerHTML = `<p class="kick">${kickOf(sh.step)}${sh.vertical ? " · 세로셈" : ""}</p><h1>정답</h1><div class="ws-ansv hide" id="ans">${answersBlock(sh)}</div>
+        <button type="button" class="peek" id="peek">정답 보이기</button><p class="hint">다 풀고 나서 눌러 채점해요.</p>`;
+      document.getElementById("peek").addEventListener("click", (e) => { document.getElementById("ans").classList.toggle("hide"); e.target.textContent = document.getElementById("ans").classList.contains("hide") ? "정답 보이기" : "정답 가리기"; });
+    }
+  </script>
+</body>
+</html>

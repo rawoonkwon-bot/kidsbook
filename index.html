@@ -13,6 +13,7 @@
   <link rel="preconnect" href="https://covers.openlibrary.org" />
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
   <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/barcode-detector@3.2.4/ponyfill/+esm" crossorigin />
+  <link rel="stylesheet" href="/ws.css" />
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
@@ -36,6 +37,8 @@
         <button type="button" class="ring-card" id="ringStampBtn" aria-label="독서 스탬프 보기"><div class="ring" id="ringStamp"></div><small>스탬프</small></button>
         <div class="ring-card"><div class="ring" id="ringPoint"></div><small>독서 포인트</small></div>
       </div>
+
+      <button type="button" class="ws-entry" id="wsOpen"><span class="ws-ico" aria-hidden="true">✏️</span><span class="ws-et"><b>연산 프린트</b><small>초1~중3 단계별 문제지 · 정답은 QR로</small></span><span class="ws-go" aria-hidden="true">›</span></button>
 
       <div id="popWrap" hidden>
         <div class="pop-head"><h3 class="sec-title">인기글</h3><button type="button" class="link-btn" id="popMore">게시판 가기 ›</button></div>
@@ -333,6 +336,38 @@
     <div class="page-in">
       <div class="page-top no-print"><button type="button" class="x-btn" id="certClose" aria-label="닫기">✕</button><button type="button" class="pill-btn" id="certPrint">인쇄 · PDF로 저장</button></div>
       <article class="cert" id="cert"></article>
+    </div>
+  </dialog>
+
+  <!-- 연산 프린트 -->
+  <dialog id="wsPage" class="page">
+    <div class="page-in">
+      <div class="page-top"><button type="button" class="x-btn" id="wsClose" aria-label="닫기">✕</button></div>
+      <h2 class="page-title">✏️ 연산 프린트</h2>
+      <p class="ws-help">학년을 고르고 단계를 누르면 문제지가 만들어져요. 뽑을 때마다 문제가 바뀌어요.</p>
+      <div class="ws-grades" id="wsGrades" role="radiogroup" aria-label="학년"></div>
+      <div id="wsUnits"></div>
+      <form class="ws-codef" id="wsCodeForm">
+        <input id="wsCodeIn" autocomplete="off" autocapitalize="characters" placeholder="문제지 번호로 다시 뽑기 (예: E31A2-K4PX)" aria-label="문제지 번호" />
+        <button type="submit">열기</button>
+      </form>
+    </div>
+  </dialog>
+  <dialog id="wsOpt" class="bottom">
+    <div class="sheet">
+      <div class="ws-opt-h"><small id="wsOptKick"></small><b id="wsOptTitle"></b></div>
+      <div id="wsModeWrap"><p class="ws-lab">계산 모양</p><div class="seg" id="wsMode" role="radiogroup" aria-label="계산 모양"><button type="button" role="radio" data-m="h">가로셈</button><button type="button" role="radio" data-m="v">세로셈</button></div></div>
+      <p class="ws-lab">몇 장 뽑을까요?</p>
+      <div class="seg" id="wsCount" role="radiogroup" aria-label="장 수"><button type="button" role="radio" data-n="1">1장</button><button type="button" role="radio" data-n="2">2장</button><button type="button" role="radio" data-n="3">3장</button><button type="button" role="radio" data-n="5">5장</button></div>
+      <label class="check"><input type="checkbox" id="wsWithAns" /><span>정답지도 함께 뽑기</span></label>
+      <button type="button" class="btn dark" id="wsGo">문제지 만들기</button>
+    </div>
+  </dialog>
+  <dialog id="wsPrev" class="page">
+    <div class="page-in ws-prev-in">
+      <div class="page-top no-print"><button type="button" class="x-btn" id="wsPrevClose" aria-label="닫기">✕</button><span class="ws-pbtns"><button type="button" class="pill-btn" id="wsRe">🔄 다른 문제</button><button type="button" class="pill-btn ws-print" id="wsPrint">인쇄 · PDF</button></span></div>
+      <p class="ws-tip no-print">QR을 찍으면 정답을 볼 수 있어요. 문제지 번호가 같으면 언제든 같은 문제가 다시 나와요.</p>
+      <div id="wsSheets"></div>
     </div>
   </dialog>
 
