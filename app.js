@@ -1,8 +1,32 @@
 import { Scanner, warmUpDetector } from "./scanner.js";
 import { lookupBook } from "./lookup.js";
 import { toIsbn13 } from "./isbn.js";
+import * as sync from "./sync.js";
 
 const $ = (id) => document.getElementById(id);
+
+// ---------- 로그인 · 다른 집 구경 ----------
+// 시작하기 전에 로그인을 확인하고 계정 기록과 맞춤 (그동안 첫 화면이 보임)
+const AUTH = await sync.boot();
+const PARAMS = new URLSearchParams(location.search);
+const PEEK_ID = AUTH.user && !AUTH.offline ? PARAMS.get("peek") : null;
+const PEEK = PEEK_ID ? await sync.fetchUser(PEEK_ID).catch(() => null) : null;
+const mem = new Map();
+if (PEEK) {
+  mem.set("kbc:kids:v1", JSON.stringify(PEEK.kids || []));
+  if (PEEK.cats) mem.set("kbc:cats:v1", JSON.stringify(PEEK.cats));
+  mem.set("kbc:records:v1", JSON.stringify(PEEK.records || []));
+  mem.set("kbc:journal:v1", JSON.stringify(PEEK.journal || []));
+  if (PARAMS.get("kid")) mem.set("kbc:activeKid", PARAMS.get("kid"));
+}
+// 구경할 때는 휴대폰에 아무것도 저장하지 않음(메모리에만). 내 기록은 저장하면 계정에도 올라감
+const store = PEEK
+  ? { getItem: (k) => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => mem.set(k, String(v)), removeItem: (k) => mem.delete(k) }
+  : {
+    getItem: (k) => localStorage.getItem(k),
+    setItem: (k, v) => { if (localStorage.getItem(k) === String(v)) return; localStorage.setItem(k, v); sync.touched(k); },
+    removeItem: (k) => { if (localStorage.getItem(k) === null) return; localStorage.removeItem(k); sync.touched(k); },
+  };
 const REC_KEY = "kbc:records:v1";
 const BONUS = 50; // 독후활동 보너스 포인트
 const STAMPS_PER_BOARD = 8;
@@ -41,17 +65,17 @@ function migrate(r) {
   return r;
 }
 const uid = () => crypto.randomUUID?.() || Date.now().toString(36) + Math.random().toString(36).slice(2);
-const readJSON = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
+const readJSON = (k, d) => { try { return JSON.parse(store.getItem(k)) ?? d; } catch { return d; } };
 
 // ---------- 자녀 ----------
 // 모든 기록은 자녀(kid)별로 저장. 화면에는 지금 고른 자녀의 기록만 보여 줌
 const KIDS_KEY = "kbc:kids:v1", ACTIVE_KEY = "kbc:activeKid";
 let kids = readJSON(KIDS_KEY, []);
-let activeKid = localStorage.getItem(ACTIVE_KEY);
+let activeKid = store.getItem(ACTIVE_KEY);
 if (!kids.some((k) => k.id === activeKid)) activeKid = kids[0]?.id || null;
 const saveKids = () => {
-  localStorage.setItem(KIDS_KEY, JSON.stringify(kids));
-  if (activeKid) localStorage.setItem(ACTIVE_KEY, activeKid); else localStorage.removeItem(ACTIVE_KEY);
+  store.setItem(KIDS_KEY, JSON.stringify(kids));
+  if (activeKid) store.setItem(ACTIVE_KEY, activeKid); else store.removeItem(ACTIVE_KEY);
 };
 const mineNow = (x) => !activeKid || !x.kid || x.kid === activeKid;
 
@@ -63,7 +87,7 @@ const saveRecords = () => {
   for (const r of records) if (!r.kid && activeKid) r.kid = activeKid;
   const ids = new Set(records.map((r) => r.id));
   allRecords = [...records, ...allRecords.filter((r) => !ids.has(r.id) && !mineNow(r))];
-  localStorage.setItem(REC_KEY, JSON.stringify(allRecords));
+  store.setItem(REC_KEY, JSON.stringify(allRecords));
 };
 viewRecords();
 saveRecords();
@@ -131,10 +155,10 @@ function go(tab) {
   document.querySelectorAll(".tab").forEach((s) => (s.hidden = s.dataset.tab !== tab));
   document.querySelectorAll(".tabbar button").forEach((b) => b.toggleAttribute("aria-current", b.dataset.go === tab));
   document.querySelectorAll(".tabbar button[aria-current]").forEach((b) => b.setAttribute("aria-current", "page"));
-  if (tab === "stats") renderStats();
+  if (tab === "stats") { renderStats(); renderBrowse(); }
   if (tab === "port") renderCalendar();
   window.scrollTo(0, 0);
-  history.replaceState(null, "", tab === "home" ? location.pathname : `#${tab}`);
+  history.replaceState(null, "", location.pathname + location.search + (tab === "home" ? "" : `#${tab}`));
 }
 document.querySelectorAll(".tabbar button").forEach((b) => b.addEventListener("click", () => go(b.dataset.go)));
 
@@ -532,12 +556,12 @@ const saveJournal = () => {
   for (const j of journal) if (!j.kid && activeKid) j.kid = activeKid;
   const ids = new Set(journal.map((j) => j.id));
   allJournal = [...allJournal.filter((j) => !ids.has(j.id) && !mineNow(j)), ...journal];
-  localStorage.setItem(JOURNAL_KEY, JSON.stringify(allJournal));
+  store.setItem(JOURNAL_KEY, JSON.stringify(allJournal));
 };
 viewJournal();
 const writeAll = () => {
-  localStorage.setItem(REC_KEY, JSON.stringify(allRecords));
-  localStorage.setItem(JOURNAL_KEY, JSON.stringify(allJournal));
+  store.setItem(REC_KEY, JSON.stringify(allRecords));
+  store.setItem(JOURNAL_KEY, JSON.stringify(allJournal));
 };
 
 // 카테고리: 사용자가 편집 가능. kind = book(책장) · focus(책장+시간) · time(한 것+시간) · note(메모만)
@@ -570,16 +594,16 @@ if (!Array.isArray(catList)) {
   // 처음 한 번: 기본 5개 + 이미 기록이 있는 예전 카테고리(수학·기타)
   catList = [...DEFAULT_CATS];
   for (const c of LEGACY_CATS) if (allJournal.some((j) => j.cat === c.key)) catList.splice(catList.length - 1, 0, c);
-  localStorage.setItem(CATS_KEY, JSON.stringify(catList));
+  store.setItem(CATS_KEY, JSON.stringify(catList));
 }
 // 기록은 있는데 목록에 없는 예전 카테고리는 다시 넣어 둠 (기록이 안 보이게 되는 일 방지)
 for (const c of LEGACY_CATS) {
   if (!catList.some((x) => x.key === c.key) && allJournal.some((j) => j.cat === c.key)) {
     catList.splice(Math.max(0, catList.findIndex((x) => x.key === "memo")), 0, { ...c });
-    localStorage.setItem(CATS_KEY, JSON.stringify(catList));
+    store.setItem(CATS_KEY, JSON.stringify(catList));
   }
 }
-const saveCats = () => localStorage.setItem(CATS_KEY, JSON.stringify(catList));
+const saveCats = () => store.setItem(CATS_KEY, JSON.stringify(catList));
 let CATS = [], CAT = {};
 const refreshCats = () => {
   CAT = Object.fromEntries(catList.map((c) => [c.key, decorate(c)]));
@@ -1012,10 +1036,46 @@ $("cSave").addEventListener("click", () => {
 // ---------- 설정 ----------
 const EXPORT_KEY = "kbc:lastExport";
 function openSettings() {
-  const last = localStorage.getItem(EXPORT_KEY);
+  const last = store.getItem(EXPORT_KEY);
   $("lastExport").textContent = last ? `마지막으로 내려받은 날: ${last}` : "모든 자녀의 기록을 파일 하나(ZIP)로 저장해요";
+  $("acctEmail").textContent = sync.currentEmail() ? `${sync.currentEmail()} 로 로그인했어요${AUTH.offline ? " (지금은 인터넷 없음)" : ""}` : "";
+  $("setPrivate").checked = !sync.getPublic();
   $("settingsDialog").showModal();
 }
+$("setPrivate").addEventListener("change", async (e) => {
+  const priv = e.target.checked;
+  try { await sync.setPublic(!priv); toast(priv ? "이제 나만 볼 수 있어요 🔒" : "이제 다른 사람도 구경할 수 있어요 👀"); }
+  catch { e.target.checked = !priv; toast("바꾸지 못했어요. 인터넷 연결을 확인해 주세요"); }
+});
+$("setLogout").addEventListener("click", async () => {
+  if (!confirm("로그아웃할까요?\n기록은 계정에 남아 있어서 다시 로그인하면 그대로 보여요.")) return;
+  try { await sync.signOut(); location.replace(location.pathname); }
+  catch (err) { toast(err.message === "unsynced" ? "아직 계정에 올라가지 않은 기록이 있어요. 인터넷에 연결한 뒤 다시 해 주세요" : "로그아웃하지 못했어요. 인터넷 연결을 확인해 주세요", 4000); }
+});
+
+// ---------- 둘러보기 (공개한 다른 집 책장) ----------
+let browseLoaded = false;
+async function renderBrowse() {
+  if (PEEK || !AUTH.user || AUTH.offline) { $("browseWrap").hidden = true; return; }
+  if (browseLoaded) return;
+  browseLoaded = true;
+  $("browse").innerHTML = `<small class="muted">불러오는 중…</small>`;
+  try {
+    const rows = await sync.listPublic();
+    const items = rows.flatMap((r) => (Array.isArray(r.kids) ? r.kids : []).map((k) => ({ u: r.user_id, k })));
+    $("browse").innerHTML = items.length
+      ? items.map(({ u, k }) => `<button type="button" class="kid" data-u="${esc(u)}" data-k="${esc(k.id)}">${esc(k.nick)}${gradeOf(k) ? ` <small class="grade">${gradeOf(k)}</small>` : ""}</button>`).join("")
+      : `<small class="muted">아직 공개된 다른 책장이 없어요.</small>`;
+  } catch {
+    browseLoaded = false;
+    $("browse").innerHTML = `<small class="muted">불러오지 못했어요. 인터넷 연결을 확인해 주세요.</small>`;
+  }
+}
+$("browse").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-u]");
+  if (b) location.href = `/?peek=${encodeURIComponent(b.dataset.u)}&kid=${encodeURIComponent(b.dataset.k)}`;
+});
+$("peekBack").addEventListener("click", () => { location.href = "/#stats"; });
 $("gearBtn").addEventListener("click", openSettings);
 $("setKids").addEventListener("click", () => { $("settingsDialog").close("away"); openKids(false); });
 $("setCats").addEventListener("click", () => { $("settingsDialog").close("away"); openCats(); });
@@ -1154,7 +1214,7 @@ async function exportAll() {
     { name: "읽어주세요.txt", data: readme },
   ]);
   await saveFile(blob, `바나나북코드-기록-${localDay()}.zip`);
-  localStorage.setItem(EXPORT_KEY, localDay());
+  store.setItem(EXPORT_KEY, localDay());
   $("lastExport").textContent = `마지막으로 내려받은 날: ${localDay()}`;
   toast("💾 기록 파일을 내려받았어요");
 }
@@ -1220,15 +1280,56 @@ render();
 go(["port", "stats"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "home");
 warmUpDetector();
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
-// 첫 화면: 처음이면 시작하기 버튼, 다음부터는 잠깐 보였다 사라짐 (눌러도 넘어감)
-(() => {
-  const w = $("welcome");
-  const hide = () => { if (w.classList.contains("out")) return; w.classList.add("out"); setTimeout(() => (w.hidden = true), 400); };
-  if (!kids.length) {
-    $("welcomeGo").hidden = false;
-    $("welcomeGo").addEventListener("click", () => { hide(); openKids(true); });
-  } else {
-    w.addEventListener("click", hide);
-    setTimeout(hide, 1300);
-  }
-})();
+// ---------- 첫 화면 · 로그인 ----------
+const welcome = $("welcome");
+const hideWelcome = () => { if (welcome.classList.contains("out")) return; welcome.classList.add("out"); setTimeout(() => (welcome.hidden = true), 400); };
+let auMode = "login";
+function showAuth(mode, msg = "") {
+  auMode = mode;
+  $("authForm").hidden = false;
+  const t = { login: ["로그인", "처음이에요 · 회원가입"], signup: ["회원가입", "이미 가입했어요 · 로그인"],
+    reset: ["재설정 메일 보내기", "로그인으로 돌아가기"], newpw: ["새 비밀번호 저장", ""] }[mode];
+  $("auGo").textContent = t[0];
+  $("auMode").textContent = t[1]; $("auMode").hidden = !t[1];
+  $("auForgot").hidden = mode !== "login";
+  $("auEmail").hidden = mode === "newpw";
+  $("auPass").hidden = mode === "reset";
+  $("auPass").value = "";
+  $("auPass").placeholder = mode === "newpw" ? "새 비밀번호 (6자 이상)" : "비밀번호 (6자 이상)";
+  $("auPass").autocomplete = mode === "login" ? "current-password" : "new-password";
+  $("auHelp").textContent = { signup: "가입하면 기록이 계정에 저장돼서 다른 휴대폰에서도 볼 수 있어요.", reset: "가입한 이메일로 비밀번호를 다시 만드는 링크를 보내요.", newpw: "새로 쓸 비밀번호를 적어 주세요." }[mode] || "";
+  $("auMsg").textContent = msg;
+}
+$("authForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const email = $("auEmail").value.trim(), pw = $("auPass").value;
+  if (auMode !== "newpw" && !/^\S+@\S+\.\S+$/.test(email)) { $("auMsg").textContent = "이메일 주소를 적어 주세요."; return; }
+  if (auMode !== "reset" && pw.length < 6) { $("auMsg").textContent = "비밀번호는 6자 이상이에요."; return; }
+  $("auGo").disabled = true;
+  $("auMsg").textContent = "잠시만요…";
+  try {
+    if (auMode === "login") { await sync.signIn(email, pw); location.replace(location.pathname); return; }
+    if (auMode === "signup") {
+      const mailSent = await sync.signUp(email, pw);
+      if (!mailSent) { location.replace(location.pathname); return; }
+      $("auMsg").textContent = `${email} 으로 인증 메일을 보냈어요. 메일 속 링크를 누르면 시작돼요.`;
+    }
+    if (auMode === "reset") { await sync.sendReset(email); $("auMsg").textContent = "재설정 메일을 보냈어요. 메일 속 링크를 눌러 주세요."; }
+    if (auMode === "newpw") { await sync.newPassword(pw); location.replace(location.pathname); return; }
+  } catch (err) { $("auMsg").textContent = sync.koError(err); }
+  $("auGo").disabled = false;
+});
+$("auMode").addEventListener("click", () => showAuth(auMode === "login" ? "signup" : "login"));
+$("auForgot").addEventListener("click", () => showAuth("reset"));
+
+if (PEEK) {
+  document.body.classList.add("peek");
+  $("peekBar").hidden = false;
+  hideWelcome();
+} else {
+  if (PEEK_ID) { history.replaceState(null, "", location.pathname); toast("지금은 볼 수 없는 책장이에요 (나만 보기로 바뀌었을 수 있어요)", 3500); }
+  if (!AUTH.user) showAuth("login", AUTH.error ? "인터넷에 연결한 뒤 다시 열어 주세요." : "");
+  else if (sync.RECOVERY) showAuth("newpw");
+  else if (!kids.length) setTimeout(() => { hideWelcome(); openKids(true); }, 900);
+  else { welcome.addEventListener("click", hideWelcome); setTimeout(hideWelcome, 1300); }
+}

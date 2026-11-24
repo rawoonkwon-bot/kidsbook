@@ -495,3 +495,22 @@ dialog { background: var(--bg); }
 .kid .grade { font-size: 13px; font-weight: 600; opacity: .75; margin-left: 2px; }
 .kid-list .grade-pick { flex: none; width: 84px; height: 44px; border: 0; border-radius: 12px; padding: 0 8px; font-size: 15px; background: var(--card); box-shadow: var(--inset); color: var(--ink, #1E2420); }
 .kid.on .grade { opacity: 1; color: #FFCC00; }
+
+/* 로그인 */
+.auth { display: flex; flex-direction: column; gap: 10px; text-align: left; }
+.auth .sub-input { margin: 0; font-size: 16px; }
+.auth-help { font-size: 13px; color: #4A5A4C; margin: 0; text-align: center; }
+.auth-msg { font-size: 14px; color: #8A3B2E; margin: 0; min-height: 1.2em; text-align: center; }
+.auth-links { display: flex; justify-content: space-between; gap: 8px; }
+.auth-links button { border: 0; background: none; color: #2F5D3A; font-size: 14px; font-weight: 600; padding: 8px 2px; cursor: pointer; }
+.welcome p.auth-help, .welcome p.auth-msg { margin: 0; }
+/* 설정: 나만 보기 */
+.set-check { cursor: pointer; }
+.set-check input { width: 24px; height: 24px; accent-color: var(--forest); flex: none; }
+/* 둘러보기 · 구경 */
+.browse { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }
+.browse .muted { color: var(--muted); font-size: 14px; }
+.peek-bar { flex-basis: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #FFF3C4; color: #5A4300; border-radius: 14px; padding: 8px 12px; font-size: 13px; font-weight: 600; margin-top: 8px; }
+.peek-bar button { border: 0; background: #FFCC00; color: #1E2420; border-radius: 10px; padding: 6px 10px; font-weight: 700; cursor: pointer; flex: none; }
+body.peek #fab, body.peek #gearBtn, body.peek .kid.add, body.peek #vMore, body.peek #vActivity, body.peek #vTotalRow,
+body.peek #dayCats, body.peek .day-sub, body.peek .day-actions, body.peek .day-item .x, body.peek #browseWrap { display: none !important; }

@@ -23,6 +23,7 @@
     </div>
     <button type="button" class="gear" id="gearBtn" aria-label="설정">⚙️</button>
     <nav class="kidbar" id="kidBar" aria-label="자녀 고르기" hidden></nav>
+    <div class="peek-bar" id="peekBar" hidden><span>👀 다른 집 책장 구경 중 · 보기만 할 수 있어요</span><button type="button" id="peekBack">← 내 책장</button></div>
   </header>
 
   <main>
@@ -94,6 +95,11 @@
 
       <h3 class="sec-title big">달마다 읽은 쪽수 📈</h3>
       <div class="vbars" id="statMonths"></div>
+
+      <div id="browseWrap">
+        <h3 class="sec-title big">👀 둘러보기 <small>다른 친구들 책장 구경</small></h3>
+        <div class="browse" id="browse"></div>
+      </div>
     </section>
   </main>
 
@@ -376,7 +382,9 @@
       <button type="button" class="set-row" id="setCats"><span class="si">🗂️</span><span class="st"><b>포트폴리오 카테고리 편집</b><small>이름 · 아이콘 · 순서 · 숨기기 · 추가</small></span><span>›</span></button>
       <button type="button" class="set-row" id="setExport"><span class="si">💾</span><span class="st"><b>내 기록 모두 내려받기</b><small id="lastExport">모든 자녀의 기록을 파일 하나(ZIP)로 저장해요</small></span><span>›</span></button>
       <button type="button" class="set-row" id="setImport"><span class="si">📤</span><span class="st"><b>기록 파일 다시 올리기</b><small>내려받은 파일(.zip 또는 .json)로 복원해요</small></span><span>›</span></button>
-      <p class="set-note">🔐 로그인과 포트폴리오 공개 설정은 곧 추가돼요.</p>
+      <p class="set-note" id="acctEmail"></p>
+      <label class="set-row set-check"><span class="si">🔒</span><span class="st"><b>나만 보기</b><small>체크하면 다른 사람이 우리 아이 책장을 볼 수 없어요</small></span><input type="checkbox" id="setPrivate" /></label>
+      <button type="button" class="set-row" id="setLogout"><span class="si">🚪</span><span class="st"><b>로그아웃</b><small>기록은 계정에 남아 있어요</small></span><span>›</span></button>
     </form>
   </dialog>
   <input type="file" id="importFile" accept=".zip,.json,application/zip,application/json" hidden />
@@ -432,7 +440,17 @@
       <img src="/faces.svg" alt="" class="welcome-faces" width="300" height="220" />
       <h2>바나나북코드</h2>
       <p>오늘 읽은 책, 콕 찍어 기록해요</p>
-      <button type="button" class="btn lime big" id="welcomeGo" hidden>시작하기</button>
+      <form class="auth" id="authForm" novalidate hidden>
+        <p class="auth-help" id="auHelp"></p>
+        <input class="sub-input" id="auEmail" type="email" inputmode="email" autocomplete="email" placeholder="이메일" aria-label="이메일" />
+        <input class="sub-input" id="auPass" type="password" autocomplete="current-password" placeholder="비밀번호 (6자 이상)" aria-label="비밀번호" />
+        <button type="submit" class="btn lime big" id="auGo">로그인</button>
+        <p class="auth-msg" id="auMsg" role="status"></p>
+        <div class="auth-links">
+          <button type="button" id="auMode">처음이에요 · 회원가입</button>
+          <button type="button" id="auForgot">비밀번호를 잊었어요</button>
+        </div>
+      </form>
     </div>
   </div>
 
