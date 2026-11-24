@@ -171,6 +171,7 @@ function go(tab) {
   document.querySelectorAll(".tab").forEach((s) => (s.hidden = s.dataset.tab !== tab));
   document.querySelectorAll(".tabbar button").forEach((b) => b.toggleAttribute("aria-current", b.dataset.go === tab));
   document.querySelectorAll(".tabbar button[aria-current]").forEach((b) => b.setAttribute("aria-current", "page"));
+  $("kidBar").classList.toggle("off", tab !== "home" && tab !== "port"); // 자녀 고르기는 홈·포트폴리오에서만
   if (tab === "stats") { renderStats(); renderBrowse(); }
   if (tab === "port") renderCalendar();
   if (tab === "board") setTimeout(() => renderBoard()); // 게시판 코드가 아래에 있어서 한 박자 뒤에
@@ -239,10 +240,12 @@ function render() {
   const filter = $("monthFilter");
   const months = [...new Set(records.flatMap((r) => r.sessions.map((s) => s.day.slice(0, 7))))].sort().reverse();
   const cur = filter.value || "all";
+  const homeN = records.filter((r) => r.home).length;
   filter.innerHTML = `<option value="all">전체 (${records.length})</option>` +
+    (homeN || cur === "home" ? `<option value="home">우리 집 책장 (${homeN})</option>` : "") +
     months.map((m) => `<option value="${m}">${m.replace("-", "년 ")}월 (${records.filter((r) => inMonth(r, m)).length})</option>`).join("");
-  filter.value = months.includes(cur) ? cur : "all";
-  const list = filter.value === "all" ? records : records.filter((r) => inMonth(r, filter.value));
+  filter.value = months.includes(cur) || cur === "home" ? cur : "all";
+  const list = filter.value === "all" ? records : filter.value === "home" ? records.filter((r) => r.home) : records.filter((r) => inMonth(r, filter.value));
   for (const [key, suffix] of [["ko", "Ko"], ["en", "En"], ["focus", "Fo"]]) {
     const items = list.filter((r) => shelfOf(r) === key);
     $("shelf" + suffix).innerHTML = items.map(cardHtml).join("");
@@ -403,6 +406,7 @@ function openRecord({ existing = null, isbn = null, book = null, self = false, r
   $("rTo").placeholder = prev ? `${prev + 1}쪽부터 몇 쪽까지?` : "몇 쪽까지";
   // 새 책이고 전체 쪽수를 알면 '다 읽은 책'을 기본으로 (한 번에 다 읽는 그림책이 많아서)
   $("rDone").checked = (!existing || reread) && !!total;
+  $("rHome").checked = !!existing?.home;
   $("pagesLabel").textContent = prev ? "오늘 몇 쪽까지 읽었나요? / (전체 페이지)" : "읽은 페이지 / (전체 페이지)";
   syncDone();
   $("rTiming").textContent = rec.isbn ? `ISBN ${rec.isbn}` : "";
@@ -468,6 +472,7 @@ function saveRecord() {
     r.sessions.push(session);
     r.shelf = chosenShelf;
     if (total) r.totalPages = total;
+    if ($("rHome").checked) r.home = true; else delete r.home;
     records = [r, ...records.filter((x) => x.id !== r.id)]; // 최근 읽은 책이 앞으로
   } else {
     const b = rec.book || {};
@@ -483,6 +488,7 @@ function saveRecord() {
       shelf: chosenShelf,
       totalPages: total,
       sessions: [session],
+      ...($("rHome").checked ? { home: true } : {}),
       done: false, score: null, note: "", bonus: false, finishes: [], bonusRounds: [],
       date: new Date().toISOString(),
     };
@@ -607,6 +613,7 @@ function fillView(r) {
     const head = rounds > 1 || fin ? `<li class="round-h"><b>${n}번째</b><span>${ss[0] ? shortDay(ss[0].day) : ""}${fin ? ` ~ ${shortDay(fin.day)} · 다 읽음` : " ~ 읽는 중"}</span></li>` : "";
     return head + ss.map((s) => `<li><span>${prettyDay(s.day)}</span><b>${sessionText(s)}</b></li>`).join("");
   }).join("");
+  $("vHome").checked = !!r.home; $("vHome").disabled = !!PEEK;
   $("vTimes").innerHTML = timesRead(r) ? `${tallySvg(timesRead(r))}<span>${timesRead(r)}번 읽었어요</span>` : "";
   $("vMore").hidden = false;
   $("vMore").textContent = r.done ? `🔁 다시 읽기 (${rounds + 1}번째)` : "➕ 이어서 기록하기";
@@ -617,6 +624,12 @@ function fillView(r) {
   $("vTotalRow").hidden = !!r.totalPages;
   $("vTotal").value = "";
 }
+$("vHome").addEventListener("change", () => {
+  if (!viewing || PEEK) return;
+  if ($("vHome").checked) viewing.home = true; else delete viewing.home;
+  saveRecords(); render();
+  toast($("vHome").checked ? "우리 집 책장에 넣었어요" : "우리 집 책장에서 뺐어요");
+});
 $("vCat").addEventListener("change", () => { if (!viewing) return; viewing.category = $("vCat").value; saveRecords(); render(); toast("분야를 바꿨어요"); });
 $("vTotalSave").addEventListener("click", () => {
   const t = parseInt($("vTotal").value, 10);
@@ -988,6 +1001,8 @@ $("catFilter").addEventListener("click", (e) => {
   renderStats();
 });
 function renderStats() {
+  const kidNow = kids.find((k) => k.id === activeKid);
+  $("statsTitle").textContent = kidNow ? `${kidNow.nick} 독서 통계` : "독서 통계";
   const pages = records.reduce((a, r) => a + pagesOf(r), 0);
   const done = records.reduce((a, r) => a + timesRead(r), 0);
   const focusMins = records.reduce((a, r) => a + minsOf(r), 0) + journal.filter((j) => j.cat === "focus").reduce((a, j) => a + (j.minutes || 0), 0);

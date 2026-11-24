@@ -93,7 +93,7 @@
         <p class="browse-help">이름을 누르면 그 친구의 책장과 포트폴리오를 볼 수 있어요 (보기만 돼요)</p>
         <div class="browse" id="browse"></div>
       </div>
-      <h2 class="page-title">독서 통계</h2>
+      <h2 class="page-title" id="statsTitle">독서 통계</h2>
       <div class="tiles" id="statTiles"></div>
 
       <h3 class="sec-title big">한글책 · 영어책 · 집중듣기</h3>
@@ -228,7 +228,9 @@
           <span>/</span>
           <input id="rTotal" type="number" inputmode="numeric" min="1" placeholder="전체" aria-label="전체 페이지" />
         </div>
-        <label class="check"><input type="checkbox" id="rDone" /><span>이미 다 읽은 책이에요</span></label>
+        <label class="check"><input type="checkbox" id="rDone" /><span>다 읽음</span></label>
+        <label class="check"><input type="checkbox" id="rHome" /><span>우리 집 책장</span></label>
+        <p class="check-help">집에 있는 책이면 체크해요. 도서관에서 빌린 책은 그대로 두세요.</p>
       </div>
       <div class="field" id="focusRow" hidden>
         <span><span data-ico="ear"></span>집중듣기 시간</span>
@@ -316,6 +318,7 @@
       </div>
       <div class="progress" id="vProgress"></div>
       <div class="v-times" id="vTimes"></div>
+      <label class="check v-home"><input type="checkbox" id="vHome" /><span>우리 집 책장에 있는 책</span></label>
       <div class="total-row" id="vTotalRow" hidden>
         <span>책 전체</span>
         <input id="vTotal" type="number" inputmode="numeric" min="1" placeholder="?" aria-label="책 전체 쪽수" />

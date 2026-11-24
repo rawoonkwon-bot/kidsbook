@@ -59,7 +59,7 @@ function mergeData(base, extra) {
     if (!same) { out.records.push({ ...r, kid }); continue; }
     const have = new Set(same.sessions.map(sKey));
     for (const s of r.sessions || []) if (!have.has(sKey(s))) same.sessions.push(s);
-    for (const f of ["totalPages", "score", "note", "bonus", "category", "cover", "description"]) if (!same[f] && r[f]) same[f] = r[f];
+    for (const f of ["totalPages", "score", "note", "bonus", "category", "cover", "description", "home"]) if (!same[f] && r[f]) same[f] = r[f];
     for (const f of r.finishes || []) if (!(same.finishes || []).some((x) => x.round === f.round)) same.finishes = [...(same.finishes || []), f];
     if (r.bonusRounds) same.bonusRounds = [...new Set([...(same.bonusRounds || []), ...r.bonusRounds])];
     if ((r.round || 1) > (same.round || 1)) { same.round = r.round; same.done = !!r.done; same.doneAt = r.doneAt; same.doneDay = r.doneDay; }
