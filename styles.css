@@ -763,3 +763,57 @@ body.peek #diAdd { display: none; }
 .face-cols { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 4px; }
 .face-cols button { width: 30px; height: 30px; border-radius: 50%; border: 3px solid transparent; cursor: pointer; padding: 0; }
 .face-cols button.on { border-color: var(--forest); }
+
+/* 스탬프판 50칸 · 선물 · 졸업장 */
+.stamp-top { grid-template-columns: 1fr auto; margin-bottom: 8px; }
+.stamp-top b { text-align: left; font-size: 20px; }
+.stamp-bar { height: 8px; border-radius: 99px; background: var(--line); overflow: hidden; margin-bottom: 14px; }
+.stamp-bar i { display: block; height: 100%; background: var(--forest); border-radius: 99px; transition: width .4s; }
+.stamp-card .stamp-grid { grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 5px; }
+.stamp-card .stamp { border: 1.5px solid var(--line); background: var(--bg); font-size: 11px; padding: 0; filter: none; opacity: 1; }
+.stamp-card .stamp.gold { border: 2px solid #C89B3C; }
+.stamp-card .stamp.on { border: 2px solid var(--forest); cursor: pointer; }
+.stamp-card .stamp.on.gold { border-color: #C89B3C; box-shadow: 0 0 0 1.5px #C89B3C; }
+.stamp-card .stamp.on::after { content: none; }
+.stamp-card .stamp.on span { font-weight: 800; color: var(--forest); }
+.stamp-done { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: #F4E7C8; border-radius: 14px; padding: 10px 12px; margin-bottom: 12px; }
+.stamp-done b { color: #5C4310; font-size: 16px; }
+.reward { display: flex; align-items: center; gap: 10px; margin-top: 14px; background: #F4E7C8; border-radius: 14px; padding: 10px 12px; }
+.reward .gift { font-size: 22px; }
+.reward small { display: block; font-size: 12px; color: #7A5A17; }
+.reward b { font-size: 15px; color: #3E2E09; }
+.reward .link-btn { margin-left: auto; font-size: 13px; }
+.reward-add { width: 100%; border: 1.5px dashed #C89B3C; background: none; border-radius: 12px; padding: 10px; font: inherit; font-size: 14px; font-weight: 700; color: #7A5A17; cursor: pointer; }
+.reward:has(.reward-add) { background: none; padding: 0; }
+.reward-edit { display: flex; gap: 8px; margin-top: 14px; }
+.reward-edit .sub-input { flex: 1; margin: 0; font-size: 16px; }
+.cert-list { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.cert-list b { font-size: 15px; }
+.cert-list button { border: 0; background: var(--bg); border-radius: 10px; padding: 9px 12px; text-align: left; font: inherit; font-weight: 700; color: var(--forest-d); cursor: pointer; }
+.cert { background: #FFFDF6; border: 3px double #C89B3C; border-radius: 18px; padding: 26px 20px; text-align: center; color: #1E2420; }
+.cert-logo { width: 64px; height: 64px; }
+.cert-kicker { margin: 6px 0 0; font-size: 13px; color: #7A5A17; font-weight: 700; letter-spacing: 1px; }
+.cert h2 { margin: 4px 0 2px; font-size: 30px; color: var(--forest-d); letter-spacing: 2px; }
+.cert-no { margin: 0; font-size: 13px; color: var(--muted); }
+.cert-name { margin: 18px 0 6px; font-size: 26px; }
+.cert-name small { font-size: 15px; color: var(--muted); }
+.cert-body { margin: 0; font-size: 16px; line-height: 1.8; }
+.cert-reward { margin: 14px auto 0; display: inline-block; background: #F4E7C8; border-radius: 999px; padding: 6px 14px; font-size: 14px; }
+.cert-books { text-align: left; columns: 2; column-gap: 18px; font-size: 12px; line-height: 1.6; margin: 18px 0 0; padding-left: 22px; color: #3A3C44; }
+.cert-books li { break-inside: avoid; }
+.cert-date { margin: 18px 0 0; font-size: 14px; font-weight: 700; }
+@media print {
+  body.printing > *:not(#certPage) { display: none !important; }
+  body.printing #certPage { position: static; display: block; width: auto; height: auto; max-height: none; background: #fff; }
+  body.printing #certPage .no-print { display: none !important; }
+  body.printing .cert { border-color: #C89B3C; }
+}
+/* 엄마 목록: 작은 정사각형 */
+#browseWrap .mom-list { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+#browseWrap .mom-list > .muted { grid-column: 1 / -1; }
+.mom-tile { position: relative; width: 100%; aspect-ratio: 1; border: 0; border-radius: 16px; background: var(--card); box-shadow: var(--raise-s); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 6px 4px; cursor: pointer; color: inherit; font: inherit; }
+.mom-tile .av { width: 40%; height: auto; aspect-ratio: 1; max-width: 40px; }
+.mom-tile .av.av-txt { font-size: 15px; }
+.mom-tile b { font-size: 12px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
+.mom-tile small { font-size: 11px; color: var(--muted); line-height: 1; }
+.mom-tile em { position: absolute; top: 5px; right: 5px; font-style: normal; font-size: 9px; font-weight: 800; color: var(--forest); background: var(--sage-l); border-radius: 999px; padding: 1px 5px; }

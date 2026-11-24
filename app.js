@@ -36,7 +36,7 @@ const localStore = {
 let store = PEEK ? memStore : localStore;
 const REC_KEY = "kbc:records:v1";
 const BONUS = 50; // 독후활동 보너스 포인트
-const STAMPS_PER_BOARD = 8;
+const STAMPS_PER_BOARD = 50;
 const BOOK_CATS = ["문학", "자연과학", "사회과학", "역사", "예술", "언어", "기술과학", "철학", "종교", "총류", "기타"];
 const SHELVES = { ko: "한글책", en: "영어책", focus: "집중듣기" };
 const shelfName = (k) => SHELVES[k];
@@ -574,23 +574,80 @@ aDone.addEventListener("click", () => finishActivity("done"));
 // Esc 등으로 그냥 닫혀도 건너뛰기처럼 처리 (흐름 중이면 스탬프는 받음)
 $("activityPage").addEventListener("cancel", (e) => { e.preventDefault(); finishActivity("skip"); });
 
-// ---------- 5) 독서 스탬프 ----------
+// ---------- 5) 독서 스탬프 (한 판 50개, 다 모으면 졸업장) ----------
+const dayOfStamp = (x) => (x.r.finishes || []).find((f) => f.round === x.round)?.day || localDay(new Date(x.at || Date.now()));
+let stampOn = [];
 function openStamp(newId) {
   const list = stampList();
   const n = list.length;
   const board = n === 0 ? 0 : Math.floor((n - 1) / STAMPS_PER_BOARD);
-  const on = list.slice(board * STAMPS_PER_BOARD, board * STAMPS_PER_BOARD + STAMPS_PER_BOARD);
-  $("stampCount").textContent = `(${on.length}/${STAMPS_PER_BOARD})`;
+  const on = (stampOn = list.slice(board * STAMPS_PER_BOARD, board * STAMPS_PER_BOARD + STAMPS_PER_BOARD));
+  $("stampCount").textContent = `${on.length} / ${STAMPS_PER_BOARD}`;
+  $("stampBar").style.width = `${(on.length / STAMPS_PER_BOARD) * 100}%`;
   $("stampGrid").innerHTML = Array.from({ length: STAMPS_PER_BOARD }, (_, i) => {
-    const x = on[i];
-    if (!x) return `<div class="stamp" aria-label="빈 칸">📖</div>`;
+    const x = on[i], gold = (i + 1) % 10 === 0 ? " gold" : "";
+    if (!x) return `<div class="stamp${gold}" aria-label="빈 칸"></div>`;
     const r = x.r, isNew = r.id === newId && x.round === (r.finishes || []).at(-1)?.round;
-    return `<div class="stamp on${isNew ? " new" : ""}" title="${esc(r.title)}${x.round > 1 ? ` (${x.round}번째)` : ""}">${r.cover ? `<img src="${esc(r.cover)}" alt="">` : ""}</div>`;
+    return `<button type="button" class="stamp on${gold}${isNew ? " new" : ""}" data-i="${i}" title="${esc(r.title)}${x.round > 1 ? ` (${x.round}번째)` : ""}">${r.cover ? `<img src="${esc(r.cover)}" alt="">` : `<span>${esc([...r.title][0] || "")}</span>`}</button>`;
   }).join("");
+  const full = on.length === STAMPS_PER_BOARD;
+  $("stampDone").hidden = !full;
+  $("stampDone").innerHTML = full ? `<b>🎉 ${STAMPS_PER_BOARD}권 완주!</b><button type="button" class="btn dark" data-cert="${board}">졸업장 보기</button>` : "";
+  paintReward();
   const boards = Math.floor(n / STAMPS_PER_BOARD);
-  $("stampBoards").textContent = boards ? `지금까지 완성한 스탬프판: ${boards}장 🎉` : "";
+  $("certList").innerHTML = boards ? `<b>받은 졸업장</b>` + Array.from({ length: boards }, (_, b) => `<button type="button" data-cert="${b}">${b + 1}번째 졸업장 · ${prettyDay(dayOfStamp(list[(b + 1) * STAMPS_PER_BOARD - 1]))}</button>`).join("") : "";
   if (!$("stampPage").open) $("stampPage").showModal();
+  // 방금 받은 스탬프로 한 판을 다 채웠으면 졸업장을 바로 보여 줘요
+  if (full && newId && on.some((x) => x.r.id === newId)) setTimeout(() => openCert(board), 1200);
 }
+const kidNow = () => kids.find((k) => k.id === activeKid) || null;
+function paintReward() {
+  const k = kidNow(), rw = k?.reward || "";
+  $("rewardEdit").hidden = true;
+  $("reward").innerHTML = rw
+    ? `<span class="gift">🎁</span><span><small>${STAMPS_PER_BOARD}개 모으면</small><b>${esc(rw)}</b></span>${PEEK ? "" : `<button type="button" class="link-btn" data-rw>바꾸기</button>`}`
+    : PEEK ? "" : `<button type="button" class="reward-add" data-rw>🎁 ${STAMPS_PER_BOARD}개 모으면 받을 선물을 정해 주세요 ›</button>`;
+  $("reward").hidden = !$("reward").innerHTML;
+}
+$("reward").addEventListener("click", (e) => {
+  if (!e.target.closest("[data-rw]")) return;
+  $("rewardIn").value = kidNow()?.reward || "";
+  $("reward").hidden = true; $("rewardEdit").hidden = false; $("rewardIn").focus();
+});
+$("rewardSave").addEventListener("click", () => {
+  const k = kidNow(); if (!k || PEEK) return;
+  const v = $("rewardIn").value.trim();
+  if (v) k.reward = v; else delete k.reward;
+  saveKids(); paintReward();
+  toast(v ? "선물을 정했어요" : "선물을 지웠어요");
+});
+$("rewardIn").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $("rewardSave").click(); } });
+$("stampGrid").addEventListener("click", (e) => { const b = e.target.closest("[data-i]"); if (b && stampOn[b.dataset.i]) openView(stampOn[b.dataset.i].r.id); });
+$("stampPage").addEventListener("click", (e) => { const b = e.target.closest("[data-cert]"); if (b) openCert(Number(b.dataset.cert)); });
+
+// 독서 졸업장
+function openCert(board) {
+  const list = stampList().slice(board * STAMPS_PER_BOARD, (board + 1) * STAMPS_PER_BOARD);
+  if (list.length < STAMPS_PER_BOARD) return;
+  const k = kidNow(), d = (x) => { const [y, m, dd] = dayOfStamp(x).split("-"); return `${y}년 ${Number(m)}월 ${Number(dd)}일`; };
+  $("cert").innerHTML = `
+    <img class="cert-logo" src="/logo.svg" alt="">
+    <p class="cert-kicker">바나나북코드</p>
+    <h2>독서 졸업장</h2>
+    <p class="cert-no">${board + 1}번째 스탬프판</p>
+    <p class="cert-name"><b>${esc(k?.nick || "")}</b>${k && gradeOf(k) ? ` <small>${gradeOf(k)}</small>` : ""}</p>
+    <p class="cert-body">위 어린이는 ${d(list[0])}부터 ${d(list.at(-1))}까지<br>책 <b>${STAMPS_PER_BOARD}권</b>을 끝까지 읽었기에<br>이 졸업장을 드립니다.</p>
+    ${k?.reward ? `<p class="cert-reward">🎁 약속한 선물: <b>${esc(k.reward)}</b></p>` : ""}
+    <ol class="cert-books">${list.map((x) => `<li>${esc(x.r.title)}${x.round > 1 ? ` <small>(${x.round}번째)</small>` : ""}</li>`).join("")}</ol>
+    <p class="cert-date">${d(list.at(-1))}</p>`;
+  $("certPage").showModal();
+  $("certPage").scrollTop = 0;
+}
+$("certClose").addEventListener("click", () => $("certPage").close());
+$("certPrint").addEventListener("click", () => {
+  document.body.classList.add("printing");
+  setTimeout(() => { window.print(); setTimeout(() => document.body.classList.remove("printing"), 500); }, 50);
+});
 
 // ---------- 책장에서 책 눌렀을 때 ----------
 let viewing = null;
@@ -1395,7 +1452,7 @@ const agoDay = (iso) => {
   const n = dayDiff(localDay(new Date(iso)), localDay());
   return n <= 0 ? "오늘 기록" : n === 1 ? "어제 기록" : n < 30 ? `${n}일 전 기록` : "한 달 넘게 쉬는 중";
 };
-const momRow = (m) => `<li><button type="button" class="mom-row" data-u="${esc(m.user_id)}">${avatar(m.nick, m.face)}<span><b>${esc(m.nick)}</b>${m.updated_at ? `<small>${agoDay(m.updated_at)}</small>` : ""}</span>${follows.has(m.user_id) ? `<em>이웃</em>` : ""}</button></li>`;
+const momRow = (m, nbMark = true) => `<li><button type="button" class="mom-tile" data-u="${esc(m.user_id)}">${avatar(m.nick, m.face)}<b>${esc(m.nick)}</b>${m.updated_at ? `<small>${agoDay(m.updated_at).replace(" 기록", "")}</small>` : ""}${nbMark && follows.has(m.user_id) ? `<em>이웃</em>` : ""}</button></li>`;
 let follows = new Map(), followsLoaded = false, momOffset = 0;
 async function renderBrowse() {
   $("browseWrap").hidden = !!(PEEK || !AUTH.user || AUTH.offline);
@@ -1417,7 +1474,7 @@ async function renderBrowse() {
 }
 function paintFollows() {
   $("nbWrap").hidden = !follows.size;
-  $("nbList").innerHTML = [...follows.values()].map((m) => `<button type="button" class="nb-chip" data-u="${esc(m.user_id)}">${avatar(m.nick, m.face)}${esc(m.nick)}</button>`).join("");
+  $("nbList").innerHTML = [...follows.values()].map((m) => momRow({ ...m, updated_at: null }, false)).join("");
 }
 function addMoms({ list, more }) {
   momOffset += 20;

@@ -104,7 +104,7 @@
         <div id="momMain">
           <div id="nbWrap" hidden>
             <h3 class="sec-title">내 이웃</h3>
-            <div class="nb-list" id="nbList"></div>
+            <ul class="mom-list" id="nbList"></ul>
           </div>
           <h3 class="sec-title">요즘 기록한 집</h3>
           <ul class="mom-list" id="browse"></ul>
@@ -299,18 +299,36 @@
       <div class="page-top end"><button class="x-btn" value="close" aria-label="닫기">✕</button></div>
       <h2 class="stamp-h">책 한 권 다 읽을 때마다<br>독서 스탬프 하나씩!</h2>
       <div class="stamp-card">
-        <div class="stamp-top"><span class="avatar">🍌</span><b>독서 스탬프</b><span id="stampCount"></span></div>
+        <div class="stamp-top"><b>독서 스탬프</b><span id="stampCount"></span></div>
+        <div class="stamp-bar"><i id="stampBar"></i></div>
+        <div class="stamp-done" id="stampDone" hidden></div>
         <div class="stamp-grid" id="stampGrid"></div>
+        <div class="reward" id="reward"></div>
+        <div class="reward-edit" id="rewardEdit" hidden>
+          <input id="rewardIn" class="sub-input" maxlength="40" placeholder="예: 놀이공원 가기" />
+          <button type="button" class="btn dark" id="rewardSave">저장</button>
+        </div>
       </div>
       <div class="stamp-info">
         <h4>🏅 독서스탬프 안내</h4>
         <ul>
           <li>책 한 권을 끝까지 읽으면 스탬프를 하나씩 받아요</li>
-          <li>8개를 다 채우면 새 스탬프판이 시작돼요</li>
-          <li id="stampBoards"></li>
+          <li>50개를 다 채우면 졸업장을 받고 새 스탬프판이 시작돼요</li>
+          <li>10개마다 금색 칸이 있어요. 중간 목표로 삼아 보세요</li>
+        </ul>
+        <div class="cert-list" id="certList"></div>
+        <ul hidden>
         </ul>
       </div>
     </form>
+  </dialog>
+
+  <!-- 독서 졸업장 -->
+  <dialog id="certPage" class="page">
+    <div class="page-in">
+      <div class="page-top no-print"><button type="button" class="x-btn" id="certClose" aria-label="닫기">✕</button><button type="button" class="pill-btn" id="certPrint">인쇄 · PDF로 저장</button></div>
+      <article class="cert" id="cert"></article>
+    </div>
   </dialog>
 
   <!-- 포인트 획득 효과 -->
