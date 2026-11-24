@@ -850,10 +850,19 @@ document.querySelectorAll('dialog button[value="cancel"], dialog button[value="c
   b.addEventListener("click", () => b.closest("dialog").close(b.value));
 });
 
+// ---------- 학년 (3월마다 한 칸씩 자동으로 올라감) ----------
+const GRADES = ["3세", "4세", "5세", "6세", "7세", "초1", "초2", "초3", "초4", "초5", "초6", "중1", "중2", "중3", "고1", "고2", "고3", "졸업"];
+function schoolYear(d = new Date()) { return d.getMonth() >= 2 ? d.getFullYear() : d.getFullYear() - 1; }
+function gradeIdx(k) {
+  if (k.grade == null || k.gradeYear == null) return -1;
+  return Math.min(GRADES.length - 1, Math.max(0, k.grade + schoolYear() - k.gradeYear));
+}
+function gradeOf(k) { const i = gradeIdx(k); return i < 0 ? "" : GRADES[i]; }
+
 // ---------- 자녀 바 ----------
 function renderKids() {
   $("kidBar").hidden = !kids.length;
-  $("kidBar").innerHTML = kids.map((k) => `<button type="button" class="kid${k.id === activeKid ? " on" : ""}" data-kid="${k.id}">${esc(k.nick)}</button>`).join("") +
+  $("kidBar").innerHTML = kids.map((k) => `<button type="button" class="kid${k.id === activeKid ? " on" : ""}" data-kid="${k.id}">${esc(k.nick)}${gradeOf(k) ? ` <small class="grade">${gradeOf(k)}</small>` : ""}</button>`).join("") +
     `<button type="button" class="kid add" data-kid="+" aria-label="자녀 추가·관리">＋</button>`;
 }
 function setKid(id) {
@@ -872,17 +881,21 @@ $("kidBar").addEventListener("click", (e) => {
 let kidsFirst = false, kidDraft = [];
 function openKids(first) {
   kidsFirst = first;
-  kidDraft = kids.map((k) => ({ ...k }));
-  if (!kidDraft.length) kidDraft.push({ id: uid(), nick: "" });
+  kidDraft = kids.map((k) => ({ id: k.id, nick: k.nick, g: gradeIdx(k) }));
+  if (!kidDraft.length) kidDraft.push({ id: uid(), nick: "", g: -1 });
   $("kTitle").textContent = first ? "반가워요! 자녀를 등록해 주세요 🍌" : "자녀 관리";
   $("kCancel").hidden = first;
   paintKids();
   $("kidsDialog").showModal();
   if (first) setTimeout(() => $("kList").querySelector("input")?.focus(), 50);
 }
-function syncKids() { $("kList").querySelectorAll("input").forEach((inp, i) => (kidDraft[i].nick = inp.value)); }
+function syncKids() {
+  $("kList").querySelectorAll("input").forEach((inp, i) => (kidDraft[i].nick = inp.value));
+  $("kList").querySelectorAll("select").forEach((sel, i) => (kidDraft[i].g = Number(sel.value)));
+}
 function paintKids() {
   $("kList").innerHTML = kidDraft.map((k, i) => `<li><input class="sub-input" value="${esc(k.nick)}" maxlength="10" placeholder="닉네임 (예: 시운)" aria-label="${i + 1}번째 자녀 닉네임" />
+    <select class="grade-pick" aria-label="${i + 1}번째 자녀 학년"><option value="-1"${k.g < 0 ? " selected" : ""}>학년</option>${GRADES.map((g, j) => `<option value="${j}"${k.g === j ? " selected" : ""}>${g}</option>`).join("")}</select>
     ${kidDraft.length > 1 ? `<button type="button" class="x" data-rm="${i}" aria-label="${esc(k.nick || "이 자녀")} 지우기">✕</button>` : ""}</li>`).join("");
 }
 $("kList").addEventListener("click", (e) => {
@@ -891,7 +904,7 @@ $("kList").addEventListener("click", (e) => {
 });
 $("kList").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $("kSave").click(); } });
 $("kAdd").addEventListener("click", () => {
-  syncKids(); kidDraft.push({ id: uid(), nick: "" }); paintKids();
+  syncKids(); kidDraft.push({ id: uid(), nick: "", g: -1 }); paintKids();
   const ins = $("kList").querySelectorAll("input"); ins[ins.length - 1].focus();
 });
 $("kidsDialog").addEventListener("cancel", (e) => { if (kidsFirst) e.preventDefault(); });
@@ -900,6 +913,7 @@ $("kSave").addEventListener("click", () => {
   const nicks = kidDraft.map((k) => k.nick.trim());
   if (nicks.some((n) => !n)) { toast("닉네임을 모두 적어 주세요"); return; }
   if (new Set(nicks).size !== nicks.length) { toast("같은 닉네임이 있어요"); return; }
+  if (kidDraft.some((k) => k.g < 0)) { toast("학년을 모두 골라 주세요"); return; }
   saveRecords(); saveJournal();
   const keep = new Set(kidDraft.map((k) => k.id));
   const removed = kids.filter((k) => !keep.has(k.id));
@@ -910,7 +924,8 @@ $("kSave").addEventListener("click", () => {
     allRecords = allRecords.filter((r) => !gone.has(r.kid));
     allJournal = allJournal.filter((j) => !gone.has(j.kid));
   }
-  kids = kidDraft.map((k) => ({ id: k.id, nick: k.nick.trim() }));
+  const sy = schoolYear();
+  kids = kidDraft.map((k) => ({ id: k.id, nick: k.nick.trim(), grade: k.g, gradeYear: sy }));
   // 자녀 등록 전에 만든 기록은 첫째 자녀에게
   for (const x of [...allRecords, ...allJournal]) if (!x.kid) x.kid = kids[0].id;
   writeAll();
@@ -1011,7 +1026,7 @@ $("setImport").addEventListener("click", () => $("importFile").click());
 const BACKUP_FORMAT = "banana-bookcode-backup", BACKUP_VERSION = 1;
 const ABOUT = {
   "이 파일은": "바나나북코드(아이 독서기록 앱)의 모든 기록을 담은 보관용 파일이에요. 앱의 '설정 → 기록 파일 다시 올리기'로 복원할 수 있어요.",
-  kids: "자녀 목록. id, nick(닉네임)",
+  kids: "자녀 목록. id, nick(닉네임), grade(학년 번호: 0=3세 … 4=7세, 5=초1 … 10=초6, 11=중1 … 13=중3, 14=고1 … 16=고3, 17=졸업), gradeYear(그 학년이었던 학년도, 3월 시작). 지금 학년 = grade + (올해 학년도 - gradeYear)",
   categories: "포트폴리오 카테고리. kind: book=책장(한글책/영어책), focus=집중듣기(책+시간), time=한 것+시간, note=메모. hidden=숨김",
   records: "책 기록(책 한 권 = 1개). kid=자녀 id, shelf: ko 한글책 / en 영어책 / focus 집중듣기. sessions=읽은 날(day, YYYY-MM-DD)마다 읽은 쪽(from~to)과 집중듣기 시간(minutes, 분). totalPages=전체 쪽수, done=끝까지 읽음, score=별점(1~5), note=독후활동 글, bonus=독후활동 포인트(+50) 받음, category=분야",
   journal: "포트폴리오 하루 기록. kid=자녀 id, day=날짜, cat=카테고리 key, what=한 것, minutes=시간(분), text=메모",
@@ -1041,7 +1056,7 @@ function diaryHtml(d) {
       add(j.day, `<li>${c.icon} ${esc(c.name)}${j.what ? ` · <b>${esc(j.what)}</b>` : ""}${j.minutes ? ` · ${fmtMin(j.minutes)}` : ""}${j.text ? `<div class="memo">${esc(j.text)}</div>` : ""}</li>`);
     }
     const pages = recs.reduce((a, r) => a + pagesOf(r), 0), pts = recs.reduce((a, r) => a + pointsOf(r), 0);
-    return `<section><h2>🍌 ${esc(k.nick)}</h2>
+    return `<section><h2>🍌 ${esc(k.nick)}${gradeOf(k) ? " " + gradeOf(k) : ""}</h2>
       <p class="sum">책 ${recs.length}권 · 끝까지 읽은 책 ${recs.filter((r) => r.done).length}권 · ${pages.toLocaleString()}쪽 · 독서 포인트 ${pts.toLocaleString()}점</p>
       <h3>📅 날짜별 기록</h3>
       ${Object.keys(days).sort().reverse().map((day) => `<div class="day"><h4>${plainDay(day)}</h4><ul>${days[day].join("")}</ul></div>`).join("") || "<p>기록이 없어요</p>"}
@@ -1149,7 +1164,8 @@ function mergeBackup(d) {
   for (const k of d.kids || []) {
     const same = kids.find((x) => x.id === k.id) || kids.find((x) => x.nick === k.nick);
     if (same) kidMap[k.id] = same.id;
-    else { kids.push({ id: k.id || uid(), nick: k.nick || "자녀" }); kidMap[k.id] = kids.at(-1).id; n.k++; }
+    else { kids.push({ id: k.id || uid(), nick: k.nick || "자녀", ...(k.grade != null && k.gradeYear != null ? { grade: k.grade, gradeYear: k.gradeYear } : {}) }); kidMap[k.id] = kids.at(-1).id; n.k++; }
+    if (same && same.grade == null && k.grade != null && k.gradeYear != null) { same.grade = k.grade; same.gradeYear = k.gradeYear; }
   }
   if (!kids.length) kids.push({ id: uid(), nick: "자녀" });
   const fallback = activeKid && kids.some((k) => k.id === activeKid) ? activeKid : kids[0].id;
