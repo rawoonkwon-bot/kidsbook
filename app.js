@@ -175,6 +175,7 @@ function go(tab) {
   if (tab === "stats") { renderStats(); renderBrowse(); }
   if (tab === "port") renderCalendar();
   if (tab === "board") setTimeout(() => renderBoard()); // 게시판 코드가 아래에 있어서 한 박자 뒤에
+  if (tab === "home") setTimeout(() => renderPopular());
   window.scrollTo(0, 0);
   history.replaceState(null, "", location.pathname + location.search + (tab === "home" ? "" : `#${tab}`));
 }
@@ -1352,26 +1353,19 @@ async function renderBrowse() {
   browseLoaded = true;
   $("browse").innerHTML = `<small class="muted">불러오는 중…</small>`;
   try {
-    const rows = await sync.listPublic();
-    const items = rows.flatMap((r) => (Array.isArray(r.kids) ? r.kids : []).map((k) => ({ u: r.user_id, k })));
-    $("browse").innerHTML = items.length
-      ? items.map(({ u, k }) => `<button type="button" class="kid" data-u="${esc(u)}" data-k="${esc(k.id)}">${esc(k.nick)}${gradeOf(k) ? ` <small class="grade">${gradeOf(k)}</small>` : ""}</button>`).join("")
+    const moms = await sync.listMoms();
+    moms.forEach((m) => momCache.set(m.user_id, m));
+    $("browse").innerHTML = moms.length
+      ? moms.map((m) => `<button type="button" class="kid mom" data-u="${esc(m.user_id)}">${esc(m.nick)}</button>`).join("")
       : `<small class="muted">아직 공개된 다른 책장이 없어요.</small>`;
-    [...new Set(items.map((x) => x.u))].slice(0, 8).forEach(prefetchPeek);
+    moms.slice(0, 8).forEach((m) => prefetchPeek(m.user_id));
   } catch {
     browseLoaded = false;
     $("browse").innerHTML = `<small class="muted">불러오지 못했어요. 인터넷 연결을 확인해 주세요.</small>`;
   }
 }
 $("browse").addEventListener("pointerdown", (e) => { const b = e.target.closest("[data-u]"); if (b) prefetchPeek(b.dataset.u); });
-$("browse").addEventListener("click", async (e) => {
-  const b = e.target.closest("[data-u]"); if (!b) return;
-  b.classList.add("loading");
-  const data = await prefetchPeek(b.dataset.u);
-  b.classList.remove("loading");
-  if (!data) { toast("지금은 볼 수 없는 책장이에요 (나만 보기로 바뀌었을 수 있어요)", 3500); return; }
-  enterPeek(data, b.dataset.k);
-});
+$("browse").addEventListener("click", (e) => { const b = e.target.closest("[data-u]"); if (b) openMom(b.dataset.u); });
 // 앱을 다시 열지 않고 화면만 친구 책장으로 바꾸기 (구경하는 동안은 휴대폰에 아무것도 저장하지 않음)
 function enterPeek(data, kid) {
   fillMem(data, kid);
@@ -1644,6 +1638,7 @@ $("setNick").addEventListener("click", () => { $("settingsDialog").close("away")
 // ---------- 게시판 ----------
 const BOARDS = { free: "자유", books: "책 추천", qna: "질문" };
 let board = "free", boardLoaded = "", postNow = null;
+const viewed = new Set(); // 이번에 앱을 켜고 조회수를 올린 글
 const ago = (iso) => {
   const d = new Date(iso), now = new Date();
   if (localDay(d) === localDay(now)) return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
@@ -1660,7 +1655,7 @@ async function renderBoard(force = false) {
     if (boardLoaded !== board) return;
     $("postList").innerHTML = list.length ? list.map((p) => `<li><button type="button" class="post-row${p.pinned ? " pinned" : ""}" data-id="${p.id}">
         <b>${p.pinned ? `<span class="pin">공지</span>` : ""}${esc(p.title)}</b>
-        <small><span>${esc(p.nick)}</span><span>${ago(p.created_at)}</span>${p.nComments ? `<span>${ico("message")} ${p.nComments}</span>` : ""}${p.nLikes ? `<span>${ico("heart")} ${p.nLikes}</span>` : ""}</small>
+        <small><span>${esc(p.nick)}</span><span>${ago(p.created_at)}</span>${p.views ? `<span>${ico("eye")} ${p.views}</span>` : ""}${p.nComments ? `<span>${ico("message")} ${p.nComments}</span>` : ""}${p.nLikes ? `<span>${ico("heart")} ${p.nLikes}</span>` : ""}</small>
       </button></li>`).join("") : `<li class="muted">아직 글이 없어요. 첫 글을 써 보세요!</li>`;
   } catch {
     boardLoaded = "";
@@ -1679,13 +1674,23 @@ async function openPost(id) {
     if (!p) { $("postView").close(); toast("지워진 글이에요"); renderBoard(true); return; }
     postNow = p;
     paintPost();
+    if (!viewed.has(id)) {
+      viewed.add(id);
+      sync.bumpView(id).then((n) => { if (n != null && postNow?.id === id && n !== postNow.views) { postNow.views = n; paintMeta(); boardLoaded = ""; } }).catch(() => viewed.delete(id));
+    }
   } catch { $("pTitle").textContent = "불러오지 못했어요. 인터넷 연결을 확인해 주세요."; }
+}
+function paintMeta() {
+  const p = postNow;
+  $("pMeta").innerHTML = `<button type="button" class="nick-link" data-u="${esc(p.user_id)}">${esc(p.nick)}</button> · ${ago(p.created_at)}${p.updated_at && Date.parse(p.updated_at) - Date.parse(p.created_at) > 60000 ? " · 고침" : ""} · 조회 ${p.views || 0}`;
 }
 function paintPost() {
   const p = postNow, mine = p.user_id === sync.myId(), adm = sync.amAdmin();
   $("pBoard").textContent = `${BOARDS[p.board] || ""}${p.pinned ? " · 공지" : ""}`;
   $("pTitle").textContent = p.title;
-  $("pMeta").textContent = `${p.nick} · ${ago(p.created_at)}${p.updated_at && Date.parse(p.updated_at) - Date.parse(p.created_at) > 60000 ? " · 고침" : ""}`;
+  paintMeta();
+  $("pTopic").innerHTML = p.topic?.title ? topicCardHtml(p.topic) : "";
+  fillTopicImgs($("pTopic"));
   $("pBody").textContent = p.body;
   $("pPhotos").innerHTML = p.photos?.length ? `<div class="ph-row big" data-paths="${esc(p.photos.join("|"))}"></div>` : "";
   fillPhotoRows($("pPhotos"));
@@ -1759,6 +1764,9 @@ function openWrite(p = null) {
   $("peTitle").value = p?.title || ""; $("peBody").value = p?.body || "";
   $("peSave").textContent = p ? "고치기" : "올리기";
   paintWPhotos();
+  if (wTopic?.url) URL.revokeObjectURL(wTopic.url);
+  wTopic = p?.topic?.title ? { ...p.topic } : null;
+  paintWTopic();
   $("postEdit").showModal();
 }
 $("bWrite").addEventListener("click", () => openWrite());
@@ -1794,7 +1802,17 @@ $("peSave").addEventListener("click", async () => {
       try { paths.push(await sync.uploadPhoto(await shrinkPhoto(fresh[i].file), "board")); } catch { /* 건너뜀 */ }
     }
     const removed = (writing?.photos || []).filter((x) => !kept.includes(x));
-    const id = await sync.savePost({ id: writing?.id, board: bd, title, body, photos: paths });
+    let topic = null;
+    if (wTopic) {
+      topic = { type: tType(wTopic), title: wTopic.title };
+      for (const k of ["cover", "by", "photo"]) if (wTopic[k]) topic[k] = wTopic[k];
+      if (wTopic.file) { try { topic.photo = await sync.uploadPhoto(await shrinkPhoto(wTopic.file), "board"); } catch { /* 사진 없이 */ } }
+    }
+    const oldTp = writing?.topic?.photo;
+    if (oldTp && oldTp !== topic?.photo) removed.push(oldTp);
+    const id = await sync.savePost({ id: writing?.id, board: bd, title, body, photos: paths, topic });
+    if (wTopic?.url) URL.revokeObjectURL(wTopic.url);
+    wTopic = null;
     if (removed.length) sync.deletePhotos(removed);
     fresh.forEach((x) => URL.revokeObjectURL(x.url)); wPhotos = [];
     $("postEdit").close();
@@ -1804,6 +1822,234 @@ $("peSave").addEventListener("click", async () => {
   } catch { toast("올리지 못했어요. 인터넷 연결을 확인해 주세요", 3500); }
   $("peSave").disabled = false;
 });
+
+// ---------- 글감 ----------
+const TOPIC = { book: ["책", "book"], movie: ["영화", "movie"], show: ["공연·전시", "ticket"], tv: ["방송", "device-tv"] };
+const tType = (t) => (TOPIC[t?.type] ? t.type : "book");
+function topicCover(t, cls) {
+  if (t.url) return `<img class="${cls}" src="${esc(t.url)}" alt="">`;
+  if (t.cover) return `<img class="${cls}" src="${esc(t.cover)}" alt="" loading="lazy">`;
+  if (t.photo) return `<img class="${cls}" data-tp="${esc(t.photo)}" alt="">`;
+  return `<span class="${cls} tp-ph t-${tType(t)}">${ico(TOPIC[tType(t)][1])}</span>`;
+}
+const topicCardHtml = (t) => `<div class="topic-card">${topicCover(t, "tc-cover")}<div><small>${TOPIC[tType(t)][0]}</small><b>${esc(t.title)}</b>${t.by ? `<small>${esc(t.by)}</small>` : ""}</div></div>`;
+async function fillTopicImgs(root) {
+  const els = [...root.querySelectorAll("img[data-tp]")]; if (!els.length) return;
+  const urls = await sync.photoUrls(els.map((e) => e.dataset.tp));
+  els.forEach((e, i) => { if (urls[i]) e.src = urls[i]; });
+}
+// 글쓰기 화면의 글감
+let wTopic = null; // { type, title, cover?, by?, photo?(저장된 사진), file?, url?(새 사진 미리보기) }
+function paintWTopic() {
+  $("peTopic").innerHTML = wTopic
+    ? `<div class="topic-pick">${topicCardHtml(wTopic)}<button type="button" class="x" id="peTopicRm" aria-label="글감 빼기">✕</button></div>`
+    : `<button type="button" class="btn ghost topic-add" id="peTopicAdd">＋ 글감 붙이기</button>`;
+  fillTopicImgs($("peTopic"));
+}
+$("peTopic").addEventListener("click", (e) => {
+  if (e.target.closest("#peTopicRm")) { if (wTopic?.url) URL.revokeObjectURL(wTopic.url); wTopic = null; paintWTopic(); return; }
+  if (e.target.closest("#peTopicAdd") || e.target.closest(".topic-card")) openTopicPick();
+});
+let tdType = "book", tdFile = null, tdItems = [];
+function openTopicPick() {
+  tdType = wTopic ? tType(wTopic) : "book"; tdFile = null;
+  $("tdTitle").value = wTopic && tdType !== "book" ? wTopic.title : "";
+  $("tdQ").value = "";
+  paintTd();
+  $("topicDialog").showModal();
+}
+function paintTd() {
+  [...$("tdType").children].forEach((x) => x.setAttribute("aria-checked", String(x.dataset.t === tdType)));
+  $("tdBook").hidden = tdType !== "book"; $("tdOther").hidden = tdType === "book";
+  if (tdType === "book") myBooks(); else paintTdCover();
+}
+function myBooks() {
+  const q = $("tdQ").value.trim().toLowerCase();
+  const seen = new Set();
+  tdItems = allRecords.filter((r) => r.title && (!q || r.title.toLowerCase().includes(q)) && !seen.has(r.title) && seen.add(r.title))
+    .slice(0, 40).map((r) => ({ title: r.title, cover: r.cover || "", by: r.authors || "" }));
+  $("tdHelp").textContent = "내 책장에 있는 책이에요. 없으면 제목을 적고 찾기를 눌러요.";
+  paintTdList();
+}
+function paintTdList() {
+  $("tdList").innerHTML = tdItems.length ? tdItems.map((b, i) => `<button type="button" class="find-item" data-i="${i}">
+      ${b.cover ? `<img src="${esc(b.cover)}" alt="" loading="lazy">` : `<span class="noimg"></span>`}
+      <span><b>${esc(b.title)}</b><small>${esc(b.by)}</small></span></button>`).join("")
+    : `<small class="muted">${$("tdQ").value.trim() ? "내 책장에 없는 책이에요. 찾기를 눌러 보세요." : "아직 책장에 책이 없어요. 제목을 적고 찾기를 눌러요."}</small>`;
+}
+$("tdType").addEventListener("click", (e) => { const b = e.target.closest("[data-t]"); if (b) { tdType = b.dataset.t; paintTd(); } });
+$("tdQ").addEventListener("input", myBooks);
+$("tdQ").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $("tdFind").click(); } });
+$("tdFind").addEventListener("click", async () => {
+  const q = $("tdQ").value.trim();
+  if (q.length < 2) { toast("책 제목을 2글자 이상 적어 주세요"); return; }
+  $("tdList").innerHTML = `<small class="muted">찾는 중…</small>`;
+  try {
+    const r = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+    const found = r.ok ? (await r.json()).results || [] : [];
+    tdItems = found.map((b) => ({ title: b.title, cover: b.cover || "", by: (b.authors || []).join(", ") }));
+    $("tdHelp").textContent = "찾은 책이에요. 맞는 책을 골라 주세요.";
+    if (!tdItems.length) tdItems = [{ title: q, cover: "", by: "" }];
+    paintTdList();
+  } catch { $("tdList").innerHTML = `<small class="muted">찾지 못했어요. 인터넷 연결을 확인해 주세요.</small>`; }
+});
+$("tdList").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-i]"); if (!b) return;
+  const it = tdItems[Number(b.dataset.i)];
+  if (wTopic?.url) URL.revokeObjectURL(wTopic.url);
+  wTopic = { type: "book", title: it.title, ...(it.cover ? { cover: it.cover } : {}), ...(it.by ? { by: it.by } : {}) };
+  $("topicDialog").close(); paintWTopic();
+});
+function paintTdCover() {
+  const keep = !tdFile && wTopic && tType(wTopic) === tdType && (wTopic.url || wTopic.photo);
+  const t = tdFile ? { type: tdType, url: $("tdCover").dataset.url } : keep ? wTopic : { type: tdType };
+  $("tdCover").innerHTML = topicCover(t, "tc-cover big");
+  fillTopicImgs($("tdCover"));
+}
+$("tdPhotoBtn").addEventListener("click", () => $("tdPhoto").click());
+$("tdPhoto").addEventListener("change", () => {
+  const f = $("tdPhoto").files[0]; $("tdPhoto").value = "";
+  if (!f) return;
+  if ($("tdCover").dataset.url) URL.revokeObjectURL($("tdCover").dataset.url);
+  tdFile = f; $("tdCover").dataset.url = URL.createObjectURL(f);
+  paintTdCover();
+});
+$("tdUse").addEventListener("click", () => {
+  const title = $("tdTitle").value.trim();
+  if (!title) { toast("제목을 적어 주세요"); $("tdTitle").focus(); return; }
+  const same = wTopic && tType(wTopic) === tdType;
+  const next = { type: tdType, title };
+  if (tdFile) { next.file = tdFile; next.url = $("tdCover").dataset.url; delete $("tdCover").dataset.url; }
+  else if (same && wTopic.url) { next.file = wTopic.file; next.url = wTopic.url; }
+  else if (same && wTopic.photo) next.photo = wTopic.photo;
+  if (wTopic?.url && wTopic.url !== next.url) URL.revokeObjectURL(wTopic.url);
+  wTopic = next; tdFile = null;
+  $("topicDialog").close(); paintWTopic();
+});
+$("tdClose").addEventListener("click", () => { $("topicDialog").close(); if (tdFile && $("tdCover").dataset.url) { URL.revokeObjectURL($("tdCover").dataset.url); delete $("tdCover").dataset.url; } tdFile = null; });
+
+// ---------- 홈: 인기글 ----------
+let popAt = 0;
+async function renderPopular(force = false) {
+  if (PEEK || !AUTH.user || AUTH.offline) { $("popWrap").hidden = true; return; }
+  if (!force && Date.now() - popAt < 120000) return;
+  popAt = Date.now();
+  try {
+    const list = await sync.listPopular();
+    $("popWrap").hidden = !list.length;
+    if (!list.length) return;
+    const paths = [...new Set(list.map((p) => p.photos?.[0] || "").filter(Boolean))];
+    const urls = paths.length ? await sync.photoUrls(paths) : [];
+    const u = new Map(paths.map((p, i) => [p, urls[i]]));
+    $("popRow").innerHTML = list.map((p) => {
+      const ph = p.photos?.[0] ? u.get(p.photos[0]) : "";
+      const img = ph ? `<img src="${esc(ph)}" alt="" loading="lazy">` : p.topic?.title ? topicCover(p.topic, "pop-img") : "";
+      return `<button type="button" class="pop-card" data-id="${p.id}">
+        ${img ? `<span class="pop-im">${img}</span>` : ""}
+        <b>${esc(p.title)}</b>
+        ${img ? "" : `<p>${esc((p.body || "").replace(/\s+/g, " ").slice(0, 70))}</p>`}
+        <small>${esc(p.nick)} · 조회 ${p.views || 0}</small></button>`;
+    }).join("");
+    fillTopicImgs($("popRow"));
+  } catch { popAt = 0; $("popWrap").hidden = true; }
+}
+$("popRow").addEventListener("click", (e) => { const b = e.target.closest("[data-id]"); if (b) openPost(b.dataset.id); });
+$("popMore").addEventListener("click", () => go("board"));
+$("postView").addEventListener("close", () => {
+  if (!document.querySelector('.tab[data-tab="home"]').hidden) renderPopular(true); else popAt = 0;
+  if ($("momPage").open && momNow) openMom(momNow.uid, true);
+});
+
+// ---------- 엄마 페이지 ----------
+let momNow = null;
+const momCache = new Map();
+async function openMom(uid, refresh = false) {
+  if (!AUTH.user || AUTH.offline || !uid) return;
+  const me = uid === sync.myId();
+  const known = momCache.get(uid);
+  if (!refresh) {
+    momNow = { uid, nick: known?.nick || (me ? sync.myNick() : ""), posts: [], data: null };
+    $("mNick").textContent = momNow.nick || "불러오는 중…";
+    $("mAv").textContent = (momNow.nick || " ").slice(0, 1).toUpperCase();
+    $("mCount").textContent = ""; $("mKids").innerHTML = `<small class="muted">불러오는 중…</small>`;
+    $("mTopics").innerHTML = ""; $("mPosts").innerHTML = `<li class="muted">불러오는 중…</li>`;
+    $("momPage").showModal();
+  }
+  const [nick, data, posts] = await Promise.all([
+    momNow.nick ? momNow.nick : sync.nickOf(uid).catch(() => ""),
+    me ? null : prefetchPeek(uid),
+    sync.postsBy(uid).catch(() => null),
+  ]);
+  if (momNow?.uid !== uid) return;
+  momNow.nick = nick || "(알 수 없음)"; momNow.posts = posts || []; momNow.data = data;
+  $("mNick").textContent = momNow.nick;
+  $("mAv").textContent = momNow.nick.slice(0, 1).toUpperCase();
+  const kl = me ? kids : data?.kids || [];
+  $("mKids").innerHTML = kl.length
+    ? kl.map((k) => `<button type="button" class="kid" data-k="${esc(k.id)}">${esc(k.nick)}${gradeOf(k) ? ` <small class="grade">${gradeOf(k)}</small>` : ""}</button>`).join("")
+    : `<small class="muted">${me || data ? "아직 등록한 아이가 없어요." : "책장을 나만 보기로 해 둔 집이에요."}</small>`;
+  const tops = topicGroups();
+  $("mCount").textContent = posts ? `글 ${momNow.posts.length} · 글감 ${tops.length}` : "";
+  const n = (t) => tops.filter((x) => tType(x.topic) === t).length;
+  $("mTopics").innerHTML = tops.length
+    ? Object.keys(TOPIC).filter(n).map((t) => `<button type="button" class="tchip" data-t="${t}">${ico(TOPIC[t][1])}${TOPIC[t][0]} <span>${n(t)}</span></button>`).join("")
+    : `<small class="muted">아직 글감을 붙인 글이 없어요.</small>`;
+  $("mTopicsAll").hidden = !tops.length;
+  $("mPosts").innerHTML = !posts ? `<li class="muted">불러오지 못했어요. 인터넷 연결을 확인해 주세요.</li>`
+    : momNow.posts.length ? momNow.posts.map((p) => `<li><button type="button" class="post-row" data-id="${p.id}">
+        <b>${esc(p.title)}</b><small><span>${BOARDS[p.board] || ""}</span><span>${ago(p.created_at)}</span><span>${ico("eye")} ${p.views || 0}</span></small></button></li>`).join("")
+    : `<li class="muted">아직 쓴 글이 없어요.</li>`;
+}
+$("mClose").addEventListener("click", () => { $("momPage").close(); momNow = null; });
+$("mPosts").addEventListener("click", (e) => { const b = e.target.closest("[data-id]"); if (b) openPost(b.dataset.id); });
+$("mKids").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-k]"); if (!b || !momNow) return;
+  const { uid, data } = momNow;
+  momNow = null;
+  for (const id of ["topicsPage", "postView", "momPage"]) if ($(id).open) $(id).close();
+  if (uid === sync.myId()) { setKid(b.dataset.k); go("home"); return; }
+  if (!data) { toast("지금은 볼 수 없는 책장이에요 (나만 보기로 바뀌었을 수 있어요)", 3500); return; }
+  enterPeek(data, b.dataset.k);
+});
+$("mTopics").addEventListener("click", (e) => { const b = e.target.closest("[data-t]"); if (b) openTopics(b.dataset.t); });
+$("mTopicsAll").addEventListener("click", () => openTopics("all"));
+$("pMeta").addEventListener("click", (e) => { const b = e.target.closest("[data-u]"); if (b) openMom(b.dataset.u); });
+
+// 글감 모아보기
+let tpType = "all", tpOpen = "";
+function topicGroups() {
+  const g = new Map();
+  for (const p of momNow?.posts || []) {
+    if (!p.topic?.title) continue;
+    const key = `${tType(p.topic)}|${p.topic.title.trim().toLowerCase()}`;
+    if (!g.has(key)) g.set(key, { key, topic: p.topic, posts: [] });
+    g.get(key).posts.push(p);
+  }
+  return [...g.values()];
+}
+function openTopics(type) { tpType = type; tpOpen = ""; paintTopics(); $("topicsPage").showModal(); }
+function paintTopics() {
+  const all = topicGroups();
+  $("tpTitle").textContent = `${momNow?.nick || ""}님의 글감`;
+  $("tpTabs").innerHTML = [["all", "전체"], ...Object.entries(TOPIC).map(([k, v]) => [k, v[0]])]
+    .map(([k, v]) => `<button type="button" data-t="${k}" class="${k === tpType ? "on" : ""}">${v}</button>`).join("");
+  const list = tpType === "all" ? all : all.filter((x) => tType(x.topic) === tpType);
+  $("tpCount").innerHTML = `<b>${list.length}</b>건`;
+  $("tpGrid").innerHTML = list.length ? list.map((x) => `<button type="button" class="tp-item${x.key === tpOpen ? " open" : ""}" data-key="${esc(x.key)}">
+      ${topicCover(x.topic, "tp-cover")}<span>${esc(x.topic.title)}</span>${x.posts.length > 1 ? `<small>글 ${x.posts.length}</small>` : ""}</button>
+      ${x.key === tpOpen ? `<div class="tp-more">${x.posts.map((p) => `<button type="button" data-id="${p.id}">${esc(p.title)}</button>`).join("")}</div>` : ""}`).join("")
+    : `<p class="muted">이 종류의 글감은 아직 없어요.</p>`;
+  fillTopicImgs($("tpGrid"));
+}
+$("tpTabs").addEventListener("click", (e) => { const b = e.target.closest("[data-t]"); if (b) { tpType = b.dataset.t; tpOpen = ""; paintTopics(); } });
+$("tpGrid").addEventListener("click", (e) => {
+  const p = e.target.closest("[data-id]"); if (p) { openPost(p.dataset.id); return; }
+  const b = e.target.closest("[data-key]"); if (!b) return;
+  const g = topicGroups().find((x) => x.key === b.dataset.key); if (!g) return;
+  if (g.posts.length === 1) openPost(g.posts[0].id);
+  else { tpOpen = tpOpen === g.key ? "" : g.key; paintTopics(); }
+});
+$("tpClose").addEventListener("click", () => $("topicsPage").close());
 
 // ---------- 첫 화면 · 로그인 ----------
 const welcome = $("welcome");

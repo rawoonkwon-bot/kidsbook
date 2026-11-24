@@ -300,7 +300,7 @@ const cnt = (x) => (Array.isArray(x) ? x[0]?.count || 0 : 0);
 export async function listPosts(board) {
   const c = await client();
   const { data, error } = await c.from("posts")
-    .select("id, board, title, pinned, created_at, user_id, profiles(nick), comments(count), likes(count)")
+    .select("id, board, title, pinned, views, topic, created_at, user_id, profiles(nick), comments(count), likes(count)")
     .eq("board", board).order("pinned", { ascending: false }).order("created_at", { ascending: false }).limit(60);
   if (error) throw error;
   return (data || []).map((p) => ({ ...p, nick: p.profiles?.nick || "(알 수 없음)", nComments: cnt(p.comments), nLikes: cnt(p.likes) }));
@@ -308,7 +308,7 @@ export async function listPosts(board) {
 export async function getPost(id) {
   const c = await client();
   const [{ data: post, error }, { data: comments }, { data: mine }] = await Promise.all([
-    c.from("posts").select("id, board, title, body, photos, pinned, created_at, updated_at, user_id, profiles(nick), likes(count)").eq("id", id).maybeSingle(),
+    c.from("posts").select("id, board, title, body, photos, pinned, views, topic, created_at, updated_at, user_id, profiles(nick), likes(count)").eq("id", id).maybeSingle(),
     c.from("comments").select("id, body, created_at, user_id, profiles(nick)").eq("post_id", id).order("created_at"),
     c.from("likes").select("post_id").eq("post_id", id).eq("user_id", user.id).maybeSingle(),
   ]);
@@ -317,14 +317,14 @@ export async function getPost(id) {
   return { ...post, nick: post.profiles?.nick || "(알 수 없음)", nLikes: cnt(post.likes), liked: !!mine,
     comments: (comments || []).map((x) => ({ ...x, nick: x.profiles?.nick || "(알 수 없음)" })) };
 }
-export async function savePost({ id, board, title, body, photos }) {
+export async function savePost({ id, board, title, body, photos, topic = null }) {
   const c = await client();
   if (id) {
-    const { error } = await c.from("posts").update({ board, title, body, photos }).eq("id", id);
+    const { error } = await c.from("posts").update({ board, title, body, photos, topic }).eq("id", id);
     if (error) throw error;
     return id;
   }
-  const { data, error } = await c.from("posts").insert({ board, title, body, photos }).select("id").single();
+  const { data, error } = await c.from("posts").insert({ board, title, body, photos, topic }).select("id").single();
   if (error) throw error;
   return data.id;
 }
@@ -332,7 +332,8 @@ export async function deletePost(post) {
   const c = await client();
   const { error } = await c.from("posts").delete().eq("id", post.id);
   if (error) throw error;
-  if (post.photos?.length) { try { await c.storage.from(BUCKET).remove(post.photos); } catch { /* 무시 */ } }
+  const files = [...(post.photos || []), ...(post.topic?.photo ? [post.topic.photo] : [])];
+  if (files.length) { try { await c.storage.from(BUCKET).remove(files); } catch { /* 무시 */ } }
 }
 export async function setPinned(id, pinned) {
   const c = await client();
@@ -353,4 +354,49 @@ export async function deleteComment(id) {
   const c = await client();
   const { error } = await c.from("comments").delete().eq("id", id);
   if (error) throw error;
+}
+
+// ---------- 조회수 · 인기글 · 엄마 페이지 ----------
+// 조회수 올리기 (같은 사람은 하루 1번, 내 글은 안 셈) → 새 조회수
+export async function bumpView(id) {
+  const c = await client();
+  const { data, error } = await c.rpc("bump_view", { pid: id });
+  if (error) throw error;
+  return typeof data === "number" ? data : null;
+}
+// 최근 2주 글 가운데 좋아요·댓글·조회수가 많은 글
+export async function listPopular(n = 6) {
+  const c = await client();
+  const since = new Date(Date.now() - 14 * 86400000).toISOString();
+  const { data, error } = await c.from("posts")
+    .select("id, board, title, body, photos, topic, views, created_at, user_id, profiles(nick), comments(count), likes(count)")
+    .gte("created_at", since).order("created_at", { ascending: false }).limit(200);
+  if (error) throw error;
+  return (data || []).map((p) => ({ ...p, nick: p.profiles?.nick || "(알 수 없음)", nComments: cnt(p.comments), nLikes: cnt(p.likes) }))
+    .map((p) => ({ ...p, score: p.nLikes * 3 + p.nComments * 2 + (p.views || 0) }))
+    .filter((p) => p.score > 0)
+    .sort((a, b) => b.score - a.score || b.created_at.localeCompare(a.created_at)).slice(0, n);
+}
+// 친구들 책장 구경: 책장을 공개한 엄마 별명 목록
+export async function listMoms() {
+  const rows = await listPublic();
+  if (!rows.length) return [];
+  const c = await client();
+  const { data, error } = await c.from("profiles").select("user_id, nick").in("user_id", rows.map((r) => r.user_id));
+  if (error) throw error;
+  const nick = new Map((data || []).map((p) => [p.user_id, p.nick]));
+  return rows.filter((r) => nick.has(r.user_id)).map((r) => ({ user_id: r.user_id, nick: nick.get(r.user_id), kids: Array.isArray(r.kids) ? r.kids : [] }));
+}
+export async function nickOf(uid) {
+  const c = await client();
+  const { data } = await c.from("profiles").select("nick").eq("user_id", uid).maybeSingle();
+  return data?.nick || "";
+}
+// 한 엄마가 쓴 글 (글감 포함)
+export async function postsBy(uid) {
+  const c = await client();
+  const { data, error } = await c.from("posts").select("id, board, title, topic, views, pinned, created_at, user_id")
+    .eq("user_id", uid).order("created_at", { ascending: false }).limit(300);
+  if (error) throw error;
+  return data || [];
 }

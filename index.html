@@ -37,6 +37,11 @@
         <div class="ring-card"><div class="ring" id="ringPoint"></div><small>독서 포인트</small></div>
       </div>
 
+      <div id="popWrap" hidden>
+        <div class="pop-head"><h3 class="sec-title">인기글</h3><button type="button" class="link-btn" id="popMore">게시판 가기 ›</button></div>
+        <div class="pop-row" id="popRow"></div>
+      </div>
+
       <h3 class="sec-title" id="readingHead" hidden>📖 요즘 읽는 중</h3>
       <div class="reading" id="reading" hidden></div>
 
@@ -90,7 +95,7 @@
     <section class="tab" data-tab="stats" hidden>
       <div id="browseWrap">
         <h2 class="page-title">👀 친구들 책장 구경</h2>
-        <p class="browse-help">이름을 누르면 그 친구의 책장과 포트폴리오를 볼 수 있어요 (보기만 돼요)</p>
+        <p class="browse-help">엄마 별명을 누르면 그 집 아이들 책장과 쓴 글을 볼 수 있어요 (보기만 돼요)</p>
         <div class="browse" id="browse"></div>
       </div>
       <h2 class="page-title" id="statsTitle">독서 통계</h2>
@@ -497,6 +502,7 @@
         <small class="post-board" id="pBoard"></small>
         <h2 id="pTitle"></h2>
         <p class="post-meta" id="pMeta"></p>
+        <div id="pTopic"></div>
         <div class="post-body" id="pBody"></div>
         <div id="pPhotos"></div>
         <button type="button" class="like-btn" id="pLike" hidden></button>
@@ -522,11 +528,72 @@
       <input id="peTitle" class="title-input" maxlength="100" placeholder="제목" />
       <textarea id="peBody" rows="12" maxlength="5000" placeholder="내용을 적어 주세요"></textarea>
       <div class="field">
+        <span>글감 <small>책·영화·공연·방송 중 하나를 붙일 수 있어요</small></span>
+        <div id="peTopic"></div>
+      </div>
+      <div class="field">
         <span>사진 <small id="pePhotoCount">0/10</small></span>
         <div class="photo-grid" id="pePhotos"></div>
         <button type="button" class="btn ghost photo-add" id="pePhotoAdd">📷 사진 추가</button>
         <input type="file" id="pePhotoFile" accept="image/*" multiple hidden />
       </div>
+    </div>
+  </dialog>
+
+  <!-- 게시판: 글감 고르기 -->
+  <dialog id="topicDialog" class="page">
+    <div class="page-in">
+      <div class="page-top"><button type="button" class="x-btn" id="tdClose" aria-label="닫기">✕</button><b>글감 붙이기</b><span></span></div>
+      <div class="seg small" id="tdType" role="radiogroup" aria-label="글감 종류">
+        <button type="button" role="radio" data-t="book" aria-checked="true">책</button>
+        <button type="button" role="radio" data-t="movie" aria-checked="false">영화</button>
+        <button type="button" role="radio" data-t="show" aria-checked="false">공연·전시</button>
+        <button type="button" role="radio" data-t="tv" aria-checked="false">방송</button>
+      </div>
+      <div id="tdBook">
+        <div class="td-search"><input id="tdQ" class="sub-input" placeholder="책 제목" autocomplete="off" /><button type="button" class="btn dark" id="tdFind">찾기</button></div>
+        <p class="td-help" id="tdHelp">내 책장에 있는 책이에요. 없으면 제목을 적고 찾기를 눌러요.</p>
+        <div class="td-list" id="tdList"></div>
+      </div>
+      <div id="tdOther" hidden>
+        <input id="tdTitle" class="title-input" maxlength="80" placeholder="제목" />
+        <div class="td-photo">
+          <div class="td-cover" id="tdCover"></div>
+          <div><button type="button" class="btn ghost" id="tdPhotoBtn">사진 넣기 (선택)</button><p class="td-help">포스터나 직접 찍은 사진을 넣으면 표지로 보여요</p></div>
+          <input type="file" id="tdPhoto" accept="image/*" hidden />
+        </div>
+        <button type="button" class="btn dark" id="tdUse">이 글감 붙이기</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- 엄마 페이지 -->
+  <dialog id="momPage" class="page">
+    <div class="page-in">
+      <div class="page-top"><button type="button" class="x-btn" id="mClose" aria-label="닫기">✕</button><span></span></div>
+      <div class="mom-head"><div class="mom-av" id="mAv"></div><div><h2 id="mNick"></h2><p id="mCount"></p></div></div>
+      <section id="mKidsSec">
+        <h3 class="sec-title">아이 책장</h3>
+        <div class="browse" id="mKids"></div>
+      </section>
+      <section>
+        <div class="pop-head"><h3 class="sec-title">글감</h3><button type="button" class="link-btn" id="mTopicsAll">전체보기 ›</button></div>
+        <div class="tchips" id="mTopics"></div>
+      </section>
+      <section>
+        <h3 class="sec-title">쓴 글</h3>
+        <ul class="post-list" id="mPosts"></ul>
+      </section>
+    </div>
+  </dialog>
+
+  <!-- 글감 모아보기 -->
+  <dialog id="topicsPage" class="page">
+    <div class="page-in">
+      <div class="page-top"><button type="button" class="x-btn" id="tpClose" aria-label="닫기">✕</button><b id="tpTitle"></b><span></span></div>
+      <div class="tp-tabs" id="tpTabs"></div>
+      <p class="tp-count" id="tpCount"></p>
+      <div class="tp-grid" id="tpGrid"></div>
     </div>
   </dialog>
 
