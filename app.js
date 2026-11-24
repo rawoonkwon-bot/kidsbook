@@ -757,7 +757,7 @@ function renderCalendar() {
     const out = d.getMonth() !== m - 1;
     const cats = out ? [] : catsOn(day);
     if (cats.length) count++;
-    const cls = [out && "out", day === today && "today", cats.length && "has"].filter(Boolean).join(" ");
+    const cls = [out && "out", day === today && "today", day === selDay && "sel", cats.length && "has"].filter(Boolean).join(" ");
     // 아이콘은 3개씩 2줄(최대 6개), 넘치면 5개 + "+숫자"
     const shown = cats.length > 6 ? cats.slice(0, 5) : cats;
     const icons = shown.map((c) => c.svg).join("") + (cats.length > 6 ? `<span class="more">+${cats.length - 5}</span>` : "");
@@ -766,11 +766,65 @@ function renderCalendar() {
   }
   $("calGrid").innerHTML = html;
   $("calLegend").innerHTML = count ? `이번 달 <b>${count}</b>일 기록했어요` : "이 달에는 아직 기록이 없어요";
+  renderDayInline();
 }
+// 고른 날짜의 기록을 달력 아래에 바로 보여 주기
+let selDay = localDay();
+function renderDayInline() {
+  if (selDay > localDay()) selDay = localDay();
+  const html = dayGroupsHtml(selDay);
+  const n = (html.match(/class="day-item/g) || []).length;
+  $("diTitle").innerHTML = `${prettyDay(selDay)}${n ? ` <small>· 기록 ${n}개</small>` : ""}`;
+  $("diList").innerHTML = html || `<p class="di-empty">이 날은 아직 기록이 없어요</p>`;
+  fillPhotoRows($("diList"));
+}
+$("diAdd").addEventListener("click", () => openDay(selDay));
+$("diList").addEventListener("click", (e) => {
+  if (e.target.closest(".ph-thumb")) return;
+  const t = e.target.closest("[data-view],[data-del],[data-edit]"); if (!t) return;
+  if (t.dataset.view) { openView(t.dataset.view); return; }
+  if (PEEK) return; // 구경 중에는 보기만
+  if (t.dataset.del) {
+    if (!confirm("이 기록을 지울까요?")) return;
+    const gone = journal.find((j) => j.id === t.dataset.del);
+    if (gone?.photos?.length) sync.deletePhotos(gone.photos);
+    journal = journal.filter((j) => j.id !== t.dataset.del); saveJournal(); render(); return;
+  }
+  const j = journal.find((x) => x.id === t.dataset.edit); if (!j || !CAT[j.cat]) return;
+  openDayKey = selDay;
+  openEntry(j.cat, j);
+  returnDay = null; // 고친 뒤 날짜 창을 다시 열지 않고 달력으로
+});
 $("calPrev").addEventListener("click", () => { const [y, m] = calYM.split("-").map(Number); calYM = localDay(new Date(y, m - 2, 1)).slice(0, 7); renderCalendar(); });
 $("calNext").addEventListener("click", () => { const [y, m] = calYM.split("-").map(Number); calYM = localDay(new Date(y, m, 1)).slice(0, 7); renderCalendar(); });
-$("calGrid").addEventListener("click", (e) => { const b = e.target.closest("button[data-day]"); if (b && !b.disabled) openDay(b.dataset.day); });
+$("calGrid").addEventListener("click", (e) => { const b = e.target.closest("button[data-day]"); if (b && !b.disabled) { selDay = b.dataset.day; renderCalendar(); } });
 
+// 그날 기록: 카테고리마다 한 블록
+function dayGroupsHtml(day) {
+  let html = "";
+  for (const c of CATS) {
+    let rows = "", n = 0;
+    if (c.book || c.hybrid) {
+      for (const { r, s } of booksOn(day, c.key)) {
+        n++;
+        rows += `<div class="day-item link" data-view="${r.id}">
+          ${r.cover ? `<img src="${esc(r.cover)}" alt="">` : `<span>${c.svg}</span>`}
+          <div class="grow"><b>${esc(r.title)}</b><small>${sessionText(s)}</small></div></div>`;
+      }
+    }
+    if (!c.book) {
+      for (const j of journalOn(day, c.key)) {
+        n++;
+        const sub = [j.minutes ? fmtMin(j.minutes) : "", j.text || ""].filter(Boolean).join(" · ");
+        rows += `<div class="day-item link" data-edit="${j.id}"><span>${c.svg}</span>
+          <div class="grow"><b>${esc(j.what || c.name)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}${j.photos?.length ? `<div class="ph-row" data-paths="${esc(j.photos.join("|"))}"></div>` : ""}</div>
+          <button type="button" class="x" data-del="${j.id}" aria-label="지우기">✕</button></div>`;
+      }
+    }
+    if (n) html += `<section class="day-group"><h4 class="dg-head" style="color:${c.color}">${c.svg}<b>${esc(c.name)}</b><small>${n}</small></h4>${rows}</section>`;
+  }
+  return html;
+}
 // 날짜 시트
 let openDayKey = null;  // 지금 열려 있는 날짜
 let returnDay = null;   // 다른 창을 다 쓰고 나면 돌아올 날짜 (기록 날짜 기본값으로도 사용)
@@ -804,28 +858,7 @@ function fillDay(day) {
         <div class="grow"><b>${esc(r.title)}</b><small>${progressText(r) || "아직 쪽수 기록 없음"}</small></div><span>➕</span></div>`).join("")
       : `<small>읽고 있는 ${c.name} 책이 없어요. 책 스캔으로 새 책을 기록해 보세요.</small>`;
   } else {
-    // 카테고리마다 한 블록: 앞에 카테고리 이름, 안에 그날 기록들
-    for (const c of CATS) {
-      let rows = "", n = 0;
-      if (c.book || c.hybrid) {
-        for (const { r, s } of booksOn(day, c.key)) {
-          n++;
-          rows += `<div class="day-item link" data-view="${r.id}">
-            ${r.cover ? `<img src="${esc(r.cover)}" alt="">` : `<span>${c.svg}</span>`}
-            <div class="grow"><b>${esc(r.title)}</b><small>${sessionText(s)}</small></div></div>`;
-        }
-      }
-      if (!c.book) {
-        for (const j of journalOn(day, c.key)) {
-          n++;
-          const sub = [j.minutes ? fmtMin(j.minutes) : "", j.text || ""].filter(Boolean).join(" · ");
-          rows += `<div class="day-item link" data-edit="${j.id}"><span>${c.svg}</span>
-            <div class="grow"><b>${esc(j.what || c.name)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}${j.photos?.length ? `<div class="ph-row" data-paths="${esc(j.photos.join("|"))}"></div>` : ""}</div>
-            <button type="button" class="x" data-del="${j.id}" aria-label="지우기">✕</button></div>`;
-        }
-      }
-      if (n) html += `<section class="day-group"><h4 class="dg-head" style="color:${c.color}">${c.svg}<b>${esc(c.name)}</b><small>${n}</small></h4>${rows}</section>`;
-    }
+    html = dayGroupsHtml(day);
     if (!html) html = `<small style="text-align:center">아직 이 날의 기록이 없어요. 위 카테고리를 눌러 기록해 보세요.</small>`;
   }
   $("dayList").innerHTML = html;

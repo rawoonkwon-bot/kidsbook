@@ -69,7 +69,6 @@
     <!-- ===== 포트폴리오 ===== -->
     <section class="tab" data-tab="port" hidden>
       <h2 class="page-title">포트폴리오</h2>
-      <h3 class="sec-title big">꾸준함 🔥</h3>
       <div class="cal-head">
         <button class="cal-nav" id="calPrev" aria-label="이전 달">‹</button>
         <b id="calTitle"></b>
@@ -78,7 +77,11 @@
       <div class="cal-week"><span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span></div>
       <div class="cal-grid" id="calGrid"></div>
       <p class="cal-legend" id="calLegend"></p>
-      <p class="cal-tip">날짜를 누르면 그날 한 일을 기록할 수 있어요</p>
+      <section class="day-inline" id="dayInline">
+        <h3 class="di-title" id="diTitle"></h3>
+        <div class="day-list" id="diList"></div>
+        <button type="button" class="btn dark" id="diAdd">＋ 이 날 기록 더하기</button>
+      </section>
     </section>
 
     <!-- ===== 소식 (통계) ===== -->
