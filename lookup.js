@@ -5,7 +5,7 @@
 //  3) 요청마다 타임아웃 → 느린 서버 하나 때문에 전체가 멈추지 않음
 import { isbn13to10 } from "./isbn.js";
 
-const CACHE_KEY = "kbc:bookcache:v3";
+const CACHE_KEY = "kbc:bookcache:v4";
 const TIMEOUT_MS = 5000;
 
 function readCache() {
@@ -29,6 +29,25 @@ const stripTags = (h) => h.replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "")
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const https = (u) => (u ? u.replace(/^http:\/\//, "https://") : "");
 
+// 분야: 영어 분류어 → 우리말 분야 (먼저 맞는 것 사용)
+const CAT_RULES = [
+  ["문학", /fiction|stor(y|ies)|poetry|poem|novel|literature|fairy|folk|fable|picture book|comic|graphic novel|nursery|rhyme|소설|동화|문학|시집|그림책|만화/i],
+  ["역사", /histor|biograph|역사|위인|전기/i],
+  ["자연과학", /science|nature|animal|math|biolog|space|planet|dinosaur|plant|insect|ocean|weather|과학|자연|동물|수학|우주/i],
+  ["예술", /\bart\b|arts|music|drawing|paint|craft|dance|예술|미술|음악/i],
+  ["언어", /language|alphabet|phonics|reading|vocabular|grammar|word|english|readers|언어|한글|영어|어휘/i],
+  ["사회과학", /social|famil|communit|school|educat|friend|emotion|feeling|behavior|manner|econom|사회|가족|학교|경제/i],
+  ["기술과학", /technolog|cook|health|vehicle|machine|computer|engineer|transport|기술|요리|건강/i],
+  ["종교", /religio|bible|church|종교|성경/i],
+  ["철학", /philosoph|psycholog|철학|심리/i],
+];
+export function mapCategory(list) {
+  const text = (Array.isArray(list) ? list : [list]).filter(Boolean).join(" | ");
+  if (!text) return "";
+  for (const [name, re] of CAT_RULES) if (re.test(text)) return name;
+  return "";
+}
+
 async function fromOpenLibrary(isbn, signal) {
   const key = `ISBN:${isbn}`;
   const data = await fetchJson(
@@ -43,6 +62,7 @@ async function fromOpenLibrary(isbn, signal) {
     cover: https(b.cover?.medium || b.cover?.large || ""),
     description: "",
     link: b.url || "",
+    category: mapCategory((b.subjects || []).slice(0, 8).map((x) => x.name)),
     source: "Open Library",
   };
 }
@@ -60,6 +80,7 @@ async function fromGoogleBooks(isbn, signal) {
     cover: https(v.imageLinks?.thumbnail || v.imageLinks?.smallThumbnail || ""),
     description: stripTags(v.description || ""),
     link: https(v.infoLink || ""),
+    category: mapCategory(v.categories || []),
     source: "Google Books",
   };
 }
@@ -123,6 +144,11 @@ export async function lookupBook(isbn, { needDescription = false } = {}) {
       await Promise.race([Promise.allSettled(all), sleep(1500)]);
       const withPages = done.find((b) => b.pages);
       if (withPages) book = { ...book, pages: withPages.pages };
+    }
+    // 분야가 없으면 이미 도착한 다른 결과에서 빌려 옴
+    if (book && !book.category) {
+      const withCat = done.find((b) => b.category);
+      if (withCat) book = { ...book, category: withCat.category };
     }
     // 책 검색: 먼저 온 결과에 설명이 없으면 다른 곳의 설명을 최대 2.5초 더 기다려 채움
     if (needDescription && book && !book.description) {

@@ -3,15 +3,13 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#E8834E" />
+  <meta name="theme-color" content="#FFFFFF" />
   <title>바나나북코드 · 찍으면 끝! 독서기록</title>
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-  <!-- 도서 조회 서버에 미리 연결해 두어 첫 조회 지연을 줄임 -->
   <link rel="preconnect" href="https://openlibrary.org" crossorigin />
   <link rel="preconnect" href="https://www.googleapis.com" crossorigin />
   <link rel="preconnect" href="https://covers.openlibrary.org" />
-  <!-- 바코드 엔진(WASM)을 페이지 로딩과 동시에 미리 받아 둠 -->
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
   <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/barcode-detector@3.2.4/ponyfill/+esm" crossorigin />
   <link rel="stylesheet" href="/styles.css" />
@@ -22,63 +20,84 @@
       <span class="stripes" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
       <h1>바나나북코드</h1>
     </div>
-    <div class="stats" id="stats"></div>
   </header>
 
   <main>
-    <section class="mode-card search">
-      <div class="mode-head">
-        <span class="mode-icon" aria-hidden="true">🔍</span>
-        <div>
-          <h2>책 검색</h2>
-          <p>어떤 책인지 줄거리와 소개를 알아봐요</p>
-        </div>
+    <!-- ===== 홈 ===== -->
+    <section class="tab" data-tab="home">
+      <h2 class="hero">읽은 책을 모두 스캔,<br>차곡차곡 독서를 기록해요 🔥</h2>
+
+      <div class="rings">
+        <div class="ring-card"><div class="ring" id="ringMonth"></div><small>이번 달</small></div>
+        <button type="button" class="ring-card" id="ringStampBtn" aria-label="독서 스탬프 보기"><div class="ring" id="ringStamp"></div><small>스탬프</small></button>
+        <div class="ring-card"><div class="ring" id="ringPoint"></div><small>독서 포인트</small></div>
       </div>
-      <button class="btn primary big" data-scan="search">📷 바코드 찍기</button>
-      <button class="btn ghost" data-manual="search">ISBN 직접 입력</button>
-    </section>
 
-    <section class="mode-card record">
-      <div class="mode-head">
-        <span class="mode-icon" aria-hidden="true">📚</span>
-        <div>
-          <h2>책 기록</h2>
-          <p>다 읽은 책을 내 책장에 꽂아요</p>
-        </div>
+      <h3 class="sec-title" id="readingHead">📖 요즘 읽는 중</h3>
+      <div class="reading" id="reading"></div>
+
+      <div class="shelf-head">
+        <h3 class="sec-title">📚 내 책장</h3>
+        <select id="monthFilter" aria-label="월별 보기"></select>
       </div>
-      <button class="btn primary big" data-scan="record">📷 바코드 찍기</button>
-      <button class="btn ghost" data-manual="record">ISBN 직접 입력</button>
+      <section class="shelf-sec">
+        <h4 class="shelf-title ko">🇰🇷 한글책 <span id="countKo"></span></h4>
+        <ul class="shelf" id="shelfKo"></ul>
+        <p class="empty" id="emptyKo">아직 한글책 기록이 없어요. 오른쪽 아래 책 스캔을 눌러 보세요.</p>
+      </section>
+      <section class="shelf-sec">
+        <h4 class="shelf-title en">🔤 영어책 <span id="countEn"></span></h4>
+        <ul class="shelf" id="shelfEn"></ul>
+        <p class="empty" id="emptyEn">아직 영어책 기록이 없어요.</p>
+      </section>
     </section>
 
-    <div class="shelf-head">
-      <h3>내 책장</h3>
-      <select id="monthFilter" aria-label="월별 보기"></select>
-    </div>
-
-    <section class="shelf-sec">
-      <h4 class="shelf-title ko">🇰🇷 한글책 <span id="countKo"></span></h4>
-      <ul class="shelf" id="shelfKo"></ul>
-      <p class="empty" id="emptyKo">아직 한글책 기록이 없어요.</p>
-    </section>
-
-    <section class="shelf-sec">
-      <h4 class="shelf-title en">🔤 영어책 <span id="countEn"></span></h4>
-      <ul class="shelf" id="shelfEn"></ul>
-      <p class="empty" id="emptyEn">아직 영어책 기록이 없어요.</p>
-    </section>
-
-    <section class="portfolio">
-      <h3>📅 포트폴리오</h3>
+    <!-- ===== 포트폴리오 ===== -->
+    <section class="tab" data-tab="port" hidden>
+      <h2 class="page-title">포트폴리오</h2>
+      <h3 class="sec-title big">꾸준함 🔥</h3>
       <div class="cal-head">
-        <button class="cal-nav" id="calPrev" aria-label="이전 달">◀</button>
+        <button class="cal-nav" id="calPrev" aria-label="이전 달">‹</button>
         <b id="calTitle"></b>
-        <button class="cal-nav" id="calNext" aria-label="다음 달">▶</button>
+        <button class="cal-nav" id="calNext" aria-label="다음 달">›</button>
       </div>
       <div class="cal-week"><span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span></div>
       <div class="cal-grid" id="calGrid"></div>
       <p class="cal-legend" id="calLegend"></p>
+      <p class="cal-tip">날짜를 누르면 그날 한 일을 기록할 수 있어요</p>
+    </section>
+
+    <!-- ===== 소식 (통계) ===== -->
+    <section class="tab" data-tab="stats" hidden>
+      <h2 class="page-title">독서 통계</h2>
+      <div class="tiles" id="statTiles"></div>
+
+      <h3 class="sec-title big">한글책 · 영어책</h3>
+      <div class="split" id="statSplit"></div>
+
+      <h3 class="sec-title big">다양성 🌈 <small>분야별 읽은 책</small></h3>
+      <div class="seg small" id="catFilter" role="radiogroup" aria-label="책장 고르기">
+        <button type="button" role="radio" data-f="all" aria-checked="true">전체</button>
+        <button type="button" role="radio" data-f="ko">한글책</button>
+        <button type="button" role="radio" data-f="en">영어책</button>
+      </div>
+      <div class="hbars" id="statCats"></div>
+
+      <h3 class="sec-title big">달마다 읽은 쪽수 📈</h3>
+      <div class="vbars" id="statMonths"></div>
     </section>
   </main>
+
+  <!-- 아래 탭 + 책 스캔 버튼 -->
+  <button class="fab" id="fab" type="button">
+    <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M3 7V4h3M18 4h3v3M21 17v3h-3M6 20H3v-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M7 8v8M10 8v8M12.5 8v8M15 8v8M17 8v8" stroke="currentColor" stroke-width="1.6"/></svg>
+    책 스캔
+  </button>
+  <nav class="tabbar" aria-label="메뉴">
+    <button type="button" data-go="home" aria-current="page"><span>🏠</span>홈</button>
+    <button type="button" data-go="port"><span>📅</span>포트폴리오</button>
+    <button type="button" data-go="stats"><span>📊</span>소식</button>
+  </nav>
 
   <!-- 스캐너 -->
   <div class="scanner" id="scanner" hidden>
@@ -88,7 +107,7 @@
     </div>
     <div class="scan-top">
       <button class="icon" id="closeScan" aria-label="닫기">✕</button>
-      <span class="hint"><b id="scanMode"></b><br><span id="scanHint">바코드를 네모 안에 맞춰 주세요</span></span>
+      <span class="hint"><b>바코드 스캔</b><br><span id="scanHint">바코드를 네모 안에 맞춰 주세요</span></span>
       <button class="icon" id="torchBtn" aria-label="플래시" hidden>🔦</button>
     </div>
     <div class="scan-bottom">
@@ -96,68 +115,58 @@
         <span>확대</span>
         <input type="range" id="zoom" min="1" max="3" step="0.1" value="1" />
       </label>
+      <button class="btn glass" id="scanManual" type="button">ISBN 직접 입력</button>
       <div class="engine" id="engine"></div>
     </div>
   </div>
 
-  <!-- 책 검색 결과 -->
-  <dialog id="infoDialog">
+  <!-- 1) 스캔 후 뜨는 책 정보 시트 -->
+  <dialog id="scanSheet" class="bottom">
     <form method="dialog" class="sheet">
-      <div class="book-card">
-        <img id="iCover" alt="" />
+      <div class="sheet-top">
+        <button class="x-btn" value="close" aria-label="닫기">✕</button>
+        <b id="sCat">책 정보</b>
+        <button type="button" class="link-btn" id="sSelf">셀프등록</button>
+      </div>
+      <div class="s-book">
+        <img id="sCover" alt="" />
         <div>
-          <h3 class="i-title" id="iTitle"></h3>
-          <p class="i-author" id="iAuthor"></p>
-          <p class="meta" id="iMeta"></p>
+          <h3 id="sTitle"></h3>
+          <p id="sAuthor"></p>
+          <p id="sPages"></p>
         </div>
       </div>
-      <p class="timing" id="iTiming"></p>
-      <div class="desc" id="iDesc"></div>
-      <a class="src-link" id="iLink" target="_blank" rel="noopener" hidden></a>
-      <div class="row">
-        <button class="btn ghost" value="close">닫기</button>
-        <button class="btn primary" value="record" id="iRecord">이 책 기록하기</button>
-      </div>
+      <p class="s-desc" id="sDesc"></p>
+      <p class="s-mine" id="sMine" hidden></p>
+      <p class="s-note">일부 전집의 낱권 도서 정보가 다르다면 [셀프등록] 하세요</p>
+      <button class="btn lime big" value="ok" id="sOk">확인</button>
+      <p class="timing" id="sTiming"></p>
     </form>
   </dialog>
 
-  <!-- 책 기록 -->
-  <dialog id="bookDialog">
-    <form method="dialog" class="sheet" id="bookForm">
-      <div class="book-card">
-        <img id="bCover" alt="" />
-        <div>
-          <input id="bTitle" class="title-input" placeholder="책 제목" required />
-          <input id="bAuthor" class="sub-input" placeholder="지은이" />
-          <p class="meta" id="bMeta"></p>
-        </div>
+  <!-- 2) 책 기록 화면 -->
+  <dialog id="recordPage" class="page">
+    <form method="dialog" class="page-in" id="recordForm">
+      <div class="page-top">
+        <button class="x-btn" value="cancel" aria-label="닫기">✕</button>
+        <button class="pill-btn" value="save" id="rSave">책 등록</button>
       </div>
-      <p class="timing" id="bTiming"></p>
-      <div class="field">
-        <span>읽은 날</span>
-        <div class="date-row">
-          <input id="bDate" type="date" aria-label="읽은 날짜" />
-          <div class="date-chips" data-for="bDate">
-            <button type="button" data-ago="0">오늘</button>
-            <button type="button" data-ago="1">어제</button>
-            <button type="button" data-ago="2">그저께</button>
+      <div class="r-card">
+        <div class="r-book">
+          <img id="rCover" alt="" />
+          <div class="r-info">
+            <h3 id="rTitleText"></h3>
+            <input id="rTitle" class="title-input" placeholder="책 제목" hidden />
+            <input id="rAuthor" class="sub-input" placeholder="지은이" hidden />
+            <p id="rMeta"></p>
           </div>
         </div>
+        <h4 class="r-sub" id="rDescHead">책소개</h4>
+        <p class="r-desc" id="rDesc"></p>
       </div>
-      <div class="field">
-        <span>읽은 쪽수</span>
-        <div class="pages-row">
-          <input id="bPageFrom" type="number" inputmode="numeric" min="1" placeholder="1" aria-label="시작 쪽" />
-          <span>~</span>
-          <input id="bPageTo" type="number" inputmode="numeric" min="1" placeholder="마지막 쪽" aria-label="끝 쪽" />
-          <span>쪽</span>
-        </div>
-        <div class="total-row">
-          <span>책 전체</span>
-          <input id="bTotal" type="number" inputmode="numeric" min="1" placeholder="?" aria-label="책 전체 쪽수" />
-          <span>쪽 <small class="hint-sm" id="bTotalHint">(책 마지막 쪽 번호)</small></span>
-        </div>
-      </div>
+
+      <h3 class="mark">시작 전 확인</h3>
+
       <div class="field">
         <span>어느 책장에 꽂을까요?</span>
         <div class="seg" id="shelfPick" role="radiogroup" aria-label="책장">
@@ -165,30 +174,108 @@
           <button type="button" role="radio" data-shelf="en">🔤 영어책</button>
         </div>
       </div>
-      <label class="field">
-        <span>한 줄 독후감</span>
-        <textarea id="bNote" rows="2" placeholder="어떤 장면이 제일 재미있었어?"></textarea>
-      </label>
+
       <div class="field">
-        <span>몇 점을 줄까요?</span>
-        <div class="scores" id="scores" role="radiogroup" aria-label="점수"></div>
+        <span>읽은 날짜</span>
+        <div class="date-chips" id="dateChips">
+          <button type="button" data-d="today">오늘</button>
+          <button type="button" data-d="yesterday">어제</button>
+          <span class="pick-wrap">
+            <button type="button" data-d="pick" id="datePickBtn" tabindex="-1">📅 날짜 고르기</button>
+            <input type="date" id="rDate" aria-label="읽은 날짜 고르기" />
+          </span>
+        </div>
+        <p class="date-say" id="dateSay"></p>
       </div>
-      <div class="row">
-        <button class="btn ghost" value="cancel" formnovalidate>취소</button>
-        <button class="btn primary" value="save" id="saveBtn">기록하기</button>
+
+      <div class="field">
+        <span id="pagesLabel">읽은 페이지 / (전체 페이지)</span>
+        <p class="so-far" id="soFar" hidden></p>
+        <div class="pages-pair">
+          <input id="rTo" type="number" inputmode="numeric" min="1" placeholder="몇 쪽까지" aria-label="읽은 페이지" />
+          <span>/</span>
+          <input id="rTotal" type="number" inputmode="numeric" min="1" placeholder="전체" aria-label="전체 페이지" />
+        </div>
+        <label class="check"><input type="checkbox" id="rDone" /><span>이미 다 읽은 책이에요</span></label>
+      </div>
+      <p class="timing" id="rTiming"></p>
+    </form>
+  </dialog>
+
+  <!-- 3) 다 읽었을 때: 마무리 고르기 -->
+  <dialog id="finishSheet" class="bottom">
+    <form method="dialog" class="sheet center">
+      <div class="grab" aria-hidden="true"></div>
+      <h2 class="finish-h">오늘도 한 권 읽었어요</h2>
+      <p class="finish-sub">어떻게 마무리할까요?</p>
+      <button class="choice dark" value="activity">
+        <span class="ci">✏️</span>
+        <span class="ct"><b>독후활동 하기</b><small>별점 주고 내 생각 적기 · +50점</small></span><span>›</span>
+      </button>
+      <button class="choice" value="stamp">
+        <span class="ci">🌸</span>
+        <span class="ct"><b>스탬프 바로 받기</b><small>독후활동은 다음에 할게요</small></span><span>›</span>
+      </button>
+    </form>
+  </dialog>
+
+  <!-- 4) 독후 활동 시간 -->
+  <dialog id="activityPage" class="page">
+    <form method="dialog" class="page-in">
+      <div class="page-top">
+        <h2 class="act-h">독후 활동 시간</h2>
+        <button class="pill-btn" value="skip" id="aSkip">건너뛰기</button>
+      </div>
+      <img class="act-cover" id="aCover" alt="" />
+      <h3 class="act-title" id="aTitle"></h3>
+      <p class="act-q">하나. 책 별점 주기</p>
+      <div class="stars" id="stars" role="radiogroup" aria-label="별점"></div>
+      <p class="act-q">둘. 내 생각 간단히 적기 ✏️</p>
+      <textarea id="aText" rows="6" maxlength="250" placeholder="이 책을 읽고 생각한 것을 자유롭게 적어 보세요.&#10;예) 가장 기억에 남는 장면, 주인공에게 해 주고 싶은 말"></textarea>
+      <p class="count"><span id="aCount">0</span>/250자</p>
+      <button class="btn lime big" value="done">완료</button>
+    </form>
+  </dialog>
+
+  <!-- 5) 독서 스탬프 -->
+  <dialog id="stampPage" class="page">
+    <form method="dialog" class="page-in">
+      <div class="page-top end"><button class="x-btn" value="close" aria-label="닫기">✕</button></div>
+      <h2 class="stamp-h">책 한 권 다 읽을 때마다<br>독서 스탬프 하나씩!</h2>
+      <div class="stamp-card">
+        <div class="stamp-top"><span class="avatar">🍌</span><b>독서 스탬프</b><span id="stampCount"></span></div>
+        <div class="stamp-grid" id="stampGrid"></div>
+      </div>
+      <div class="stamp-info">
+        <h4>🏅 독서스탬프 안내</h4>
+        <ul>
+          <li>책 한 권을 끝까지 읽으면 스탬프를 하나씩 받아요</li>
+          <li>8개를 다 채우면 새 스탬프판이 시작돼요</li>
+          <li id="stampBoards"></li>
+        </ul>
       </div>
     </form>
   </dialog>
 
-  <!-- 책장에서 책 눌렀을 때: 기록 보기 -->
-  <dialog id="viewDialog">
+  <!-- 포인트 획득 효과 -->
+  <div class="burst" id="burst" hidden>
+    <div class="burst-ring"><b id="burstN"></b><span>독서 포인트 획득 ✨</span></div>
+  </div>
+
+  <!-- 책장에서 책 눌렀을 때 -->
+  <dialog id="viewDialog" class="bottom">
     <form method="dialog" class="sheet">
-      <div class="book-card">
+      <div class="sheet-top">
+        <button class="x-btn" value="close" aria-label="닫기">✕</button>
+        <b>내 독서 기록</b>
+        <span></span>
+      </div>
+      <div class="s-book">
         <img id="vCover" alt="" />
         <div>
-          <h3 class="i-title" id="vTitle"></h3>
-          <p class="i-author" id="vAuthor"></p>
-          <p class="meta" id="vMeta"></p>
+          <h3 id="vTitle"></h3>
+          <p id="vAuthor"></p>
+          <p id="vMeta"></p>
         </div>
       </div>
       <div class="progress" id="vProgress"></div>
@@ -202,10 +289,12 @@
         <h4>📖 읽은 기록</h4>
         <ol id="vSessions"></ol>
       </div>
-      <button class="btn more" value="more" id="vMore">➕ 이어서 기록하기</button>
+      <button class="btn lime" value="more" id="vMore">➕ 이어서 기록하기</button>
+      <button class="btn dark" value="activity" id="vActivity">✏️ 독후활동 하기 (+50점)</button>
       <dl class="rec-info">
-        <dt>점수</dt><dd id="vScore"></dd>
-        <dt>한 줄 독후감</dt><dd id="vNote"></dd>
+        <dt>별점</dt><dd id="vScore"></dd>
+        <dt>내 생각</dt><dd id="vNote"></dd>
+        <dt>분야</dt><dd><select id="vCat" aria-label="분야"></select></dd>
       </dl>
       <div class="row spread">
         <button class="btn danger" value="delete" formnovalidate>삭제</button>
@@ -214,53 +303,14 @@
     </form>
   </dialog>
 
-  <!-- 이어서 기록하기 (쪽수 + 날짜만) -->
-  <dialog id="moreDialog">
-    <form method="dialog" class="sheet">
-      <div class="mini-head">
-        <img id="mCover" alt="" />
-        <div>
-          <h3 id="mTitle"></h3>
-          <p class="meta" id="mSoFar"></p>
-        </div>
-      </div>
-      <div class="field">
-        <span>읽은 날</span>
-        <div class="date-row">
-          <input id="mDate" type="date" aria-label="읽은 날짜" />
-          <div class="date-chips" data-for="mDate">
-            <button type="button" data-ago="0">오늘</button>
-            <button type="button" data-ago="1">어제</button>
-            <button type="button" data-ago="2">그저께</button>
-          </div>
-        </div>
-      </div>
-      <div class="field">
-        <span>오늘 읽은 쪽수</span>
-        <div class="pages-row">
-          <input id="mPageFrom" type="number" inputmode="numeric" min="1" aria-label="시작 쪽" />
-          <span>~</span>
-          <input id="mPageTo" type="number" inputmode="numeric" min="1" placeholder="마지막 쪽" aria-label="끝 쪽" />
-          <span>쪽</span>
-        </div>
-      </div>
-      <div class="row">
-        <button class="btn ghost" value="cancel" formnovalidate>취소</button>
-        <button class="btn primary" value="save">기록하기</button>
-      </div>
-    </form>
-  </dialog>
-
   <!-- 포트폴리오: 날짜를 눌렀을 때 -->
-  <dialog id="dayDialog" class="dark">
+  <dialog id="dayDialog" class="bottom">
     <form method="dialog" class="sheet">
       <h2 class="day-title" id="dayTitle"></h2>
       <p class="day-sub">카테고리</p>
       <div class="cats" id="dayCats"></div>
       <div class="day-list" id="dayList"></div>
-      <div class="row">
-        <button class="btn primary" value="close">닫기</button>
-      </div>
+      <button class="btn dark" value="close">닫기</button>
     </form>
   </dialog>
 
@@ -282,7 +332,7 @@
       </label>
       <div class="row">
         <button class="btn ghost" value="cancel" formnovalidate>취소</button>
-        <button class="btn primary" value="save">저장</button>
+        <button class="btn dark" value="save">저장</button>
       </div>
     </form>
   </dialog>
@@ -290,12 +340,12 @@
   <!-- ISBN 직접 입력 -->
   <dialog id="manualDialog">
     <form method="dialog" class="sheet">
-      <h3 id="manualTitle">ISBN 입력</h3>
+      <h3>ISBN 직접 입력</h3>
       <input id="manualIsbn" inputmode="numeric" placeholder="978로 시작하는 13자리 또는 10자리" />
       <p class="err" id="manualErr"></p>
       <div class="row">
         <button class="btn ghost" value="cancel" formnovalidate>취소</button>
-        <button class="btn primary" value="ok">찾기</button>
+        <button class="btn dark" value="ok">찾기</button>
       </div>
     </form>
   </dialog>
