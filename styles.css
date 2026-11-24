@@ -399,3 +399,86 @@ textarea { resize: vertical; line-height: 1.6; }
   background: var(--ink); color: #fff; padding: 10px 16px; border-radius: 999px; font-size: 14px; z-index: 70;
   box-shadow: var(--shadow); max-width: 90vw; text-align: center;
 }
+
+/* ===== 테마: 숲초록 · 세이지 · 아이보리 (부드럽게 떠 있는 카드) ===== */
+:root {
+  --bg: #F3EFE6; --soft: #ECE7DC; --card: #FBF9F4; --line: #E2DCCF;
+  --ink: #1E2420; --muted: #6E776F;
+  --forest: #2F5D3A; --forest-d: #1F3D27; --sage: #B7C9A8; --sage-l: #DDE5D3;
+  --lime: #2F5D3A; --lime-ink: #F3EFE6;
+  --ko: #2F5D3A; --en: #6F9F97; --fo: #C89B3C; --cal: #CFDCC3;
+  --raise: 4px 4px 10px #D9D2C3, -4px -4px 10px #FFFFFF;
+  --raise-s: 2px 2px 6px #D9D2C3, -2px -2px 6px #FFFFFF;
+  --inset: inset 2px 2px 5px #D9D2C3, inset -2px -2px 5px #FFFFFF;
+}
+body { background: var(--bg); }
+.top { background: rgba(243, 239, 230, .94); }
+.stripes i:nth-child(odd) { background: #2F5D3A; }
+.stripes i:nth-child(even) { background: #B7C9A8; }
+.hero, .sec-title, .page-title { color: var(--forest-d); }
+.gear, .cal-nav { background: var(--card); box-shadow: var(--raise-s); }
+.kid { background: var(--card); color: var(--muted); box-shadow: var(--raise-s); }
+.kid.on { background: var(--forest); color: #F3EFE6; box-shadow: none; }
+.ring-card, .tile, .r-card, .stamp-card, .stamp-info { background: var(--card); box-shadow: var(--raise); }
+.r-card { border-radius: 18px; }
+.ring svg circle:first-child { stroke: var(--sage-l); }
+.ring svg circle + circle { stroke: var(--forest); }
+.ring b { color: var(--forest-d); }
+.read-card { background: var(--forest); box-shadow: var(--raise); }
+.read-card .bgimg { opacity: .22; }
+.read-card b { color: #F3EFE6; }
+.read-card p { color: #D6E2CC; }
+.read-card .bar { background: rgba(255, 255, 255, .2); }
+.read-card .bar i { background: var(--sage); }
+.read-card .rc-cover { background: #4A7656; }
+.shelf { border-radius: 14px; overflow: hidden; box-shadow: var(--raise); }
+.shelf li { background: var(--soft); }
+.shelf .pbar i { background: var(--sage); }
+.shelf .done-badge { background: var(--forest); color: #F3EFE6; }
+.shelf-title.ko { background: #DDE5D3; color: #1F3D27; }
+.shelf-title.en { background: #DCEAE7; color: #2E5B55; }
+.shelf-title.fo { background: #F2E6C9; color: #7A5A14; }
+.shelf-head select { background: var(--card); border-color: transparent; box-shadow: var(--raise-s); }
+.tabbar { background: var(--card); box-shadow: var(--raise); }
+.tabbar button[aria-current="page"] { background: var(--bg); color: var(--forest); box-shadow: var(--inset); }
+.fab { background: var(--forest); color: #F3EFE6; box-shadow: 4px 6px 14px rgba(47, 93, 58, .35); }
+.btn.lime { background: var(--forest); color: #F3EFE6; border-color: var(--forest); }
+.btn.dark { background: var(--forest-d); }
+.x-btn { background: var(--card); color: var(--muted); box-shadow: var(--raise-s); }
+.pill-btn { background: var(--card); color: var(--forest); border-color: transparent; box-shadow: var(--raise-s); }
+.link-btn { color: var(--forest); }
+dialog { background: var(--bg); }
+.s-mine, .so-far { background: var(--sage-l); color: var(--forest-d); }
+.seg button { background: var(--card); box-shadow: var(--raise-s); }
+.seg button[aria-checked="true"] { background: var(--forest); color: #F3EFE6; border-color: var(--forest); box-shadow: none; }
+.date-chips button { background: var(--card); border-color: transparent; box-shadow: var(--raise-s); }
+.date-chips button.on { background: var(--forest); border-color: var(--forest); color: #F3EFE6; }
+.pages-pair input, .min-row input, .pages-row input, .title-input, .sub-input, #manualIsbn, textarea, .total-row input, #vCat, .ic-in, .nm-in {
+  background: var(--card); border-color: transparent; border-radius: 12px; box-shadow: var(--inset);
+}
+.check input { accent-color: var(--forest); }
+.mark { background: linear-gradient(transparent 58%, #DDE5D3 58%); color: var(--forest-d); }
+.choice { background: var(--card); border-color: transparent; box-shadow: var(--raise); }
+.choice.dark { background: var(--forest); border-color: var(--forest); }
+.stars path { stroke: #8EB69B; }
+.stars button[aria-checked="true"] path, .stars button.lit path { fill: #8EB69B; stroke: var(--forest); }
+.stamp { border-color: #B9B2A3; }
+.stamp.on { border-color: var(--forest); }
+.stamp.on::after { color: var(--forest); }
+.burst { background: rgba(30, 36, 32, .72); }
+.burst-ring { background: linear-gradient(rgba(31, 61, 39, .55), rgba(31, 61, 39, .55)) padding-box, linear-gradient(180deg, #B7C9A8, #2F5D3A) border-box; }
+.bar i, .vbar i { background: var(--forest); }
+.hbar .fill[style*="#4C6EF5"] { background: var(--forest) !important; }
+.cal-grid button.has { background: var(--cal); }
+.cal-grid button.today { color: var(--forest); box-shadow: inset 0 0 0 2px var(--forest); }
+.cal-legend b { color: var(--forest); }
+.cats .ic { background: var(--card); box-shadow: var(--raise-s); }
+.cats button.on .ic { background: var(--sage-l); box-shadow: var(--inset); }
+.cats .cnt { background: var(--forest); }
+.day-item, .sessions li { background: var(--card); }
+.set-row { background: var(--card); box-shadow: var(--raise-s); }
+.cat-add { background: var(--card); }
+.emoji-pick button { background: var(--bg); }
+.kid-list .x, .cat-list button { background: var(--card); box-shadow: var(--raise-s); }
+.toast { background: var(--forest-d); }
+.roi.hit { border-color: var(--sage); }
