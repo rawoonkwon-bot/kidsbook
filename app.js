@@ -663,6 +663,7 @@ const DEFAULT_CATS = [
   { key: "listen", icon: "headphones", name: "흘려듣기", kind: "time" },
   { key: "focus", icon: "ear", name: "집중듣기", kind: "focus" },
   { key: "memo", icon: "pencil", name: "메모", kind: "note" },
+  { key: "secret", icon: "lock", name: "나만보기", kind: "note" },
 ];
 const LEGACY_CATS = [
   { key: "math", icon: "math-symbols", name: "수학", kind: "time" },
@@ -670,7 +671,7 @@ const LEGACY_CATS = [
 ];
 const PH = { listen: "예: Peppa Pig 3화", focus: "예: Magic Tree House 1권", math: "예: 연산 문제집 12~15쪽", etc: "예: 피아노 연습" };
 // 카테고리마다 아이콘 색
-const CAT_COLOR = { ko: "#2F5D3A", en: "#6F9F97", listen: "#C89B3C", focus: "#D4537E", memo: "#534AB7", math: "#185FA5", etc: "#BA7517" };
+const CAT_COLOR = { ko: "#2F5D3A", en: "#6F9F97", listen: "#C89B3C", focus: "#D4537E", memo: "#534AB7", math: "#185FA5", etc: "#BA7517", secret: "#5F5E5A" };
 function decorate(c) {
   const d = { ...c, icon: toIcon(c.icon), color: CAT_COLOR[c.key] || "#2F5D3A" };
   d.svg = ico(d.icon, "", d.color);
@@ -680,7 +681,7 @@ function decorate(c) {
     const listen = c.key === "listen" || c.key === "focus";
     Object.assign(d, { what: listen ? "무엇을 들었나요?" : "무엇을 했나요?", whatPh: PH[c.key] || "예: 오늘 한 것", amount: "얼마나 했나요?", unit: "분" });
   }
-  if (c.kind === "note") Object.assign(d, { text: c.key === "memo" ? "메모 · 일기" : "내용", textPh: "오늘 있었던 일, 느낀 점, 칭찬할 점을 일기처럼 자유롭게 적어요" });
+  if (c.kind === "note") Object.assign(d, { text: c.key === "memo" ? "메모 · 일기" : c.key === "secret" ? "🔒 나만 보는 비밀 메모" : "내용", textPh: c.key === "secret" ? "여기 쓴 글과 사진은 나만 볼 수 있어요. 친구들은 책장을 구경해도 못 봐요." : "오늘 있었던 일, 느낀 점, 칭찬할 점을 일기처럼 자유롭게 적어요" });
   return d;
 }
 let catList = readJSON(CATS_KEY, null);
@@ -696,6 +697,12 @@ for (const c of LEGACY_CATS) {
     catList.splice(Math.max(0, catList.findIndex((x) => x.key === "memo")), 0, { ...c });
     store.setItem(CATS_KEY, JSON.stringify(catList));
   }
+}
+// 새 기본 카테고리 '나만보기'(비밀 메모)가 없으면 메모 다음에 넣어 둠
+if (!catList.some((c) => c.key === "secret")) {
+  const at = catList.findIndex((c) => c.key === "memo");
+  catList.splice(at < 0 ? catList.length : at + 1, 0, { key: "secret", icon: "lock", name: "나만보기", kind: "note" });
+  store.setItem(CATS_KEY, JSON.stringify(catList));
 }
 // 예전 이모지 아이콘은 선 아이콘 이름으로 바꿔 둠
 if (catList.some((c) => c.icon !== toIcon(c.icon))) {
@@ -956,7 +963,7 @@ $("entryDialog").addEventListener("close", async () => {
     else {
       for (let i = 0; i < picked.length; i++) {
         toast(`사진 올리는 중 ${i + 1}/${picked.length}`, 60000);
-        try { paths.push(await sync.uploadPhoto(await shrinkPhoto(picked[i].file))); } catch { /* 이 사진은 건너뜀 */ }
+        try { paths.push(await sync.uploadPhoto(await shrinkPhoto(picked[i].file), cat === "secret")); } catch { /* 이 사진은 건너뜀 */ }
       }
       if (paths.length < picked.length) toast(`사진 ${picked.length - paths.length}장은 올리지 못했어요`, 3500);
     }
@@ -1207,7 +1214,7 @@ $("kSave").addEventListener("click", () => {
 const PICK_ALL = [["book", "책"], ["abc", "영어"], ["headphones", "듣기"], ["ear", "귀"], ["pencil", "메모"], ["math-symbols", "수학"], ["star", "별"], ...PICK];
 let catDraft = [], newKind = "time", newIcon = "star", pickFor = "new"; // pickFor: "new" 또는 목록 번호
 const catColor = (c) => CAT_COLOR[c.key] || "#2F5D3A";
-const LOCKED = (c) => c.kind === "book" || c.kind === "focus";
+const LOCKED = (c) => c.kind === "book" || c.kind === "focus" || c.key === "secret";
 const KIND_NAME = { book: "책장", focus: "책장+시간", time: "한 것+시간", note: "메모" };
 $("cEmoji").innerHTML = PICK_ALL.map(([n, label]) => `<button type="button" data-e="${n}" aria-label="${label} 아이콘 고르기">${ico(n)}<small>${label}</small></button>`).join("");
 function paintPick() {
@@ -1248,7 +1255,7 @@ function paintCats() {
     <button type="button" data-mv="-1" aria-label="위로" ${i ? "" : "disabled"}>▲</button>
     <button type="button" data-mv="1" aria-label="아래로" ${i < last ? "" : "disabled"}>▼</button>
     <button type="button" data-hide aria-label="${c.hidden ? "보이기" : "숨기기"}">${c.hidden ? "🙈" : "👁"}</button>
-    ${LOCKED(c) ? `<span class="lock" title="책장과 연결돼 있어서 숨기기만 돼요">🔒</span>` : `<button type="button" data-rm aria-label="${esc(c.name)} 삭제">🗑</button>`}
+    ${LOCKED(c) ? `<span class="lock" title="${c.key === "secret" ? "비밀 메모는 지울 수 없고 숨기기만 돼요" : "책장과 연결돼 있어서 숨기기만 돼요"}">🔒</span>` : `<button type="button" data-rm aria-label="${esc(c.name)} 삭제">🗑</button>`}
   </li>`).join("");
 }
 $("cList").addEventListener("click", (e) => {

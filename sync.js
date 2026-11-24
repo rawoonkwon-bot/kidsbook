@@ -35,6 +35,9 @@ function writeLocal(d) {
   localStorage.setItem(KEYS.records, JSON.stringify(d.records || []));
   localStorage.setItem(KEYS.journal, JSON.stringify(d.journal || []));
 }
+// '나만보기'(비밀 메모)는 공개 기록(userdata)에 넣지 않고, 나만 읽을 수 있는 userprivate 표에 따로 저장
+const isSecret = (j) => j.cat === "secret";
+const withSecrets = (d, priv) => ({ ...(d || {}), journal: [...((d || {}).journal || []).filter((j) => !isSecret(j)), ...((priv?.data?.journal) || [])] });
 const hasData = (d) => (d.kids?.length || 0) + (d.records?.length || 0) + (d.journal?.length || 0) > 0;
 
 // 두 기록 합치기 (같은 자녀·같은 책·같은 날 기록은 한 번만)
@@ -70,7 +73,12 @@ function mergeData(base, extra) {
 async function pushNow() {
   if (!user || !sb) return;
   const startEdits = edits;
-  const { data, error } = await sb.from("userdata").upsert({ user_id: user.id, data: readLocal() }, { onConflict: "user_id" })
+  const local = readLocal();
+  const secrets = (local.journal || []).filter(isSecret);
+  const pub = { ...local, journal: (local.journal || []).filter((j) => !isSecret(j)) };
+  const { error: e2 } = await sb.from("userprivate").upsert({ user_id: user.id, data: { journal: secrets } }, { onConflict: "user_id" });
+  if (e2) throw e2;
+  const { data, error } = await sb.from("userdata").upsert({ user_id: user.id, data: pub }, { onConflict: "user_id" })
     .select("updated_at, is_public").single();
   if (error) throw error;
   localStorage.setItem(SAT, data.updated_at);
@@ -96,8 +104,13 @@ window.addEventListener("online", () => flush());
 
 // ---------- 계정과 휴대폰 기록 맞추기 ----------
 async function reconcile() {
-  const { data: row, error } = await sb.from("userdata").select("data, is_public, updated_at").eq("user_id", user.id).maybeSingle();
+  const [{ data: row0, error }, { data: priv, error: e2 }] = await Promise.all([
+    sb.from("userdata").select("data, is_public, updated_at").eq("user_id", user.id).maybeSingle(),
+    sb.from("userprivate").select("data").eq("user_id", user.id).maybeSingle(),
+  ]);
   if (error) throw error;
+  if (e2) throw e2;
+  const row = row0 ? { ...row0, data: withSecrets(row0.data, priv) } : null;
   const local = readLocal();
   const su = localStorage.getItem(SUSER);
   if (row) isPublic = row.is_public;
@@ -232,10 +245,11 @@ export async function shareBook(b) {
 const BUCKET = "photos";
 const urlCache = new Map();
 export const canUpload = () => !!user;
-export async function uploadPhoto(blob) {
+// secret=true 면 private 폴더에 저장 → 공개 회원이어도 다른 사람은 못 봄
+export async function uploadPhoto(blob, secret = false) {
   if (!user) throw new Error("login");
   const c = await client();
-  const path = `${user.id}/${crypto.randomUUID()}.jpg`;
+  const path = `${user.id}/${secret ? "private/" : ""}${crypto.randomUUID()}.jpg`;
   const { error } = await c.storage.from(BUCKET).upload(path, blob, { contentType: "image/jpeg", upsert: false });
   if (error) throw error;
   return path;

@@ -30,6 +30,7 @@ export const ICONS = {
   "plant": '<path d="M7 15h10v4a2 2 0 0 1 -2 2h-6a2 2 0 0 1 -2 -2v-4"/><path d="M12 9a6 6 0 0 0 -6 -6h-3v2a6 6 0 0 0 6 6h3"/><path d="M12 11a6 6 0 0 1 6 -6h3v1a6 6 0 0 1 -6 6h-3"/><path d="M12 15l0 -6"/>',
   "message": '<path d="M8 9h8"/><path d="M8 13h6"/><path d="M18 4a3 3 0 0 1 3 3v8a3 3 0 0 1 -3 3h-5l-5 3v-3h-2a3 3 0 0 1 -3 -3v-8a3 3 0 0 1 3 -3h12"/>',
   "heart": '<path d="M19.5 12.572l-7.5 7.428l-7.5 -7.428a5 5 0 1 1 7.5 -6.566a5 5 0 1 1 7.5 6.572"/>',
+  "lock": '<path d="M5 13a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v6a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-6"/><path d="M11 16a1 1 0 1 0 2 0a1 1 0 0 0 -2 0"/><path d="M8 11v-4a4 4 0 1 1 8 0v4"/>',
 };
 // 아이콘 그리기: ico("book") → <svg …>
 export const ico = (name, cls = "", color = "") =>
@@ -37,12 +38,12 @@ export const ico = (name, cls = "", color = "") =>
 // 예전 이모지 아이콘 → 선 아이콘
 const FROM_EMOJI = { "📕": "book", "📖": "book", "📚": "book", "📘": "abc", "🔤": "abc", "🎧": "headphones", "👂": "ear", "📝": "pencil", "✏️": "brush", "➗": "math-symbols",
   "⭐": "star", "🎹": "piano", "🎻": "music", "🎵": "music", "🎶": "music", "⚽": "ball-football", "🏊": "swimming", "🎨": "palette", "🧩": "puzzle", "🔬": "microscope",
-  "🌏": "world", "🌍": "world", "🈶": "language", "🧘": "yoga", "🏃": "run", "💻": "code", "🗣️": "message", "🚲": "bike", "♟️": "chess", "🌱": "plant", "❤️": "heart" };
+  "🌏": "world", "🌍": "world", "🈶": "language", "🧘": "yoga", "🏃": "run", "💻": "code", "🗣️": "message", "🚲": "bike", "♟️": "chess", "🌱": "plant", "❤️": "heart", "🔒": "lock" };
 export const toIcon = (v) => (ICONS[v] ? v : FROM_EMOJI[v] || FROM_EMOJI[String(v || "").split(String.fromCharCode(0xFE0F)).join("")] || "star");
 // 백업 기록장(인터넷 없이 여는 파일)용 이모지
 export const ICON_EMOJI = { book: "📕", abc: "📘", headphones: "🎧", ear: "👂", pencil: "📝", "math-symbols": "➗", star: "⭐", music: "🎵", piano: "🎹",
   "ball-football": "⚽", swimming: "🏊", palette: "🎨", puzzle: "🧩", microscope: "🔬", world: "🌏", language: "🈶", yoga: "🧘", run: "🏃", code: "💻",
-  bike: "🚲", chess: "♟️", brush: "✏️", plant: "🌱", message: "🗣️", heart: "❤️" };
+  bike: "🚲", chess: "♟️", brush: "✏️", plant: "🌱", message: "🗣️", heart: "❤️", lock: "🔒" };
 // 새 카테고리에서 고를 수 있는 아이콘
 export const PICK = [["music", "음악"], ["piano", "피아노"], ["ball-football", "축구"], ["swimming", "수영"], ["palette", "미술"], ["puzzle", "퍼즐"],
   ["microscope", "과학"], ["world", "사회"], ["language", "외국어"], ["yoga", "요가"], ["run", "운동"], ["code", "코딩"],
