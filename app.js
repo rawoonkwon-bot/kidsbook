@@ -176,6 +176,7 @@ function go(tab) {
   document.querySelectorAll(".tabbar button").forEach((b) => b.toggleAttribute("aria-current", b.dataset.go === tab));
   document.querySelectorAll(".tabbar button[aria-current]").forEach((b) => b.setAttribute("aria-current", "page"));
   $("kidBar").classList.toggle("off", tab !== "home" && tab !== "port"); // 자녀 고르기는 홈·포트폴리오에서만
+  $("wsOpen").hidden = tab !== "home"; // 연산 프린트 동그라미는 홈에서만
   if (tab === "stats") { renderStats(); renderBrowse(); }
   if (tab === "port") renderCalendar();
   if (tab === "board") setTimeout(() => renderBoard()); // 게시판 코드가 아래에 있어서 한 박자 뒤에
