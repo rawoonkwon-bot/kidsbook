@@ -2,6 +2,7 @@ import { Scanner, warmUpDetector } from "./scanner.js";
 import { lookupBook } from "./lookup.js";
 import { toIsbn13 } from "./isbn.js";
 import * as sync from "./sync.js";
+import { ico, toIcon, ICON_EMOJI, PICK } from "./icons.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -31,8 +32,8 @@ const REC_KEY = "kbc:records:v1";
 const BONUS = 50; // 독후활동 보너스 포인트
 const STAMPS_PER_BOARD = 8;
 const BOOK_CATS = ["문학", "자연과학", "사회과학", "역사", "예술", "언어", "기술과학", "철학", "종교", "총류", "기타"];
-const SHELVES = { ko: "🇰🇷 한글책", en: "🔤 영어책", focus: "🎧 집중듣기" };
-const shelfName = (k) => SHELVES[k].split(" ")[1];
+const SHELVES = { ko: "한글책", en: "영어책", focus: "집중듣기" };
+const shelfName = (k) => SHELVES[k];
 const fmtMin = (m) => (m >= 60 ? `${Math.floor(m / 60)}시간${m % 60 ? ` ${m % 60}분` : ""}` : `${m}분`);
 
 // ---------- 날짜 (한국 시간 기준 YYYY-MM-DD) ----------
@@ -512,7 +513,7 @@ function fillView(r) {
   setImg($("vCover"), r.cover);
   $("vTitle").textContent = r.title;
   $("vAuthor").textContent = r.authors || "";
-  $("vMeta").textContent = [SHELVES[shelfOf(r)], r.totalPages && `${r.totalPages}쪽`, minsOf(r) && `🎧 ${fmtMin(minsOf(r))}`, `${pointsOf(r)}점`].filter(Boolean).join(" · ");
+  $("vMeta").textContent = [SHELVES[shelfOf(r)], r.totalPages && `${r.totalPages}쪽`, minsOf(r) && `${fmtMin(minsOf(r))} 들음`, `${pointsOf(r)}점`].filter(Boolean).join(" · ");
   $("vProgress").innerHTML = progressText(r)
     ? `<b>${esc(progressText(r))}</b>${r.totalPages ? `<div class="bar"><i style="width:${pct(r)}%"></i></div>` : ""}` : "";
   $("vSessions").innerHTML = [...r.sessions].sort((a, b) => a.day.localeCompare(b.day))
@@ -567,19 +568,22 @@ const writeAll = () => {
 // 카테고리: 사용자가 편집 가능. kind = book(책장) · focus(책장+시간) · time(한 것+시간) · note(메모만)
 const CATS_KEY = "kbc:cats:v1";
 const DEFAULT_CATS = [
-  { key: "ko", icon: "📕", name: "한글책", kind: "book" },
-  { key: "en", icon: "📘", name: "영어책", kind: "book" },
-  { key: "listen", icon: "🎧", name: "흘려듣기", kind: "time" },
-  { key: "focus", icon: "👂", name: "집중듣기", kind: "focus" },
-  { key: "memo", icon: "📝", name: "메모", kind: "note" },
+  { key: "ko", icon: "book", name: "한글책", kind: "book" },
+  { key: "en", icon: "abc", name: "영어책", kind: "book" },
+  { key: "listen", icon: "headphones", name: "흘려듣기", kind: "time" },
+  { key: "focus", icon: "ear", name: "집중듣기", kind: "focus" },
+  { key: "memo", icon: "pencil", name: "메모", kind: "note" },
 ];
 const LEGACY_CATS = [
-  { key: "math", icon: "➗", name: "수학", kind: "time" },
-  { key: "etc", icon: "⭐", name: "기타", kind: "time" },
+  { key: "math", icon: "math-symbols", name: "수학", kind: "time" },
+  { key: "etc", icon: "star", name: "기타", kind: "time" },
 ];
 const PH = { listen: "예: Peppa Pig 3화", focus: "예: Magic Tree House 1권", math: "예: 연산 문제집 12~15쪽", etc: "예: 피아노 연습" };
+// 카테고리마다 아이콘 색
+const CAT_COLOR = { ko: "#2F5D3A", en: "#6F9F97", listen: "#C89B3C", focus: "#D4537E", memo: "#534AB7", math: "#185FA5", etc: "#BA7517" };
 function decorate(c) {
-  const d = { ...c };
+  const d = { ...c, icon: toIcon(c.icon), color: CAT_COLOR[c.key] || "#2F5D3A" };
+  d.svg = ico(d.icon, "", d.color);
   if (c.kind === "book") d.book = true;
   if (c.kind === "focus") d.hybrid = true;
   if (c.kind === "time" || c.kind === "focus") {
@@ -602,6 +606,11 @@ for (const c of LEGACY_CATS) {
     catList.splice(Math.max(0, catList.findIndex((x) => x.key === "memo")), 0, { ...c });
     store.setItem(CATS_KEY, JSON.stringify(catList));
   }
+}
+// 예전 이모지 아이콘은 선 아이콘 이름으로 바꿔 둠
+if (catList.some((c) => c.icon !== toIcon(c.icon))) {
+  catList = catList.map((c) => ({ ...c, icon: toIcon(c.icon) }));
+  store.setItem(CATS_KEY, JSON.stringify(catList));
 }
 const saveCats = () => store.setItem(CATS_KEY, JSON.stringify(catList));
 let CATS = [], CAT = {};
@@ -634,8 +643,11 @@ function renderCalendar() {
     const cats = out ? [] : catsOn(day);
     if (cats.length) count++;
     const cls = [out && "out", day === today && "today", cats.length && "has"].filter(Boolean).join(" ");
+    // 아이콘은 3개씩 2줄(최대 6개), 넘치면 5개 + "+숫자"
+    const shown = cats.length > 6 ? cats.slice(0, 5) : cats;
+    const icons = shown.map((c) => c.svg).join("") + (cats.length > 6 ? `<span class="more">+${cats.length - 5}</span>` : "");
     html += `<button type="button" class="${cls}" data-day="${day}" ${day > today || out ? "disabled" : ""} aria-label="${prettyDay(day)}${cats.length ? ` · ${cats.map((c) => c.name).join(", ")}` : ""}">
-      ${d.getDate()}${cats.length ? `<span class="dot">${cats.slice(0, 3).map((c) => c.icon).join("")}</span>` : ""}</button>`;
+      <span class="dn">${d.getDate()}</span>${cats.length ? `<span class="ig">${icons}</span>` : ""}</button>`;
   }
   $("calGrid").innerHTML = html;
   $("calLegend").innerHTML = count ? `이번 달 <b>${count}</b>일 기록했어요` : "이 달에는 아직 기록이 없어요";
@@ -658,7 +670,7 @@ function fillDay(day) {
   $("dayTitle").innerHTML = `${m}월 ${d}일에<br>무엇을 기록할까요?`;
   $("dayCats").innerHTML = CATS.map((c) => {
     const n = countOn(day, c);
-    return `<button type="button" data-cat="${c.key}" class="${dayPanel === c.key ? "on" : ""}"><span class="ic">${c.icon}</span>${c.name}${n ? `<span class="cnt">${n}</span>` : ""}</button>`;
+    return `<button type="button" data-cat="${c.key}" class="${dayPanel === c.key ? "on" : ""}"><span class="ic">${c.svg}</span>${c.name}${n ? `<span class="cnt">${n}</span>` : ""}</button>`;
   }).join("");
 
   let html = "";
@@ -672,7 +684,7 @@ function fillDay(day) {
       </div>`;
     html += ongoing.length ? `<small>읽고 있는 ${c.name} (누르면 이 날 읽은 쪽수를 기록해요)</small>` +
       ongoing.map((r) => `<div class="day-item link" data-more="${r.id}">
-        ${r.cover ? `<img src="${esc(r.cover)}" alt="">` : `<span>${c.icon}</span>`}
+        ${r.cover ? `<img src="${esc(r.cover)}" alt="">` : `<span>${c.svg}</span>`}
         <div class="grow"><b>${esc(r.title)}</b><small>${progressText(r) || "아직 쪽수 기록 없음"}</small></div><span>➕</span></div>`).join("")
       : `<small>읽고 있는 ${c.name} 책이 없어요. 책 스캔으로 새 책을 기록해 보세요.</small>`;
   } else {
@@ -680,14 +692,14 @@ function fillDay(day) {
       if (c.book || c.hybrid) {
         for (const { r, s } of booksOn(day, c.key)) {
           html += `<div class="day-item link" data-view="${r.id}">
-            ${r.cover ? `<img src="${esc(r.cover)}" alt="">` : `<span>${c.icon}</span>`}
-            <div class="grow"><b>${c.icon} ${esc(r.title)}</b><small>${sessionText(s)}</small></div></div>`;
+            ${r.cover ? `<img src="${esc(r.cover)}" alt="">` : `<span>${c.svg}</span>`}
+            <div class="grow"><b>${esc(r.title)}</b><small>${sessionText(s)}</small></div></div>`;
         }
       }
       if (!c.book) {
         for (const j of journalOn(day, c.key)) {
           const sub = [j.minutes ? fmtMin(j.minutes) : "", j.text || ""].filter(Boolean).join(" · ");
-          html += `<div class="day-item"><span>${c.icon}</span>
+          html += `<div class="day-item"><span>${c.svg}</span>
             <div class="grow"><b>${esc(j.what || c.name)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}</div>
             <button type="button" class="x" data-del="${j.id}" aria-label="지우기">✕</button></div>`;
         }
@@ -736,7 +748,7 @@ function maybeReturn() {
 let entryCat = null;
 function openEntry(cat) {
   const c = CAT[cat]; entryCat = cat;
-  $("eTitle").textContent = `${c.icon} ${c.name} · ${prettyDay(openDayKey)}`;
+  $("eTitle").textContent = `${c.name} · ${prettyDay(openDayKey)}`;
   $("eWhatWrap").hidden = !c.what; $("eWhatLabel").textContent = c.what || ""; $("eWhat").placeholder = c.whatPh || ""; $("eWhat").value = "";
   $("eAmountWrap").hidden = !c.amount; $("eAmountLabel").textContent = (c.amount || "").replace("몇 분", "얼마나"); $("eUnit").textContent = c.unit || ""; $("eAmount").value = ""; $("eHour").value = "";
   $("eTextWrap").hidden = false; $("eTextLabel").textContent = c.text || "한 줄 메모 (선택)"; $("eText").placeholder = c.textPh || ""; $("eText").value = "";
@@ -750,7 +762,7 @@ $("entryDialog").addEventListener("close", () => {
   if (!what && !text && !minutes) { toast("내용을 적어 주세요"); return; }
   journal.push({ id: crypto.randomUUID?.() || String(Date.now()), day: returnDay || localDay(), cat: entryCat, what, minutes, text });
   saveJournal(); render();
-  toast(`${CAT[entryCat].icon} ${CAT[entryCat].name} 기록했어요`);
+  toast(`${CAT[entryCat].name} 기록했어요`);
   entryCat = null;
 });
 
@@ -960,33 +972,46 @@ $("kSave").addEventListener("click", () => {
 });
 
 // ---------- 카테고리 편집 ----------
-const EMOJIS = ["⭐", "➗", "🎹", "🎻", "⚽", "🏊", "🎨", "✏️", "🧩", "🔬", "🌏", "🈶", "🧘", "🏃", "🎵", "💻", "📖", "🗣️"];
-let catDraft = [], newKind = "time";
+const PICK_ALL = [["book", "책"], ["abc", "영어"], ["headphones", "듣기"], ["ear", "귀"], ["pencil", "메모"], ["math-symbols", "수학"], ["star", "별"], ...PICK];
+let catDraft = [], newKind = "time", newIcon = "star", pickFor = "new"; // pickFor: "new" 또는 목록 번호
+const catColor = (c) => CAT_COLOR[c.key] || "#2F5D3A";
 const LOCKED = (c) => c.kind === "book" || c.kind === "focus";
 const KIND_NAME = { book: "책장", focus: "책장+시간", time: "한 것+시간", note: "메모" };
-$("cEmoji").innerHTML = EMOJIS.map((e) => `<button type="button" data-e="${e}" aria-label="${e} 고르기">${e}</button>`).join("");
-$("cEmoji").addEventListener("click", (e) => { const b = e.target.closest("[data-e]"); if (b) $("cNewIcon").value = b.dataset.e; });
+$("cEmoji").innerHTML = PICK_ALL.map(([n, label]) => `<button type="button" data-e="${n}" aria-label="${label} 아이콘 고르기">${ico(n)}<small>${label}</small></button>`).join("");
+function paintPick() {
+  const cur = pickFor === "new" ? newIcon : catDraft[pickFor]?.icon;
+  $("cPickFor").textContent = pickFor === "new" ? "새 카테고리 아이콘 고르기" : `‘${catDraft[pickFor]?.name || ""}’ 아이콘 고르기`;
+  [...$("cEmoji").children].forEach((b) => b.classList.toggle("on", b.dataset.e === cur));
+  $("cNewIcon").innerHTML = ico(newIcon);
+  $("cNewIcon").classList.toggle("on", pickFor === "new");
+}
+$("cEmoji").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-e]"); if (!b) return;
+  if (pickFor === "new") newIcon = b.dataset.e;
+  else { syncCats(); catDraft[pickFor].icon = b.dataset.e; paintCats(); }
+  paintPick();
+});
+$("cNewIcon").addEventListener("click", () => { pickFor = "new"; paintCats(); paintPick(); });
 $("cNewKind").addEventListener("click", (e) => {
   const b = e.target.closest("[data-kind]"); if (!b) return;
   newKind = b.dataset.kind;
   [...$("cNewKind").children].forEach((x) => x.setAttribute("aria-checked", String(x === b)));
 });
 function openCats() {
-  catDraft = catList.map((c) => ({ ...c }));
-  $("cNewIcon").value = ""; $("cNewName").value = "";
-  paintCats();
+  catDraft = catList.map((c) => ({ ...c, icon: toIcon(c.icon) }));
+  newIcon = "star"; pickFor = "new"; $("cNewName").value = "";
+  paintCats(); paintPick();
   $("catsDialog").showModal();
 }
 function syncCats() {
   $("cList").querySelectorAll("li").forEach((li, i) => {
-    catDraft[i].icon = li.querySelector(".ic-in").value.trim() || catDraft[i].icon;
     catDraft[i].name = li.querySelector(".nm-in").value;
   });
 }
 function paintCats() {
   const last = catDraft.length - 1;
   $("cList").innerHTML = catDraft.map((c, i) => `<li data-i="${i}" class="${c.hidden ? "off" : ""}" title="${KIND_NAME[c.kind] || ""}">
-    <input class="ic-in" value="${esc(c.icon)}" maxlength="4" aria-label="${esc(c.name)} 아이콘" />
+    <button type="button" class="ic-btn${pickFor === i ? " on" : ""}" data-ic aria-label="${esc(c.name)} 아이콘 바꾸기">${ico(c.icon, "", catColor(c))}</button>
     <input class="nm-in" value="${esc(c.name)}" maxlength="8" aria-label="카테고리 이름" />
     <button type="button" data-mv="-1" aria-label="위로" ${i ? "" : "disabled"}>▲</button>
     <button type="button" data-mv="1" aria-label="아래로" ${i < last ? "" : "disabled"}>▼</button>
@@ -998,19 +1023,20 @@ $("cList").addEventListener("click", (e) => {
   const b = e.target.closest("button"); if (!b) return;
   syncCats();
   const i = Number(b.closest("li").dataset.i);
-  if (b.dataset.mv) { const j = i + Number(b.dataset.mv); [catDraft[i], catDraft[j]] = [catDraft[j], catDraft[i]]; }
+  if (b.hasAttribute("data-ic")) { pickFor = i; paintCats(); paintPick(); return; }
+  if (b.dataset.mv) { const j = i + Number(b.dataset.mv); [catDraft[i], catDraft[j]] = [catDraft[j], catDraft[i]]; if (pickFor === i) pickFor = j; else if (pickFor === j) pickFor = i; }
   else if (b.hasAttribute("data-hide")) catDraft[i].hidden = !catDraft[i].hidden;
-  else if (b.hasAttribute("data-rm")) catDraft.splice(i, 1);
-  paintCats();
+  else if (b.hasAttribute("data-rm")) { catDraft.splice(i, 1); pickFor = "new"; }
+  paintCats(); paintPick();
 });
 $("cAdd").addEventListener("click", () => {
   syncCats();
   const name = $("cNewName").value.trim();
   if (!name) { toast("새 카테고리 이름을 적어 주세요"); $("cNewName").focus(); return; }
   if (catDraft.some((c) => c.name === name)) { toast("같은 이름이 있어요"); return; }
-  catDraft.push({ key: "c_" + uid().replace(/-/g, "").slice(0, 10), icon: $("cNewIcon").value.trim() || "⭐", name, kind: newKind });
-  $("cNewIcon").value = ""; $("cNewName").value = "";
-  paintCats();
+  catDraft.push({ key: "c_" + uid().replace(/-/g, "").slice(0, 10), icon: newIcon, name, kind: newKind });
+  newIcon = "star"; pickFor = "new"; $("cNewName").value = "";
+  paintCats(); paintPick();
   toast(`‘${name}’을(를) 추가했어요. 저장을 눌러 주세요`);
 });
 $("cSave").addEventListener("click", () => {
@@ -1112,8 +1138,8 @@ function diaryHtml(d) {
     const add = (day, html) => (days[day] ||= []).push(html);
     for (const r of recs) for (const s of r.sessions) add(s.day, `<li>${shelfLabel[shelfOf(r)] || "📚"} <b>${esc(r.title)}</b> · ${esc(sessionText(s))}</li>`);
     for (const j of jr) {
-      const c = catOf[j.cat] || { icon: "•", name: j.cat };
-      add(j.day, `<li>${c.icon} ${esc(c.name)}${j.what ? ` · <b>${esc(j.what)}</b>` : ""}${j.minutes ? ` · ${fmtMin(j.minutes)}` : ""}${j.text ? `<div class="memo">${esc(j.text)}</div>` : ""}</li>`);
+      const c = catOf[j.cat] || { icon: "", name: j.cat };
+      add(j.day, `<li>${ICON_EMOJI[toIcon(c.icon)] || "•"} ${esc(c.name)}${j.what ? ` · <b>${esc(j.what)}</b>` : ""}${j.minutes ? ` · ${fmtMin(j.minutes)}` : ""}${j.text ? `<div class="memo">${esc(j.text)}</div>` : ""}</li>`);
     }
     const pages = recs.reduce((a, r) => a + pagesOf(r), 0), pts = recs.reduce((a, r) => a + pointsOf(r), 0);
     return `<section><h2>🍌 ${esc(k.nick)}${gradeOf(k) ? " " + gradeOf(k) : ""}</h2>
@@ -1231,7 +1257,7 @@ function mergeBackup(d) {
   const fallback = activeKid && kids.some((k) => k.id === activeKid) ? activeKid : kids[0].id;
   const kidOf = (id) => { const m = kidMap[id] || id; return kids.some((k) => k.id === m) ? m : fallback; };
   for (const c of d.categories || []) {
-    if (c?.key && !catList.some((x) => x.key === c.key)) { catList.push({ key: c.key, icon: c.icon || "⭐", name: c.name || "카테고리", kind: c.kind || "time", hidden: !!c.hidden }); n.c++; }
+    if (c?.key && !catList.some((x) => x.key === c.key)) { catList.push({ key: c.key, icon: toIcon(c.icon), name: c.name || "카테고리", kind: c.kind || "time", hidden: !!c.hidden }); n.c++; }
   }
   for (const r0 of d.records || []) {
     if (!r0?.title) continue;
@@ -1280,6 +1306,9 @@ render();
 go(["port", "stats"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "home");
 warmUpDetector();
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+// 화면에 고정된 아이콘 채우기 (탭, 설정, 책 스캔, 책장 제목)
+document.querySelectorAll("[data-ico]").forEach((el) => { el.innerHTML = ico(el.dataset.ico); });
+
 // ---------- 첫 화면 · 로그인 ----------
 const welcome = $("welcome");
 const hideWelcome = () => { if (welcome.classList.contains("out")) return; welcome.classList.add("out"); setTimeout(() => (welcome.hidden = true), 400); };

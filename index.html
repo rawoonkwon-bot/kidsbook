@@ -21,7 +21,7 @@
       <img class="logo" src="/logo.svg" alt="" width="34" height="34" />
       <h1>바나나북코드</h1>
     </div>
-    <button type="button" class="gear" id="gearBtn" aria-label="설정">⚙️</button>
+    <button type="button" class="gear" id="gearBtn" aria-label="설정"><span data-ico="settings"></span></button>
     <nav class="kidbar" id="kidBar" aria-label="자녀 고르기" hidden></nav>
     <div class="peek-bar" id="peekBar" hidden><span>👀 다른 집 책장 구경 중 · 보기만 할 수 있어요</span><button type="button" id="peekBack">← 내 책장</button></div>
   </header>
@@ -45,17 +45,17 @@
         <select id="monthFilter" aria-label="월별 보기"></select>
       </div>
       <section class="shelf-sec">
-        <h4 class="shelf-title ko">🇰🇷 한글책 <span id="countKo"></span></h4>
+        <h4 class="shelf-title ko"><span data-ico="book"></span>한글책 <span id="countKo"></span></h4>
         <ul class="shelf" id="shelfKo"></ul>
         <p class="empty" id="emptyKo">아직 한글책 기록이 없어요. 오른쪽 아래 책 스캔을 눌러 보세요.</p>
       </section>
       <section class="shelf-sec">
-        <h4 class="shelf-title en">🔤 영어책 <span id="countEn"></span></h4>
+        <h4 class="shelf-title en"><span data-ico="abc"></span>영어책 <span id="countEn"></span></h4>
         <ul class="shelf" id="shelfEn"></ul>
         <p class="empty" id="emptyEn">아직 영어책 기록이 없어요.</p>
       </section>
       <section class="shelf-sec">
-        <h4 class="shelf-title fo">🎧 집중듣기 <span id="countFo"></span></h4>
+        <h4 class="shelf-title fo"><span data-ico="ear"></span>집중듣기 <span id="countFo"></span></h4>
         <ul class="shelf" id="shelfFo"></ul>
         <p class="empty" id="emptyFo">아직 집중듣기 기록이 없어요.</p>
       </section>
@@ -105,13 +105,13 @@
 
   <!-- 아래 탭 + 책 스캔 버튼 -->
   <button class="fab" id="fab" type="button">
-    <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M3 7V4h3M18 4h3v3M21 17v3h-3M6 20H3v-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M7 8v8M10 8v8M12.5 8v8M15 8v8M17 8v8" stroke="currentColor" stroke-width="1.6"/></svg>
+    <span data-ico="barcode"></span>
     책 스캔
   </button>
   <nav class="tabbar" aria-label="메뉴">
-    <button type="button" data-go="home" aria-current="page"><span>🏠</span>홈</button>
-    <button type="button" data-go="port"><span>📅</span>포트폴리오</button>
-    <button type="button" data-go="stats"><span>📊</span>소식</button>
+    <button type="button" data-go="home" aria-current="page"><span data-ico="home"></span>홈</button>
+    <button type="button" data-go="port"><span data-ico="calendar"></span>포트폴리오</button>
+    <button type="button" data-go="stats"><span data-ico="chart-bar"></span>소식</button>
   </nav>
 
   <!-- 스캐너 -->
@@ -185,9 +185,9 @@
       <div class="field">
         <span>어느 책장에 꽂을까요?</span>
         <div class="seg" id="shelfPick" role="radiogroup" aria-label="책장">
-          <button type="button" role="radio" data-shelf="ko">🇰🇷 한글책</button>
-          <button type="button" role="radio" data-shelf="en">🔤 영어책</button>
-          <button type="button" role="radio" data-shelf="focus">🎧 집중듣기</button>
+          <button type="button" role="radio" data-shelf="ko"><span data-ico="book"></span>한글책</button>
+          <button type="button" role="radio" data-shelf="en"><span data-ico="abc"></span>영어책</button>
+          <button type="button" role="radio" data-shelf="focus"><span data-ico="ear"></span>집중듣기</button>
         </div>
       </div>
 
@@ -215,7 +215,7 @@
         <label class="check"><input type="checkbox" id="rDone" /><span>이미 다 읽은 책이에요</span></label>
       </div>
       <div class="field" id="focusRow" hidden>
-        <span>🎧 집중듣기 시간</span>
+        <span><span data-ico="ear"></span>집중듣기 시간</span>
         <div class="min-row"><input id="rHour" type="number" inputmode="numeric" min="0" placeholder="0" aria-label="시간" /><span>시간</span><input id="rMin" type="number" inputmode="numeric" min="0" max="59" placeholder="0" aria-label="분" /><span>분</span></div>
       </div>
       <p class="timing" id="rTiming"></p>
@@ -411,19 +411,20 @@
         <b>카테고리 편집</b>
         <span></span>
       </div>
-      <p class="k-help">아이콘을 눌러 이모지를 바꾸고, 이름을 고치고, ▲▼로 순서를 바꿔요. 👁를 누르면 숨겨져요. 🔒는 책장과 연결돼 있어서 숨기기만 돼요.</p>
+      <p class="k-help">아이콘을 누르고 아래에서 새 아이콘을 골라요. 이름을 고치고, ▲▼로 순서를 바꿔요. 👁를 누르면 숨겨져요. 🔒는 책장과 연결돼 있어서 숨기기만 돼요.</p>
       <ul class="cat-list" id="cList"></ul>
       <div class="cat-add">
         <b>＋ 새 카테고리</b>
         <div class="cat-add-row">
-          <input id="cNewIcon" class="ic-in" maxlength="4" placeholder="⭐" aria-label="새 카테고리 아이콘" />
+          <button type="button" id="cNewIcon" class="ic-btn" aria-label="새 카테고리 아이콘 고르기"></button>
           <input id="cNewName" class="nm-in" maxlength="8" placeholder="이름 (예: 피아노)" aria-label="새 카테고리 이름" />
         </div>
         <div class="seg small" id="cNewKind" role="radiogroup" aria-label="기록 방식">
           <button type="button" role="radio" data-kind="time" aria-checked="true">⏱ 한 것 + 시간</button>
           <button type="button" role="radio" data-kind="note" aria-checked="false">📝 메모만</button>
         </div>
-        <div class="emoji-pick" id="cEmoji"></div>
+        <small class="pick-for" id="cPickFor"></small>
+        <div class="emoji-pick icon-pick" id="cEmoji"></div>
         <button type="button" class="btn lime" id="cAdd">추가</button>
       </div>
       <div class="row">
