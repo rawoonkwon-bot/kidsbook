@@ -1,5 +1,5 @@
-// 책 조회용 서버 함수: 카카오 책 검색 + 알라딘(쪽수 정보)
-// API 키는 Vercel 환경변수(KAKAO_REST_KEY, ALADIN_TTB_KEY)에만 두고, 브라우저에는 노출하지 않음
+// 책 조회용 서버 함수: 카카오 책 검색 + 국립중앙도서관/알라딘(쪽수 정보)
+// API 키는 Vercel 환경변수(KAKAO_REST_KEY, NL_CERT_KEY, ALADIN_TTB_KEY)에만 두고, 브라우저에는 노출하지 않음
 const https = (u) => (u || "").replace(/^http:\/\//, "https://");
 
 async function fromKakao(isbn, key) {
@@ -27,24 +27,48 @@ async function fromAladin(isbn, key) {
   };
 }
 
+// 국립중앙도서관 KDC(한국십진분류) 첫 자리 → 분야
+const KDC = ["총류", "철학", "종교", "사회과학", "자연과학", "기술과학", "예술", "언어", "문학", "역사"];
+const kdcName = (k) => { const m = String(k || "").match(/\d/); return m ? KDC[Number(m[0])] : ""; };
+
+// 국립중앙도서관 ISBN 서지정보: PAGE 값 예) "312 p.", "48p" → 숫자만
+async function fromNL(isbn, key) {
+  const r = await fetch(`https://www.nl.go.kr/seoji/SearchApi.do?cert_key=${encodeURIComponent(key)}&result_style=json&page_no=1&page_size=1&isbn=${isbn}`,
+    { signal: AbortSignal.timeout(5000) });
+  if (!r.ok) throw new Error(`nl ${r.status}`);
+  const doc = (await r.json()).docs?.[0];
+  if (!doc) return null;
+  const m = String(doc.PAGE || "").match(/\d+/);
+  const pages = m ? parseInt(m[0], 10) : null;
+  return {
+    title: doc.TITLE || "", authors: doc.AUTHOR ? [doc.AUTHOR] : [], publisher: doc.PUBLISHER || "",
+    pages: pages && pages < 5000 ? pages : null, cover: https(doc.TITLE_URL || ""), description: doc.BOOK_SUMMARY || doc.BOOK_INTRODUCTION || "",
+    category: kdcName(doc.KDC), link: "", source: "국립중앙도서관",
+  };
+}
+
 export default async function handler(req, res) {
   const isbn = String(req.query.isbn || "").replace(/[^0-9X]/gi, "");
   if (!/^(\d{9}[\dX]|\d{13})$/i.test(isbn)) return res.status(400).json({ error: "bad isbn" });
   const kakaoKey = (process.env.KAKAO_REST_KEY || "").trim();
   const aladinKey = (process.env.ALADIN_TTB_KEY || "").trim();
-  if (!kakaoKey && !aladinKey) return res.status(501).json({ error: "no api key set" });
+  const nlKey = (process.env.NL_CERT_KEY || "").trim();
+  if (!kakaoKey && !aladinKey && !nlKey) return res.status(501).json({ error: "no api key set" });
 
-  // 두 곳에 동시에 묻기
-  const [k, a] = await Promise.allSettled([
+  // 세 곳에 동시에 묻기
+  const [k, a, n] = await Promise.allSettled([
     kakaoKey ? fromKakao(isbn, kakaoKey) : Promise.resolve(null),
     aladinKey ? fromAladin(isbn, aladinKey) : Promise.resolve(null),
+    nlKey ? fromNL(isbn, nlKey) : Promise.resolve(null),
   ]);
-  const kb = k.status === "fulfilled" ? k.value : null;
-  const ab = a.status === "fulfilled" ? a.value : null;
-  if (!kb && !ab) return res.status(404).json({ error: "not found" });
+  const val = (x) => (x.status === "fulfilled" ? x.value : null);
+  const kb = val(k), ab = val(a), nb = val(n);
+  if (!kb && !ab && !nb) return res.status(404).json({ error: "not found" });
 
-  // 기본 정보는 카카오, 쪽수는 알라딘 (카카오가 없으면 알라딘 정보 그대로)
-  const book = kb ? { ...kb, pages: ab?.pages || null, description: kb.description || ab?.description || "" } : ab;
+  // 기본 정보는 카카오 → 알라딘 → 국립중앙도서관 순, 쪽수는 국립중앙도서관 또는 알라딘
+  const base = kb || ab || nb;
+  const book = { ...base, pages: nb?.pages || ab?.pages || base.pages || null, category: nb?.category || base.category || "",
+    description: base.description || ab?.description || nb?.description || "" };
   res.setHeader("Cache-Control", "public, s-maxage=86400, stale-while-revalidate=604800");
   return res.status(200).json(book);
 }
