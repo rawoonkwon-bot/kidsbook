@@ -720,3 +720,8 @@ body.peek .tabbar [data-go="board"] { display: none; }
 .di-empty { margin: 4px 0; text-align: center; color: var(--muted); font-size: 14px; }
 .day-group .day-item { border-top: 0; box-shadow: none; }
 body.peek #diAdd { display: none; }
+
+/* 날짜 기록: 아이콘 겹침 없이 */
+.day-item .noc { width: 30px; aspect-ratio: 5 / 6; border-radius: 4px; background: var(--sage-l); flex: none; }
+.dn-text { margin: 0; font-size: 15px; line-height: 1.5; color: var(--ink); white-space: pre-line; word-break: break-word; }
+.day-item .grow .ph-row { margin-top: 6px; }

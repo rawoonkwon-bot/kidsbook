@@ -808,16 +808,20 @@ function dayGroupsHtml(day) {
       for (const { r, s } of booksOn(day, c.key)) {
         n++;
         rows += `<div class="day-item link" data-view="${r.id}">
-          ${r.cover ? `<img src="${esc(r.cover)}" alt="">` : `<span>${c.svg}</span>`}
+          ${r.cover ? `<img src="${esc(r.cover)}" alt="">` : `<span class="noc"></span>`}
           <div class="grow"><b>${esc(r.title)}</b><small>${sessionText(s)}</small></div></div>`;
       }
     }
     if (!c.book) {
       for (const j of journalOn(day, c.key)) {
         n++;
-        const sub = [j.minutes ? fmtMin(j.minutes) : "", j.text || ""].filter(Boolean).join(" · ");
-        rows += `<div class="day-item link" data-edit="${j.id}"><span>${c.svg}</span>
-          <div class="grow"><b>${esc(j.what || c.name)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}${j.photos?.length ? `<div class="ph-row" data-paths="${esc(j.photos.join("|"))}"></div>` : ""}</div>
+        // 박스 제목에 종류 이름·아이콘이 있으니, 기록에는 내용만
+        const mins = j.minutes ? fmtMin(j.minutes) : "";
+        const note = c.kind === "note" && !j.what;
+        const main = j.what || mins || c.name;
+        const sub = j.what ? [mins, j.text || ""].filter(Boolean).join(" · ") : mins ? j.text || "" : "";
+        rows += `<div class="day-item link" data-edit="${j.id}">
+          <div class="grow">${note ? (j.text ? `<p class="dn-text">${esc(j.text)}</p>` : "") : `<b>${esc(main)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}`}${j.photos?.length ? `<div class="ph-row" data-paths="${esc(j.photos.join("|"))}"></div>` : ""}</div>
           <button type="button" class="x" data-del="${j.id}" aria-label="지우기">✕</button></div>`;
       }
     }
