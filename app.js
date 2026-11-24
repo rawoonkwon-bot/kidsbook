@@ -1204,4 +1204,15 @@ render();
 go(["port", "stats"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "home");
 warmUpDetector();
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
-if (!kids.length) openKids(true);
+// 첫 화면: 처음이면 시작하기 버튼, 다음부터는 잠깐 보였다 사라짐 (눌러도 넘어감)
+(() => {
+  const w = $("welcome");
+  const hide = () => { if (w.classList.contains("out")) return; w.classList.add("out"); setTimeout(() => (w.hidden = true), 400); };
+  if (!kids.length) {
+    $("welcomeGo").hidden = false;
+    $("welcomeGo").addEventListener("click", () => { hide(); openKids(true); });
+  } else {
+    w.addEventListener("click", hide);
+    setTimeout(hide, 1300);
+  }
+})();

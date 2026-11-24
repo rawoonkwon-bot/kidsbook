@@ -441,7 +441,7 @@ body { background: var(--bg); }
 .shelf-head select { background: var(--card); border-color: transparent; box-shadow: var(--raise-s); }
 .tabbar { background: var(--card); box-shadow: var(--raise); }
 .tabbar button[aria-current="page"] { background: var(--bg); color: var(--forest); box-shadow: var(--inset); }
-.fab { background: var(--forest); color: #F3EFE6; box-shadow: 4px 6px 14px rgba(47, 93, 58, .35); }
+.fab { background: #FFCC00; color: #1E2420; box-shadow: 4px 6px 14px rgba(200, 155, 60, .4); }
 .btn.lime { background: var(--forest); color: #F3EFE6; border-color: var(--forest); }
 .btn.dark { background: var(--forest-d); }
 .x-btn { background: var(--card); color: var(--muted); box-shadow: var(--raise-s); }
@@ -483,3 +483,12 @@ dialog { background: var(--bg); }
 .toast { background: var(--forest-d); }
 .roi.hit { border-color: var(--sage); }
 .logo { width: 26px; height: 42px; display: block; }
+
+.welcome { position: fixed; inset: 0; z-index: 900; background: #F3EFE6; display: flex; align-items: center; justify-content: center; transition: opacity .4s ease; }
+.welcome.out { opacity: 0; pointer-events: none; }
+.welcome-in { width: min(320px, 86vw); text-align: center; animation: welcomeUp .6s ease both; }
+.welcome-faces { width: 100%; height: auto; display: block; }
+.welcome h2 { font-size: 26px; color: #1F3D27; margin: 18px 0 6px; }
+.welcome p { font-size: 14px; color: #4A5A4C; margin: 0 0 22px; }
+.welcome .btn { width: 100%; padding: 14px; font-size: 16px; }
+@keyframes welcomeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }

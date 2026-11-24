@@ -1,7 +1,7 @@
 // 앱 파일과 바코드 엔진을 기기에 저장해 두 번째 방문부터 즉시 실행
-const CACHE = "kbc-v11";
+const CACHE = "kbc-v12";
 const ASSETS = ["/", "/index.html", "/styles.css", "/app.js", "/scanner.js", "/lookup.js", "/isbn.js",
-  "/icon.svg", "/logo.svg", "/manifest.webmanifest"];
+  "/icon.svg", "/logo.svg", "/faces.svg", "/manifest.webmanifest"];
 self.addEventListener("install", (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS))); self.skipWaiting(); });
 self.addEventListener("activate", (e) => {
   e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k)))));
