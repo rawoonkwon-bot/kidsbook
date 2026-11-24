@@ -85,6 +85,10 @@
     </section>
 
     <!-- ===== 소식 (통계) ===== -->
+    <section class="tab" data-tab="blog" hidden>
+      <div class="blog" id="myBlog"></div>
+    </section>
+
     <section class="tab" data-tab="board" hidden>
       <div class="board-head"><h2 class="page-title">게시판</h2><button type="button" class="btn lime" id="bWrite">✏️ 글쓰기</button></div>
       <div class="seg small" id="boardPick" role="radiogroup" aria-label="게시판 고르기">
@@ -139,6 +143,7 @@
   <nav class="tabbar" aria-label="메뉴">
     <button type="button" data-go="home" aria-current="page"><span data-ico="home"></span>홈</button>
     <button type="button" data-go="port"><span data-ico="calendar"></span>포트폴리오</button>
+    <button type="button" data-go="blog"><span data-ico="notebook"></span>블로그</button>
     <button type="button" data-go="board"><span data-ico="message"></span>게시판</button>
     <button type="button" data-go="stats"><span data-ico="chart-bar"></span>소식</button>
   </nav>
@@ -608,19 +613,47 @@
   <dialog id="momPage" class="page">
     <div class="page-in">
       <div class="page-top"><button type="button" class="x-btn" id="mClose" aria-label="닫기">✕</button><span></span></div>
-      <div class="mom-head"><div class="mom-av" id="mAv"></div><div class="grow"><h2 id="mNick"></h2><p id="mCount"></p></div><button type="button" class="follow-btn" id="mFollow" hidden></button></div>
-      <section id="mKidsSec">
-        <h3 class="sec-title">아이 책장</h3>
-        <div class="browse" id="mKids"></div>
-      </section>
-      <section>
-        <div class="pop-head"><h3 class="sec-title">글감</h3><button type="button" class="link-btn" id="mTopicsAll">전체보기 ›</button></div>
-        <div class="tchips" id="mTopics"></div>
-      </section>
-      <section>
-        <h3 class="sec-title">쓴 글</h3>
-        <ul class="post-list" id="mPosts"></ul>
-      </section>
+      <div class="blog" id="momBlog"></div>
+    </div>
+  </dialog>
+
+  <!-- 블로그 글 보기 -->
+  <dialog id="blogView" class="page">
+    <div class="page-in">
+      <div class="page-top"><button type="button" class="x-btn" id="bvClose" aria-label="닫기">✕</button><span class="post-actions" id="bvActions"></span></div>
+      <article class="post">
+        <p class="post-meta" id="bvMeta"></p>
+        <h2 id="bvTitle"></h2>
+        <div id="bvTopic"></div>
+        <div class="post-body" id="bvBody"></div>
+        <div id="bvPhotos"></div>
+        <div class="bl-tags" id="bvTags"></div>
+      </article>
+    </div>
+  </dialog>
+
+  <!-- 블로그 글쓰기 -->
+  <dialog id="blogEdit" class="page">
+    <div class="page-in">
+      <div class="page-top"><button type="button" class="x-btn" id="beClose" aria-label="닫기">✕</button><button type="button" class="pill-btn" id="beSave">올리기</button></div>
+      <input id="beTitle" class="title-input" maxlength="100" placeholder="제목" />
+      <textarea id="beBody" rows="12" maxlength="20000" placeholder="오늘 이야기를 적어 보세요"></textarea>
+      <div class="field">
+        <span>사진 <small id="bePhotoCount">0/10</small></span>
+        <div class="photo-grid" id="bePhotos"></div>
+        <button type="button" class="btn ghost photo-add" id="bePhotoAdd">📷 사진 추가</button>
+        <input type="file" id="bePhotoFile" accept="image/*" multiple hidden />
+      </div>
+      <div class="field">
+        <span>글감 <small>책·영화·공연·방송 중 하나를 붙일 수 있어요</small></span>
+        <div id="beTopic"></div>
+      </div>
+      <div class="field">
+        <span>태그 <small>최대 10개 · 적고 엔터</small></span>
+        <div class="bl-tags edit" id="beTags"></div>
+        <input id="beTagIn" class="sub-input" maxlength="20" placeholder="#그림책" autocomplete="off" autocapitalize="off" />
+      </div>
+      <label class="check be-pub"><input type="checkbox" id="bePublic" checked /><span>공개 <small>(끄면 나만 보기)</small></span></label>
     </div>
   </dialog>
 

@@ -177,6 +177,7 @@ function go(tab) {
   if (tab === "port") renderCalendar();
   if (tab === "board") setTimeout(() => renderBoard()); // 게시판 코드가 아래에 있어서 한 박자 뒤에
   if (tab === "home") setTimeout(() => renderPopular());
+  if (tab === "blog") setTimeout(() => renderMyBlog());
   window.scrollTo(0, 0);
   history.replaceState(null, "", location.pathname + location.search + (tab === "home" ? "" : `#${tab}`));
 }
@@ -1730,7 +1731,7 @@ $("importFile").addEventListener("change", async (e) => {
 // ---------- 시작 ----------
 renderKids();
 render();
-go(["port", "stats", "board"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "home");
+go(["port", "stats", "board", "blog"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "home");
 warmUpDetector();
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
 // 지금 store(내 기록 또는 구경 중인 친구 기록)에서 화면 상태를 다시 읽기
@@ -1918,7 +1919,7 @@ function openWrite(p = null) {
   $("peSave").textContent = p ? "고치기" : "올리기";
   paintWPhotos();
   if (wTopic?.url) URL.revokeObjectURL(wTopic.url);
-  wTopic = p?.topic?.title ? { ...p.topic } : null;
+  topicTo = "peTopic"; wTopic = p?.topic?.title ? { ...p.topic } : null;
   paintWTopic();
   $("postEdit").showModal();
 }
@@ -1992,12 +1993,12 @@ async function fillTopicImgs(root) {
   els.forEach((e, i) => { if (urls[i]) e.src = urls[i]; });
 }
 // 글쓰기 화면의 글감
-let wTopic = null; // { type, title, cover?, by?, photo?(저장된 사진), file?, url?(새 사진 미리보기) }
+let wTopic = null, topicTo = "peTopic"; // 글감을 그릴 곳 (게시판 글쓰기 / 블로그 글쓰기) // { type, title, cover?, by?, photo?(저장된 사진), file?, url?(새 사진 미리보기) }
 function paintWTopic() {
-  $("peTopic").innerHTML = wTopic
+  $(topicTo).innerHTML = wTopic
     ? `<div class="topic-pick">${topicCardHtml(wTopic)}<button type="button" class="x" id="peTopicRm" aria-label="글감 빼기">✕</button></div>`
     : `<button type="button" class="btn ghost topic-add" id="peTopicAdd">＋ 글감 붙이기</button>`;
-  fillTopicImgs($("peTopic"));
+  fillTopicImgs($(topicTo));
 }
 $("peTopic").addEventListener("click", (e) => {
   if (e.target.closest("#peTopicRm")) { if (wTopic?.url) URL.revokeObjectURL(wTopic.url); wTopic = null; paintWTopic(); return; }
@@ -2110,93 +2111,15 @@ $("popRow").addEventListener("click", (e) => { const b = e.target.closest("[data
 $("popMore").addEventListener("click", () => go("board"));
 $("postView").addEventListener("close", () => {
   if (!document.querySelector('.tab[data-tab="home"]').hidden) renderPopular(true); else popAt = 0;
-  if ($("momPage").open && momNow) openMom(momNow.uid, true);
 });
 
-// ---------- 엄마 페이지 ----------
-let momNow = null;
+// ---------- 엄마 블로그 (내 블로그 탭 + 남의 블로그) ----------
+let momNow = null, myBlog = null;
 const momCache = new Map();
-async function openMom(uid, refresh = false) {
-  if (!AUTH.user || AUTH.offline || !uid) return;
-  const me = uid === sync.myId();
-  const known = momCache.get(uid);
-  if (!refresh) {
-    momNow = { uid, nick: known?.nick || (me ? sync.myNick() : ""), face: known?.face || (me ? sync.myFace() : null), posts: [], data: null };
-    $("mNick").textContent = momNow.nick || "불러오는 중…";
-    $("mAv").innerHTML = momNow.nick ? avatar(momNow.nick, momNow.face, "av big") : "";
-    paintFollowBtn();
-    if (!followsLoaded && !me) sync.myFollows().then((nb) => { follows = new Map(nb.map((m) => [m.user_id, m])); followsLoaded = true; paintFollowBtn(); }).catch(() => {});
-    $("mCount").textContent = ""; $("mKids").innerHTML = `<small class="muted">불러오는 중…</small>`;
-    $("mTopics").innerHTML = ""; $("mPosts").innerHTML = `<li class="muted">불러오는 중…</li>`;
-    $("momPage").showModal();
-  }
-  const [prof, data, posts] = await Promise.all([
-    momNow.nick ? { nick: momNow.nick, face: momNow.face } : sync.profileOf(uid).catch(() => null),
-    me ? null : prefetchPeek(uid),
-    sync.postsBy(uid).catch(() => null),
-  ]);
-  if (momNow?.uid !== uid) return;
-  momNow.nick = prof?.nick || "(알 수 없음)"; momNow.face = prof?.face || null; momNow.posts = posts || []; momNow.data = data;
-  $("mNick").textContent = momNow.nick;
-  $("mAv").innerHTML = avatar(momNow.nick, momNow.face, "av big");
-  const kl = me ? kids : data?.kids || [];
-  $("mKids").innerHTML = kl.length
-    ? kl.map((k) => `<button type="button" class="kid" data-k="${esc(k.id)}">${esc(k.nick)}${gradeOf(k) ? ` <small class="grade">${gradeOf(k)}</small>` : ""}</button>`).join("")
-    : `<small class="muted">${me || data ? "아직 등록한 아이가 없어요." : "책장을 나만 보기로 해 둔 집이에요."}</small>`;
-  const tops = topicGroups();
-  $("mCount").textContent = posts ? `글 ${momNow.posts.length} · 글감 ${tops.length}` : "";
-  const n = (t) => tops.filter((x) => tType(x.topic) === t).length;
-  $("mTopics").innerHTML = tops.length
-    ? Object.keys(TOPIC).filter(n).map((t) => `<button type="button" class="tchip" data-t="${t}">${ico(TOPIC[t][1])}${TOPIC[t][0]} <span>${n(t)}</span></button>`).join("")
-    : `<small class="muted">아직 글감을 붙인 글이 없어요.</small>`;
-  $("mTopicsAll").hidden = !tops.length;
-  $("mPosts").innerHTML = !posts ? `<li class="muted">불러오지 못했어요. 인터넷 연결을 확인해 주세요.</li>`
-    : momNow.posts.length ? momNow.posts.map((p) => `<li><button type="button" class="post-row" data-id="${p.id}">
-        <b>${esc(p.title)}</b><small><span>${BOARDS[p.board] || ""}</span><span>${ago(p.created_at)}</span><span>${ico("eye")} ${p.views || 0}</span></small></button></li>`).join("")
-    : `<li class="muted">아직 쓴 글이 없어요.</li>`;
-}
-$("mClose").addEventListener("click", () => { $("momPage").close(); momNow = null; });
-function paintFollowBtn() {
-  const me = !momNow || momNow.uid === sync.myId();
-  $("mFollow").hidden = me;
-  if (me) return;
-  const on = follows.has(momNow.uid);
-  $("mFollow").classList.toggle("on", on);
-  $("mFollow").textContent = on ? "이웃 ✓" : "＋ 이웃 추가";
-}
-$("mFollow").addEventListener("click", async () => {
-  if (!momNow) return;
-  const { uid, nick, face } = momNow, on = !follows.has(uid);
-  if (!on && !confirm(`${nick}님을 이웃에서 뺄까요?`)) return;
-  $("mFollow").disabled = true;
-  try {
-    await sync.setFollow(uid, on);
-    if (on) follows = new Map([[uid, { user_id: uid, nick, face }], ...follows]); else follows.delete(uid);
-    toast(on ? `${nick}님을 이웃으로 추가했어요` : "이웃에서 뺐어요");
-    browseLoaded = false; if (!document.querySelector('.tab[data-tab="stats"]').hidden) renderBrowse();
-  } catch { toast("바꾸지 못했어요. 인터넷 연결을 확인해 주세요"); }
-  $("mFollow").disabled = false;
-  paintFollowBtn();
-});
-$("mPosts").addEventListener("click", (e) => { const b = e.target.closest("[data-id]"); if (b) openPost(b.dataset.id); });
-$("mKids").addEventListener("click", (e) => {
-  const b = e.target.closest("[data-k]"); if (!b || !momNow) return;
-  const { uid, data } = momNow;
-  momNow = null;
-  for (const id of ["topicsPage", "postView", "momPage"]) if ($(id).open) $(id).close();
-  if (uid === sync.myId()) { setKid(b.dataset.k); go("home"); return; }
-  if (!data) { toast("지금은 볼 수 없는 책장이에요 (나만 보기로 바뀌었을 수 있어요)", 3500); return; }
-  enterPeek(data, b.dataset.k);
-});
-$("mTopics").addEventListener("click", (e) => { const b = e.target.closest("[data-t]"); if (b) openTopics(b.dataset.t); });
-$("mTopicsAll").addEventListener("click", () => openTopics("all"));
-$("pMeta").addEventListener("click", (e) => { const b = e.target.closest("[data-u]"); if (b) openMom(b.dataset.u); });
-
-// 글감 모아보기
-let tpType = "all", tpOpen = "";
-function topicGroups() {
+const blogThumb = (b, cls) => b.photos?.length ? `<img class="${cls}" data-tp="${esc(b.photos[0])}" alt="">` : b.topic?.title ? topicCover(b.topic, cls) : `<span class="${cls} tp-ph t-none">${ico("notebook")}</span>`;
+function blogTopics(st) {
   const g = new Map();
-  for (const p of momNow?.posts || []) {
+  for (const p of st?.list || []) {
     if (!p.topic?.title) continue;
     const key = `${tType(p.topic)}|${p.topic.title.trim().toLowerCase()}`;
     if (!g.has(key)) g.set(key, { key, topic: p.topic, posts: [] });
@@ -2204,29 +2127,294 @@ function topicGroups() {
   }
   return [...g.values()];
 }
-function openTopics(type) { tpType = type; tpOpen = ""; paintTopics(); $("topicsPage").showModal(); }
-function paintTopics() {
-  const all = topicGroups();
-  $("tpTitle").textContent = `${momNow?.nick || ""}님의 글감`;
+function blogTags(st) {
+  const m = new Map();
+  for (const p of st?.list || []) for (const t of p.tags || []) m.set(t, (m.get(t) || 0) + 1);
+  return [...m.entries()].sort((a, b) => b[1] - a[1]).map(([t, n]) => ({ t, n }));
+}
+async function loadBlog(uid) {
+  const me = uid === sync.myId(), known = momCache.get(uid);
+  const [prof, data, list] = await Promise.all([
+    me ? { nick: sync.myNick(), face: sync.myFace() } : known?.nick ? known : sync.profileOf(uid).catch(() => null),
+    me ? null : prefetchPeek(uid),
+    sync.blogList(uid),
+  ]);
+  return { uid, me, nick: prof?.nick || "(알 수 없음)", face: prof?.face || null, data, list, view: "list" };
+}
+function paintBlog(root, st) {
+  if (!st) { root.innerHTML = `<p class="muted bl-msg">불러오는 중…</p>`; return; }
+  const tops = blogTops(st), tags = blogTags(st);
+  const n = (t) => tops.filter((x) => tType(x.topic) === t).length;
+  const pop = [...st.list].filter((b) => b.views > 0).sort((a, b) => b.views - a.views).slice(0, 6);
+  const kl = st.me ? [] : st.data?.kids || [];
+  const nb = follows.has(st.uid);
+  root.innerHTML = `
+    <div class="bl-head">${avatar(st.nick, st.face, "av big")}<div class="grow"><h2>${esc(st.nick)}님의 블로그</h2><p>글 ${st.list.length}</p></div>
+      ${st.me ? `<button type="button" class="follow-btn" data-act="write">✏️ 글쓰기</button>` : `<button type="button" class="follow-btn${nb ? " on" : ""}" data-act="follow">${nb ? "이웃 ✓" : "＋ 이웃 추가"}</button>`}</div>
+    ${st.me ? "" : `<section><h3 class="sec-title">아이 책장</h3><div class="browse">${kl.length
+      ? kl.map((k) => `<button type="button" class="kid" data-act="kid" data-k="${esc(k.id)}">${esc(k.nick)}${gradeOf(k) ? ` <small class="grade">${gradeOf(k)}</small>` : ""}</button>`).join("")
+      : `<small class="muted">${st.data ? "아직 등록한 아이가 없어요." : "책장을 나만 보기로 해 둔 집이에요."}</small>`}</div></section>`}
+    ${tops.length ? `<section><div class="pop-head"><h3 class="sec-title">글감</h3><button type="button" class="link-btn" data-act="topics" data-t="all">전체보기 ›</button></div>
+      <div class="tchips">${Object.keys(TOPIC).filter(n).map((t) => `<button type="button" class="tchip" data-act="topics" data-t="${t}">${ico(TOPIC[t][1])}${TOPIC[t][0]} <span>${n(t)}</span></button>`).join("")}</div></section>` : ""}
+    ${tags.length ? `<section><h3 class="sec-title">태그</h3><div class="bl-tags">${tags.slice(0, 20).map((x) => `<button type="button" data-act="tag" data-tag="${esc(x.t)}">#${esc(x.t)} <small>${x.n}</small></button>`).join("")}</div></section>` : ""}
+    ${pop.length ? `<section><h3 class="sec-title">인기글</h3><div class="pop-row">${pop.map((b) => `<button type="button" class="pop-card" data-act="post" data-id="${b.id}">
+        <span class="pop-im">${blogThumb(b, "pop-img")}</span><b>${esc(b.title)}</b><small>조회 ${b.views}</small></button>`).join("")}</div></section>` : ""}
+    <section><div class="pop-head"><h3 class="sec-title">전체글</h3>${st.list.length ? `<span class="bl-view"><button type="button" data-act="view" data-v="list" class="${st.view === "list" ? "on" : ""}">목록</button><button type="button" data-act="view" data-v="grid" class="${st.view === "grid" ? "on" : ""}">사진</button></span>` : ""}</div>
+      ${!st.list.length ? `<p class="muted bl-msg">${st.me ? "아직 쓴 글이 없어요. 위의 글쓰기를 눌러 첫 글을 남겨 보세요!" : "아직 공개한 글이 없어요."}</p>`
+      : st.view === "grid" ? `<div class="tp-grid">${st.list.map((b) => `<button type="button" class="tp-item" data-act="post" data-id="${b.id}">${blogThumb(b, "tp-cover")}<span>${b.is_public ? "" : "🔒 "}${esc(b.title)}</span></button>`).join("")}</div>`
+      : `<ul class="bl-list">${st.list.map((b) => `<li><button type="button" class="bl-row" data-act="post" data-id="${b.id}">${blogThumb(b, "bl-th")}<span class="grow"><b>${esc(b.title)}</b>
+          <small>${ago(b.created_at)}${b.tags?.length ? ` · #${esc(b.tags[0])}` : ""} · ${b.is_public ? `조회 ${b.views || 0}` : "🔒 나만 보기"}</small></span></button></li>`).join("")}</ul>`}
+    </section>`;
+  fillTopicImgs(root);
+}
+const blogTops = blogTopics;
+async function renderMyBlog(force = false) {
+  const root = $("myBlog");
+  if (!AUTH.user || AUTH.offline) { root.innerHTML = `<p class="muted bl-msg">블로그는 인터넷에 연결돼 있을 때 볼 수 있어요.</p>`; return; }
+  if (!sync.myNick()) { root.innerHTML = `<p class="muted bl-msg">블로그를 쓰려면 엄마 별명을 먼저 정해 주세요.</p><button type="button" class="btn dark" data-act="nick">엄마 별명 정하기</button>`; return; }
+  if (myBlog && !force) { paintBlog(root, myBlog); return; }
+  if (!myBlog) paintBlog(root, null);
+  try { const view = myBlog?.view; myBlog = await loadBlog(sync.myId()); if (view) myBlog.view = view; paintBlog(root, myBlog); }
+  catch { root.innerHTML = `<p class="muted bl-msg">불러오지 못했어요. 인터넷 연결을 확인해 주세요.</p>`; }
+}
+async function openMom(uid) {
+  if (!AUTH.user || AUTH.offline || !uid) return;
+  if (uid === sync.myId()) { for (const id of ["topicsPage", "postView", "blogView", "momPage"]) if ($(id).open) $(id).close(); go("blog"); return; }
+  momNow = { uid };
+  paintBlog($("momBlog"), null);
+  if (!$("momPage").open) $("momPage").showModal();
+  if (!followsLoaded) sync.myFollows().then((nb) => { follows = new Map(nb.map((m) => [m.user_id, m])); followsLoaded = true; if (momNow?.list) paintBlog($("momBlog"), momNow); }).catch(() => {});
+  try {
+    const st = await loadBlog(uid);
+    if (momNow?.uid !== uid) return;
+    momNow = st; paintBlog($("momBlog"), st);
+  } catch { if (momNow?.uid === uid) $("momBlog").innerHTML = `<p class="muted bl-msg">불러오지 못했어요. 인터넷 연결을 확인해 주세요.</p>`; }
+}
+$("mClose").addEventListener("click", () => { $("momPage").close(); momNow = null; });
+async function blogAct(e, st, root) {
+  const b = e.target.closest("[data-act]"); if (!b) return;
+  const a = b.dataset.act;
+  if (a === "nick") { openNick(false); return; }
+  if (!st) return;
+  if (a === "write") openBlogEdit(null);
+  else if (a === "post") openBlogPost(b.dataset.id, st);
+  else if (a === "view") { st.view = b.dataset.v; paintBlog(root, st); }
+  else if (a === "topics") openGrid(st, { mode: "topic", type: b.dataset.t });
+  else if (a === "tag") openGrid(st, { mode: "tag", tag: b.dataset.tag });
+  else if (a === "kid") {
+    const { data } = st;
+    for (const id of ["topicsPage", "postView", "blogView", "momPage"]) if ($(id).open) $(id).close();
+    momNow = null;
+    if (!data) { toast("지금은 볼 수 없는 책장이에요 (나만 보기로 바뀌었을 수 있어요)", 3500); return; }
+    enterPeek(data, b.dataset.k);
+  } else if (a === "follow") {
+    const { uid, nick, face } = st, on = !follows.has(uid);
+    if (!on && !confirm(`${nick}님을 이웃에서 뺄까요?`)) return;
+    b.disabled = true;
+    try {
+      await sync.setFollow(uid, on);
+      if (on) follows = new Map([[uid, { user_id: uid, nick, face }], ...follows]); else follows.delete(uid);
+      toast(on ? `${nick}님을 이웃으로 추가했어요` : "이웃에서 뺐어요");
+      browseLoaded = false; if (!document.querySelector('.tab[data-tab="stats"]').hidden) renderBrowse();
+    } catch { toast("바꾸지 못했어요. 인터넷 연결을 확인해 주세요"); }
+    paintBlog(root, st);
+  }
+}
+$("myBlog").addEventListener("click", (e) => blogAct(e, myBlog, $("myBlog")));
+$("momBlog").addEventListener("click", (e) => blogAct(e, momNow, $("momBlog")));
+$("pMeta").addEventListener("click", (e) => { const b = e.target.closest("[data-u]"); if (b) openMom(b.dataset.u); });
+
+// 글감·태그 모아보기 (사진 격자)
+let grid = null; // { st, mode, type, tag, open }
+function openGrid(st, opt) { grid = { st, mode: opt.mode, type: opt.mode === "topic" ? opt.type || "all" : "all", tag: opt.tag || "", open: "" }; paintGrid(); if (!$("topicsPage").open) $("topicsPage").showModal(); $("topicsPage").scrollTop = 0; }
+function gridItems() {
+  const { st, mode, tag } = grid;
+  if (mode === "topic") return blogTopics(st).map((g) => ({ key: g.key, type: tType(g.topic), thumb: topicCover(g.topic, "tp-cover"), label: g.topic.title, posts: g.posts }));
+  return st.list.filter((b) => (b.tags || []).includes(tag)).map((b) => ({ key: b.id, type: b.topic?.title ? tType(b.topic) : "", thumb: blogThumb(b, "tp-cover"), label: b.title, posts: [b] }));
+}
+function paintGrid() {
+  const all = gridItems();
+  $("tpTitle").textContent = grid.mode === "topic" ? `${grid.st.nick}님의 글감` : `#${grid.tag}`;
   $("tpTabs").innerHTML = [["all", "전체"], ...Object.entries(TOPIC).map(([k, v]) => [k, v[0]])]
-    .map(([k, v]) => `<button type="button" data-t="${k}" class="${k === tpType ? "on" : ""}">${v}</button>`).join("");
-  const list = tpType === "all" ? all : all.filter((x) => tType(x.topic) === tpType);
+    .map(([k, v]) => `<button type="button" data-t="${k}" class="${k === grid.type ? "on" : ""}">${v}</button>`).join("");
+  const list = grid.type === "all" ? all : all.filter((x) => x.type === grid.type);
   $("tpCount").innerHTML = `<b>${list.length}</b>건`;
-  $("tpGrid").innerHTML = list.length ? list.map((x) => `<button type="button" class="tp-item${x.key === tpOpen ? " open" : ""}" data-key="${esc(x.key)}">
-      ${topicCover(x.topic, "tp-cover")}<span>${esc(x.topic.title)}</span>${x.posts.length > 1 ? `<small>글 ${x.posts.length}</small>` : ""}</button>
-      ${x.key === tpOpen ? `<div class="tp-more">${x.posts.map((p) => `<button type="button" data-id="${p.id}">${esc(p.title)}</button>`).join("")}</div>` : ""}`).join("")
-    : `<p class="muted">이 종류의 글감은 아직 없어요.</p>`;
+  $("tpGrid").innerHTML = list.length ? list.map((x) => `<button type="button" class="tp-item${x.key === grid.open ? " open" : ""}" data-key="${esc(x.key)}">
+      ${x.thumb}<span>${esc(x.label)}</span>${x.posts.length > 1 ? `<small>글 ${x.posts.length}</small>` : ""}</button>
+      ${x.key === grid.open ? `<div class="tp-more">${x.posts.map((p) => `<button type="button" data-id="${p.id}">${esc(p.title)}</button>`).join("")}</div>` : ""}`).join("")
+    : `<p class="muted">이 종류는 아직 없어요.</p>`;
   fillTopicImgs($("tpGrid"));
 }
-$("tpTabs").addEventListener("click", (e) => { const b = e.target.closest("[data-t]"); if (b) { tpType = b.dataset.t; tpOpen = ""; paintTopics(); } });
+$("tpTabs").addEventListener("click", (e) => { const b = e.target.closest("[data-t]"); if (b && grid) { grid.type = b.dataset.t; grid.open = ""; paintGrid(); } });
 $("tpGrid").addEventListener("click", (e) => {
-  const p = e.target.closest("[data-id]"); if (p) { openPost(p.dataset.id); return; }
+  if (!grid) return;
+  const p = e.target.closest("[data-id]"); if (p) { openBlogPost(p.dataset.id, grid.st); return; }
   const b = e.target.closest("[data-key]"); if (!b) return;
-  const g = topicGroups().find((x) => x.key === b.dataset.key); if (!g) return;
-  if (g.posts.length === 1) openPost(g.posts[0].id);
-  else { tpOpen = tpOpen === g.key ? "" : g.key; paintTopics(); }
+  const g = gridItems().find((x) => x.key === b.dataset.key); if (!g) return;
+  if (g.posts.length === 1) openBlogPost(g.posts[0].id, grid.st);
+  else { grid.open = grid.open === g.key ? "" : g.key; paintGrid(); }
 });
 $("tpClose").addEventListener("click", () => $("topicsPage").close());
+
+// 블로그 글 보기
+let blogNow = null, blogSt = null;
+const blogViewed = new Set();
+async function openBlogPost(id, st = null) {
+  blogSt = st;
+  if (!$("blogView").open) $("blogView").showModal();
+  $("bvTitle").textContent = "불러오는 중…"; for (const x of ["bvMeta", "bvBody", "bvTopic", "bvPhotos", "bvTags", "bvActions"]) $(x).innerHTML = "";
+  try {
+    const b = await sync.getBlog(id);
+    if (!b) { $("blogView").close(); toast("볼 수 없는 글이에요 (지워졌거나 나만 보기로 바뀌었어요)", 3500); return; }
+    blogNow = b; paintBlogPost();
+    $("blogView").scrollTop = 0;
+    if (!blogViewed.has(id)) {
+      blogViewed.add(id);
+      sync.bumpBlogView(id).then((n) => { if (n != null && blogNow?.id === id && n !== blogNow.views) { blogNow.views = n; paintBlogMeta(); const x = blogSt?.list.find((y) => y.id === id); if (x) x.views = n; } }).catch(() => blogViewed.delete(id));
+    }
+  } catch { $("bvTitle").textContent = "불러오지 못했어요. 인터넷 연결을 확인해 주세요."; }
+}
+function paintBlogMeta() {
+  const b = blogNow;
+  $("bvMeta").innerHTML = `<button type="button" class="nick-link" data-u="${esc(b.user_id)}">${avatar(b.nick, b.face, "av xs")}${esc(b.nick)}</button> · ${ago(b.created_at)}${b.updated_at && Date.parse(b.updated_at) - Date.parse(b.created_at) > 60000 ? " · 고침" : ""} · ${b.is_public ? `조회 ${b.views || 0}` : "🔒 나만 보기"}`;
+}
+function paintBlogPost() {
+  const b = blogNow, mine = b.user_id === sync.myId();
+  paintBlogMeta();
+  $("bvTitle").textContent = b.title;
+  $("bvTopic").innerHTML = b.topic?.title ? topicCardHtml(b.topic) : "";
+  fillTopicImgs($("bvTopic"));
+  $("bvBody").textContent = b.body;
+  $("bvPhotos").innerHTML = b.photos?.length ? `<div class="ph-row big" data-paths="${esc(b.photos.join("|"))}"></div>` : "";
+  fillPhotoRows($("bvPhotos"));
+  $("bvTags").innerHTML = (b.tags || []).map((t) => `<button type="button" data-tag="${esc(t)}">#${esc(t)}</button>`).join("");
+  $("bvActions").innerHTML = [mine ? `<button type="button" data-a="edit">고치기</button>` : "", mine || sync.amAdmin() ? `<button type="button" data-a="del">지우기</button>` : ""].join("");
+}
+$("bvClose").addEventListener("click", () => $("blogView").close());
+$("bvMeta").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-u]"); if (!b) return;
+  if (blogSt && blogSt.uid === b.dataset.u && (blogSt.me ? !$("momPage").open : $("momPage").open)) { $("blogView").close(); if ($("topicsPage").open) $("topicsPage").close(); return; }
+  $("blogView").close(); openMom(b.dataset.u);
+});
+$("bvTags").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-tag]"); if (!b || !blogNow) return;
+  let st = blogSt && blogSt.uid === blogNow.user_id ? blogSt : null;
+  if (!st) { try { st = await loadBlog(blogNow.user_id); } catch { toast("불러오지 못했어요"); return; } }
+  $("blogView").close();
+  openGrid(st, { mode: "tag", tag: b.dataset.tag });
+});
+$("bvActions").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-a]"); const p = blogNow; if (!b || !p) return;
+  if (b.dataset.a === "edit") { $("blogView").close(); openBlogEdit(p); return; }
+  if (!confirm("이 글을 지울까요? 사진도 함께 지워지고 되돌릴 수 없어요.")) return;
+  try {
+    await sync.deleteBlog(p);
+    $("blogView").close(); toast("글을 지웠어요");
+    for (const st of [myBlog, momNow, grid?.st]) if (st?.list) st.list = st.list.filter((x) => x.id !== p.id);
+    if ($("topicsPage").open) paintGrid();
+    if (momNow?.list && $("momPage").open) paintBlog($("momBlog"), momNow);
+    if (myBlog) paintBlog($("myBlog"), myBlog);
+  } catch { toast("지우지 못했어요. 인터넷 연결을 확인해 주세요"); }
+});
+
+// 블로그 글쓰기 · 고치기
+let bEditing = null, bPhotos = [], bTags = [];
+const MAX_TAGS = 10;
+const cleanTag = (t) => String(t || "").replace(/^#+/, "").replace(/[\s,#]+/g, "").slice(0, 20);
+function paintBPhotos() {
+  $("bePhotoCount").textContent = `${bPhotos.length}/${MAX_PHOTOS}`;
+  $("bePhotos").innerHTML = bPhotos.map((p, i) => `<span class="ph"><img src="${esc(p.url)}" alt=""><button type="button" data-rm="${i}" aria-label="사진 빼기">✕</button></span>`).join("");
+  $("bePhotoAdd").hidden = bPhotos.length >= MAX_PHOTOS;
+}
+function paintBTags() {
+  $("beTags").innerHTML = bTags.map((t, i) => `<button type="button" data-rm="${i}" aria-label="태그 빼기">#${esc(t)} ✕</button>`).join("");
+  $("beTagIn").hidden = bTags.length >= MAX_TAGS;
+}
+function addTagsFrom(text) {
+  for (const raw of String(text).split(/[\s,]+/)) {
+    const t = cleanTag(raw);
+    if (t && !bTags.includes(t) && bTags.length < MAX_TAGS) bTags.push(t);
+  }
+  paintBTags();
+}
+function openBlogEdit(b = null) {
+  if (!AUTH.user || AUTH.offline) { toast("블로그는 인터넷에 연결돼 있을 때 쓸 수 있어요"); return; }
+  if (!sync.myNick()) { openNick(false); return; }
+  bEditing = b;
+  bPhotos.forEach((x) => x.file && URL.revokeObjectURL(x.url));
+  bPhotos = (b?.photos || []).map((path) => ({ path, url: "" }));
+  if (b?.photos?.length) sync.photoUrls(b.photos).then((urls) => { const m = new Map(b.photos.map((pa, i) => [pa, urls[i]])); bPhotos.forEach((x) => { if (x.path) x.url = m.get(x.path) || ""; }); paintBPhotos(); });
+  bTags = [...(b?.tags || [])];
+  $("beTitle").value = b?.title || ""; $("beBody").value = b?.body || ""; $("beTagIn").value = "";
+  $("bePublic").checked = b ? !!b.is_public : true;
+  $("beSave").textContent = b ? "고치기" : "올리기";
+  if (wTopic?.url) URL.revokeObjectURL(wTopic.url);
+  topicTo = "beTopic"; wTopic = b?.topic?.title ? { ...b.topic } : null;
+  paintBPhotos(); paintBTags(); paintWTopic();
+  $("blogEdit").showModal();
+  $("blogEdit").scrollTop = 0;
+}
+$("beClose").addEventListener("click", () => {
+  if (($("beTitle").value.trim() || $("beBody").value.trim()) && !bEditing && !confirm("쓰던 글을 버릴까요?")) return;
+  $("blogEdit").close();
+});
+$("bePhotoAdd").addEventListener("click", () => $("bePhotoFile").click());
+$("bePhotoFile").addEventListener("change", () => {
+  const files = [...$("bePhotoFile").files].filter((f) => f.type.startsWith("image/") || /\.(heic|heif)$/i.test(f.name));
+  const room = MAX_PHOTOS - bPhotos.length;
+  if (files.length > room) toast(`사진은 ${MAX_PHOTOS}장까지 넣을 수 있어요`);
+  for (const f of files.slice(0, room)) bPhotos.push({ file: f, url: URL.createObjectURL(f) });
+  $("bePhotoFile").value = "";
+  paintBPhotos();
+});
+$("bePhotos").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-rm]"); if (!b) return;
+  const [x] = bPhotos.splice(Number(b.dataset.rm), 1); if (x.file) URL.revokeObjectURL(x.url); paintBPhotos();
+});
+$("beTags").addEventListener("click", (e) => { const b = e.target.closest("[data-rm]"); if (b) { bTags.splice(Number(b.dataset.rm), 1); paintBTags(); } });
+$("beTagIn").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" || e.key === "," || e.key === " ") { e.preventDefault(); addTagsFrom($("beTagIn").value); $("beTagIn").value = ""; }
+  else if (e.key === "Backspace" && !$("beTagIn").value && bTags.length) { bTags.pop(); paintBTags(); }
+});
+$("beTagIn").addEventListener("blur", () => { if ($("beTagIn").value.trim()) { addTagsFrom($("beTagIn").value); $("beTagIn").value = ""; } });
+$("beTopic").addEventListener("click", (e) => {
+  if (e.target.closest("#peTopicRm")) { if (wTopic?.url) URL.revokeObjectURL(wTopic.url); wTopic = null; paintWTopic(); return; }
+  if (e.target.closest("#peTopicAdd") || e.target.closest(".topic-card")) openTopicPick();
+});
+$("beSave").addEventListener("click", async () => {
+  const title = $("beTitle").value.trim(), body = $("beBody").value.trim();
+  if (!title) { toast("제목을 적어 주세요"); $("beTitle").focus(); return; }
+  if ($("beTagIn").value.trim()) { addTagsFrom($("beTagIn").value); $("beTagIn").value = ""; }
+  $("beSave").disabled = true;
+  try {
+    const kept = bPhotos.filter((x) => x.path).map((x) => x.path);
+    const fresh = bPhotos.filter((x) => x.file);
+    const paths = [...kept];
+    for (let i = 0; i < fresh.length; i++) {
+      toast(`사진 올리는 중 ${i + 1}/${fresh.length}`, 60000);
+      try { paths.push(await sync.uploadPhoto(await shrinkPhoto(fresh[i].file), "blog")); } catch { /* 건너뜀 */ }
+    }
+    const removed = (bEditing?.photos || []).filter((x) => !kept.includes(x));
+    let topic = null;
+    if (wTopic) {
+      topic = { type: tType(wTopic), title: wTopic.title };
+      for (const k of ["cover", "by", "photo"]) if (wTopic[k]) topic[k] = wTopic[k];
+      if (wTopic.file) { try { topic.photo = await sync.uploadPhoto(await shrinkPhoto(wTopic.file), "blog"); } catch { /* 사진 없이 */ } }
+    }
+    const oldTp = bEditing?.topic?.photo;
+    if (oldTp && oldTp !== topic?.photo) removed.push(oldTp);
+    const id = await sync.saveBlog({ id: bEditing?.id, title, body, photos: paths, topic, tags: bTags, is_public: $("bePublic").checked });
+    if (removed.length) sync.deletePhotos(removed);
+    fresh.forEach((x) => URL.revokeObjectURL(x.url)); bPhotos = [];
+    if (wTopic?.url) URL.revokeObjectURL(wTopic.url);
+    wTopic = null;
+    $("blogEdit").close();
+    toast(bEditing ? "글을 고쳤어요" : "블로그에 올렸어요");
+    await renderMyBlog(true);
+    openBlogPost(id, myBlog);
+  } catch { toast("올리지 못했어요. 인터넷 연결을 확인해 주세요", 3500); }
+  $("beSave").disabled = false;
+});
 
 // ---------- 첫 화면 · 로그인 ----------
 const welcome = $("welcome");

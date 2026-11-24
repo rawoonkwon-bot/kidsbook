@@ -437,3 +437,44 @@ export async function postsBy(uid) {
   if (error) throw error;
   return data || [];
 }
+
+// ---------- 엄마 블로그 ----------
+const BLOG_COLS = "id, title, body, photos, topic, tags, is_public, views, created_at, updated_at, user_id";
+// 한 엄마의 블로그 글 (남의 블로그는 공개 글만 — 서버가 걸러 줌)
+export async function blogList(uid) {
+  const c = await client();
+  const { data, error } = await c.from("blogs").select(BLOG_COLS).eq("user_id", uid).order("created_at", { ascending: false }).limit(300);
+  if (error) throw error;
+  return data || [];
+}
+export async function getBlog(id) {
+  const c = await client();
+  const { data, error } = await c.from("blogs").select(BLOG_COLS + ", profiles(nick, face)").eq("id", id).maybeSingle();
+  if (error) throw error;
+  return data ? { ...data, nick: data.profiles?.nick || "(알 수 없음)", face: data.profiles?.face || null } : null;
+}
+export async function saveBlog({ id, title, body, photos, topic = null, tags = [], is_public = true }) {
+  const c = await client();
+  const row = { title, body, photos, topic, tags, is_public };
+  if (id) {
+    const { error } = await c.from("blogs").update(row).eq("id", id);
+    if (error) throw error;
+    return id;
+  }
+  const { data, error } = await c.from("blogs").insert(row).select("id").single();
+  if (error) throw error;
+  return data.id;
+}
+export async function deleteBlog(b) {
+  const c = await client();
+  const { error } = await c.from("blogs").delete().eq("id", b.id);
+  if (error) throw error;
+  const files = [...(b.photos || []), ...(b.topic?.photo ? [b.topic.photo] : [])];
+  if (files.length) { try { await c.storage.from(BUCKET).remove(files); } catch { /* 무시 */ } }
+}
+export async function bumpBlogView(id) {
+  const c = await client();
+  const { data, error } = await c.rpc("bump_blog_view", { bid: id });
+  if (error) throw error;
+  return typeof data === "number" ? data : null;
+}
