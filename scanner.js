@@ -57,6 +57,21 @@ export class Scanner {
     this.native = native;
     this.engine = engine;
 
+    // 앱을 연 동안에는 카메라를 다시 켜지 않고 그대로 씀 → 아이폰에서 스캔할 때마다 허락을 묻지 않음
+    clearTimeout(this.idleTimer);
+    if (this.stream && this.track?.readyState === "live" && !this.track.muted) {
+      this.track.enabled = true;
+      this.video.srcObject = this.stream;
+      await this.video.play().catch(() => {});
+      this.running = true;
+      this.startedAt = performance.now();
+      this.frames = 0;
+      this.lastCode = null;
+      this.loop();
+      return;
+    }
+    this.release();
+
     this.stream = await navigator.mediaDevices.getUserMedia({
       audio: false,
       video: {
@@ -96,11 +111,24 @@ export class Scanner {
     try { await this.track.applyConstraints({ advanced: [{ torch: on }] }); return true; } catch { return false; }
   }
 
+  // 스캔 화면을 닫을 때: 카메라는 잠시 꺼 두기만 하고(허락 유지), 10분 동안 안 쓰면 완전히 끔
   stop() {
     this.running = false;
+    if (this.track) {
+      if (this.caps?.torch) this.track.applyConstraints({ advanced: [{ torch: false }] }).catch(() => {});
+      this.track.enabled = false;
+    }
+    this.video.pause();
+    this.video.srcObject = null;
+    clearTimeout(this.idleTimer);
+    this.idleTimer = setTimeout(() => this.release(), 10 * 60 * 1000);
+  }
+
+  release() {
+    clearTimeout(this.idleTimer);
     this.stream?.getTracks().forEach((t) => t.stop());
     this.stream = null;
-    this.video.srcObject = null;
+    this.track = null;
   }
 
   /** 화면의 가이드 네모가 실제 영상의 어느 영역인지 계산 (object-fit: cover 보정) */

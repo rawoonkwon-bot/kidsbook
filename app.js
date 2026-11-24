@@ -246,7 +246,9 @@ async function openSheet(isbn, scanInfo) {
   $("sOk").disabled = true; $("sOk").textContent = "확인";
   $("scanSheet").showModal();
 
-  const { book, ms, cached } = await lookupBook(isbn, { needDescription: true });
+  let { book, ms, cached } = await lookupBook(isbn, { needDescription: true });
+  // 어디에도 없으면, 다른 회원이 직접 등록해 둔 책인지 확인
+  if (!book && !PEEK) book = await sync.sharedBook(isbn).catch(() => null);
   if (!sheet || sheet.isbn !== isbn) return;
   sheet.book = book;
   const parts = [];
@@ -257,7 +259,7 @@ async function openSheet(isbn, scanInfo) {
 
   if (!book && !existing) {
     $("sTitle").textContent = "책 정보를 찾지 못했어요";
-    $("sAuthor").textContent = "셀프등록으로 제목과 쪽수를 직접 적어 주세요";
+    $("sAuthor").textContent = "셀프등록에서 제목을 적으면 다른 판의 표지와 쪽수를 찾아 줘요. 한 번 등록하면 다음부터는 누구나 바로 찾아요.";
     $("sOk").textContent = "셀프등록";
     return;
   }
@@ -340,6 +342,7 @@ function openRecord({ existing = null, isbn = null, book = null, self = false })
   $("rTitleText").hidden = self;
   $("rTitle").hidden = !self; $("rAuthor").hidden = !self;
   $("rTitle").value = title; $("rAuthor").value = authors;
+  $("rFind").hidden = !self; $("rFindList").hidden = true; $("rFindList").innerHTML = "";
   $("rMeta").textContent = [publisher && `(출판사) ${publisher}`, !self && authors && `(작가) ${authors}`, category && `(분야) ${category}`, total && `${total} pages`]
     .filter(Boolean).join("\n") || (rec.isbn ? `ISBN ${rec.isbn}` : "");
   $("rDesc").textContent = desc; $("rDesc").classList.remove("open");
@@ -365,6 +368,34 @@ function openRecord({ existing = null, isbn = null, book = null, self = false })
   if (self) setTimeout(() => $("rTitle").focus(), 50);
 }
 $("rDesc").addEventListener("click", () => $("rDesc").classList.toggle("open"));
+// 셀프등록: 제목으로 비슷한 책을 찾아 표지·쪽수 채우기
+let findResults = [];
+$("rFind").addEventListener("click", async () => {
+  const q = $("rTitle").value.trim();
+  if (q.length < 2) { toast("책 제목을 먼저 적어 주세요"); $("rTitle").focus(); return; }
+  $("rFindList").hidden = false;
+  $("rFindList").innerHTML = `<small>찾는 중…</small>`;
+  try {
+    const r = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+    findResults = r.ok ? (await r.json()).results || [] : [];
+    $("rFindList").innerHTML = findResults.length
+      ? `<small>같은 책을 고르면 표지와 쪽수를 채워요</small>` + findResults.map((b, i) => `<button type="button" class="find-item" data-i="${i}">
+          ${b.cover ? `<img src="${esc(b.cover)}" alt="">` : `<span class="noimg"></span>`}
+          <span><b>${esc(b.title)}</b><small>${esc((b.authors || []).join(", "))}${b.pages ? ` · ${b.pages}쪽` : ""}</small></span></button>`).join("")
+      : `<small>비슷한 책을 찾지 못했어요. 제목과 쪽수를 직접 적어 주세요.</small>`;
+  } catch { $("rFindList").innerHTML = `<small>찾지 못했어요. 인터넷 연결을 확인해 주세요.</small>`; }
+});
+$("rFindList").addEventListener("click", (e) => {
+  const t = e.target.closest("[data-i]"); if (!t || !rec) return;
+  const b = findResults[Number(t.dataset.i)];
+  rec.book = { ...(rec.book || {}), cover: b.cover || rec.book?.cover || "", publisher: b.publisher || "", authors: b.authors || [] };
+  if (!$("rAuthor").value.trim()) $("rAuthor").value = (b.authors || []).join(", ");
+  if (b.pages) $("rTotal").value = b.pages;
+  setImg($("rCover"), b.cover);
+  $("rFindList").hidden = true;
+  syncDone();
+  toast(b.pages ? `표지와 쪽수(${b.pages}쪽)를 채웠어요` : "표지를 채웠어요");
+});
 
 function saveRecord() {
   if (!rec) return;
@@ -410,6 +441,8 @@ function saveRecord() {
       date: new Date().toISOString(),
     };
     records.unshift(r);
+    // 바코드로 못 찾은 책은 함께 쓰는 책 목록에 올려 두기 → 다음부터 누구나 바로 찾음
+    if (rec.self && rec.isbn && !PEEK) sync.shareBook({ isbn: rec.isbn, title, authors: r.authors, publisher: r.publisher, cover: r.cover, pages: total }).catch(() => {});
   }
   const gained = to - prev;
   const finished = !!(r.totalPages && to >= r.totalPages);
@@ -590,7 +623,7 @@ function decorate(c) {
     const listen = c.key === "listen" || c.key === "focus";
     Object.assign(d, { what: listen ? "무엇을 들었나요?" : "무엇을 했나요?", whatPh: PH[c.key] || "예: 오늘 한 것", amount: "얼마나 했나요?", unit: "분" });
   }
-  if (c.kind === "note") Object.assign(d, { text: c.key === "memo" ? "메모" : "내용", textPh: "오늘 있었던 일, 칭찬할 점 등" });
+  if (c.kind === "note") Object.assign(d, { text: c.key === "memo" ? "메모 · 일기" : "내용", textPh: "오늘 있었던 일, 느낀 점, 칭찬할 점을 일기처럼 자유롭게 적어요" });
   return d;
 }
 let catList = readJSON(CATS_KEY, null);
@@ -700,7 +733,7 @@ function fillDay(day) {
         for (const j of journalOn(day, c.key)) {
           const sub = [j.minutes ? fmtMin(j.minutes) : "", j.text || ""].filter(Boolean).join(" · ");
           html += `<div class="day-item"><span>${c.svg}</span>
-            <div class="grow"><b>${esc(j.what || c.name)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}</div>
+            <div class="grow"><b>${esc(j.what || c.name)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}${j.photos?.length ? `<div class="ph-row" data-paths="${esc(j.photos.join("|"))}"></div>` : ""}</div>
             <button type="button" class="x" data-del="${j.id}" aria-label="지우기">✕</button></div>`;
         }
       }
@@ -708,7 +741,34 @@ function fillDay(day) {
     if (!html) html = `<small style="text-align:center">아직 이 날의 기록이 없어요. 위 카테고리를 눌러 기록해 보세요.</small>`;
   }
   $("dayList").innerHTML = html;
+  fillPhotoRows($("dayList"));
 }
+// 일기 사진 보여 주기 (누르면 크게)
+async function fillPhotoRows(root) {
+  for (const row of root.querySelectorAll(".ph-row[data-paths]")) {
+    const urls = await sync.photoUrls(row.dataset.paths.split("|"));
+    row.innerHTML = urls.map((u) => (u ? `<button type="button" class="ph-thumb" data-full="${esc(u)}"><img src="${esc(u)}" alt="일기 사진" loading="lazy"></button>` : `<span class="ph-thumb off"></span>`)).join("");
+  }
+}
+document.addEventListener("click", (e) => {
+  const t = e.target.closest(".ph-thumb[data-full]"); if (!t) return;
+  const all = [...t.parentElement.querySelectorAll("[data-full]")].map((x) => x.dataset.full);
+  openPhoto(all, all.indexOf(t.dataset.full));
+});
+let photoList = [], photoAt = 0;
+function openPhoto(list, i) {
+  photoList = list; photoAt = i;
+  showPhoto();
+  if (!$("photoView").open) $("photoView").showModal();
+}
+function showPhoto() {
+  $("pvImg").src = photoList[photoAt];
+  $("pvCount").textContent = photoList.length > 1 ? `${photoAt + 1} / ${photoList.length}` : "";
+  $("pvPrev").hidden = $("pvNext").hidden = photoList.length < 2;
+}
+$("pvPrev").addEventListener("click", () => { photoAt = (photoAt + photoList.length - 1) % photoList.length; showPhoto(); });
+$("pvNext").addEventListener("click", () => { photoAt = (photoAt + 1) % photoList.length; showPhoto(); });
+$("pvImg").addEventListener("click", () => $("photoView").close());
 $("dayCats").addEventListener("click", (e) => {
   const b = e.target.closest("button[data-cat]"); if (!b) return;
   const c = CAT[b.dataset.cat];
@@ -720,6 +780,8 @@ $("dayList").addEventListener("click", (e) => {
   const day = openDayKey;
   if (t.dataset.del) {
     if (!confirm("이 기록을 지울까요?")) return;
+    const gone = journal.find((j) => j.id === t.dataset.del);
+    if (gone?.photos?.length) sync.deletePhotos(gone.photos);
     journal = journal.filter((j) => j.id !== t.dataset.del); saveJournal(); render(); return;
   }
   // 다른 창을 열기 전에 날짜 시트를 잠시 닫고, 끝나면 다시 돌아옴
@@ -752,18 +814,65 @@ function openEntry(cat) {
   $("eWhatWrap").hidden = !c.what; $("eWhatLabel").textContent = c.what || ""; $("eWhat").placeholder = c.whatPh || ""; $("eWhat").value = "";
   $("eAmountWrap").hidden = !c.amount; $("eAmountLabel").textContent = (c.amount || "").replace("몇 분", "얼마나"); $("eUnit").textContent = c.unit || ""; $("eAmount").value = ""; $("eHour").value = "";
   $("eTextWrap").hidden = false; $("eTextLabel").textContent = c.text || "한 줄 메모 (선택)"; $("eText").placeholder = c.textPh || ""; $("eText").value = "";
-  $("eText").rows = c.text ? 5 : 2;
+  $("eText").rows = c.kind === "note" ? 9 : c.text ? 5 : 2;
+  ePhotos.forEach((p) => URL.revokeObjectURL(p.url)); ePhotos = [];
+  $("ePhotoWrap").hidden = c.kind !== "note"; paintPhotos();
   $("dayDialog").close("away"); returnDay = openDayKey || returnDay;
   $("entryDialog").showModal();
 }
-$("entryDialog").addEventListener("close", () => {
+// 일기 사진: 최대 10장, 올리기 전에 작게 줄임(긴 쪽 1280px)
+const MAX_PHOTOS = 10;
+let ePhotos = []; // [{ file, url }]
+function paintPhotos() {
+  $("ePhotoCount").textContent = `${ePhotos.length}/${MAX_PHOTOS}`;
+  $("ePhotos").innerHTML = ePhotos.map((p, i) => `<span class="ph"><img src="${p.url}" alt=""><button type="button" data-rm="${i}" aria-label="사진 빼기">✕</button></span>`).join("");
+  $("ePhotoAdd").hidden = ePhotos.length >= MAX_PHOTOS;
+}
+$("ePhotoAdd").addEventListener("click", () => $("ePhotoFile").click());
+$("ePhotoFile").addEventListener("change", () => {
+  const files = [...$("ePhotoFile").files].filter((f) => f.type.startsWith("image/") || /\.(heic|heif)$/i.test(f.name));
+  const room = MAX_PHOTOS - ePhotos.length;
+  if (files.length > room) toast(`사진은 ${MAX_PHOTOS}장까지 넣을 수 있어요`);
+  for (const f of files.slice(0, room)) ePhotos.push({ file: f, url: URL.createObjectURL(f) });
+  $("ePhotoFile").value = "";
+  paintPhotos();
+});
+$("ePhotos").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-rm]"); if (!b) return;
+  const [p] = ePhotos.splice(Number(b.dataset.rm), 1); URL.revokeObjectURL(p.url); paintPhotos();
+});
+async function shrinkPhoto(file) {
+  const bmp = await createImageBitmap(file, { imageOrientation: "from-image" }).catch(() => createImageBitmap(file));
+  const s = Math.min(1, 1280 / Math.max(bmp.width, bmp.height));
+  const cv = document.createElement("canvas");
+  cv.width = Math.round(bmp.width * s); cv.height = Math.round(bmp.height * s);
+  cv.getContext("2d").drawImage(bmp, 0, 0, cv.width, cv.height);
+  bmp.close?.();
+  return new Promise((res, rej) => cv.toBlob((b) => (b ? res(b) : rej(new Error("toBlob"))), "image/jpeg", 0.82));
+}
+$("entryDialog").addEventListener("close", async () => {
   if ($("entryDialog").returnValue !== "save" || !entryCat) return;
+  const cat = entryCat; entryCat = null;
   const what = $("eWhat").value.trim(), text = $("eText").value.trim(), minutes = ((parseInt($("eHour").value, 10) || 0) * 60 + (parseInt($("eAmount").value, 10) || 0)) || null;
-  if (!what && !text && !minutes) { toast("내용을 적어 주세요"); return; }
-  journal.push({ id: crypto.randomUUID?.() || String(Date.now()), day: returnDay || localDay(), cat: entryCat, what, minutes, text });
+  const picked = ePhotos; ePhotos = [];
+  if (!what && !text && !minutes && !picked.length) { toast("내용을 적어 주세요"); return; }
+  const entry = { id: crypto.randomUUID?.() || String(Date.now()), day: returnDay || localDay(), cat, what, minutes, text };
+  if (picked.length) {
+    const paths = [];
+    if (!sync.canUpload()) toast("사진은 인터넷에 연결돼 있을 때 올릴 수 있어요. 글만 저장했어요", 3500);
+    else {
+      for (let i = 0; i < picked.length; i++) {
+        toast(`사진 올리는 중 ${i + 1}/${picked.length}`, 60000);
+        try { paths.push(await sync.uploadPhoto(await shrinkPhoto(picked[i].file))); } catch { /* 이 사진은 건너뜀 */ }
+      }
+      if (paths.length < picked.length) toast(`사진 ${picked.length - paths.length}장은 올리지 못했어요`, 3500);
+    }
+    if (paths.length) entry.photos = paths;
+    picked.forEach((p) => URL.revokeObjectURL(p.url));
+  }
+  journal.push(entry);
   saveJournal(); render();
-  toast(`${CAT[entryCat].name} 기록했어요`);
-  entryCat = null;
+  if (!picked.length || entry.photos?.length === picked.length) toast(`${CAT[cat].name} 기록했어요${entry.photos ? ` · 사진 ${entry.photos.length}장` : ""}`);
 });
 
 // ---------- 소식: 통계 ----------
@@ -1115,7 +1224,7 @@ const ABOUT = {
   kids: "자녀 목록. id, nick(닉네임), grade(학년 번호: 0=3세 … 4=7세, 5=초1 … 10=초6, 11=중1 … 13=중3, 14=고1 … 16=고3, 17=졸업), gradeYear(그 학년이었던 학년도, 3월 시작). 지금 학년 = grade + (올해 학년도 - gradeYear)",
   categories: "포트폴리오 카테고리. kind: book=책장(한글책/영어책), focus=집중듣기(책+시간), time=한 것+시간, note=메모. hidden=숨김",
   records: "책 기록(책 한 권 = 1개). kid=자녀 id, shelf: ko 한글책 / en 영어책 / focus 집중듣기. sessions=읽은 날(day, YYYY-MM-DD)마다 읽은 쪽(from~to)과 집중듣기 시간(minutes, 분). totalPages=전체 쪽수, done=끝까지 읽음, score=별점(1~5), note=독후활동 글, bonus=독후활동 포인트(+50) 받음, category=분야",
-  journal: "포트폴리오 하루 기록. kid=자녀 id, day=날짜, cat=카테고리 key, what=한 것, minutes=시간(분), text=메모",
+  journal: "포트폴리오 하루 기록. kid=자녀 id, day=날짜, cat=카테고리 key, what=한 것, minutes=시간(분), text=메모(일기), photos=사진 보관함 경로 목록(사진 파일은 이 백업에 들어 있지 않고 계정 보관함에 있어요)",
   "포인트 규칙": "읽은 쪽수 1쪽 = 1점, 독후활동을 쓰면 +50점. 스탬프는 끝까지 읽은 책 1권에 1개, 8개가 한 판",
 };
 const plainDay = (day) => {
@@ -1139,7 +1248,7 @@ function diaryHtml(d) {
     for (const r of recs) for (const s of r.sessions) add(s.day, `<li>${shelfLabel[shelfOf(r)] || "📚"} <b>${esc(r.title)}</b> · ${esc(sessionText(s))}</li>`);
     for (const j of jr) {
       const c = catOf[j.cat] || { icon: "", name: j.cat };
-      add(j.day, `<li>${ICON_EMOJI[toIcon(c.icon)] || "•"} ${esc(c.name)}${j.what ? ` · <b>${esc(j.what)}</b>` : ""}${j.minutes ? ` · ${fmtMin(j.minutes)}` : ""}${j.text ? `<div class="memo">${esc(j.text)}</div>` : ""}</li>`);
+      add(j.day, `<li>${ICON_EMOJI[toIcon(c.icon)] || "•"} ${esc(c.name)}${j.what ? ` · <b>${esc(j.what)}</b>` : ""}${j.minutes ? ` · ${fmtMin(j.minutes)}` : ""}${j.text ? `<div class="memo">${esc(j.text)}</div>` : ""}${j.photos?.length ? `<div class="memo">📷 사진 ${j.photos.length}장 (앱에서 볼 수 있어요)</div>` : ""}</li>`);
     }
     const pages = recs.reduce((a, r) => a + pagesOf(r), 0), pts = recs.reduce((a, r) => a + pointsOf(r), 0);
     return `<section><h2>🍌 ${esc(k.nick)}${gradeOf(k) ? " " + gradeOf(k) : ""}</h2>

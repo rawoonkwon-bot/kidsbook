@@ -173,9 +173,11 @@
             <h3 id="rTitleText"></h3>
             <input id="rTitle" class="title-input" placeholder="책 제목" hidden />
             <input id="rAuthor" class="sub-input" placeholder="지은이" hidden />
+            <button type="button" class="btn mini find-btn" id="rFind" hidden>🔍 제목으로 표지·쪽수 찾기</button>
             <p id="rMeta"></p>
           </div>
         </div>
+        <div class="find-list" id="rFindList" hidden></div>
         <h4 class="r-sub" id="rDescHead">책소개</h4>
         <p class="r-desc" id="rDesc"></p>
       </div>
@@ -350,6 +352,12 @@
         <span id="eTextLabel"></span>
         <textarea id="eText" rows="4"></textarea>
       </label>
+      <div class="field" id="ePhotoWrap" hidden>
+        <span>사진 <small id="ePhotoCount">0/10</small></span>
+        <div class="photo-grid" id="ePhotos"></div>
+        <button type="button" class="btn ghost photo-add" id="ePhotoAdd">📷 사진 추가 (휴대폰 사진첩 · 컴퓨터 파일)</button>
+        <input type="file" id="ePhotoFile" accept="image/*" multiple hidden />
+      </div>
       <div class="row">
         <button class="btn ghost" value="cancel" formnovalidate>취소</button>
         <button class="btn dark" value="save">저장</button>
@@ -431,6 +439,15 @@
         <button class="btn ghost" value="cancel" formnovalidate>취소</button>
         <button type="button" class="btn dark" id="cSave">저장</button>
       </div>
+    </form>
+  </dialog>
+
+  <!-- 일기 사진 크게 보기 -->
+  <dialog id="photoView" class="photo-view">
+    <form method="dialog">
+      <button class="x-btn" value="close" aria-label="닫기">✕</button>
+      <img id="pvImg" alt="일기 사진" />
+      <div class="pv-nav"><button type="button" id="pvPrev" aria-label="이전 사진">‹</button><span id="pvCount"></span><button type="button" id="pvNext" aria-label="다음 사진">›</button></div>
     </form>
   </dialog>
 

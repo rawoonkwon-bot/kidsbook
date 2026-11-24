@@ -207,3 +207,50 @@ export async function fetchUser(id) {
   if (error) throw error;
   return data?.data || null;
 }
+
+// ---------- 함께 쓰는 책 목록 (바코드로 못 찾은 책을 회원이 등록) ----------
+export async function sharedBook(isbn) {
+  if (!user || !/^\d{13}$/.test(isbn || "")) return null;
+  const c = await client();
+  const { data, error } = await c.from("books").select("title, authors, publisher, cover, pages").eq("isbn", isbn).maybeSingle();
+  if (error || !data) return null;
+  return { title: data.title, authors: data.authors ? data.authors.split(", ").filter(Boolean) : [], publisher: data.publisher || "",
+    cover: data.cover || "", pages: data.pages || null, description: "", category: "", source: "회원이 등록한 책" };
+}
+export async function shareBook(b) {
+  if (!user || !/^\d{13}$/.test(b.isbn || "") || !b.title) return;
+  const c = await client();
+  await c.from("books").upsert({ isbn: b.isbn, title: b.title.slice(0, 200), authors: (b.authors || "").slice(0, 200),
+    publisher: (b.publisher || "").slice(0, 100), cover: /^https:\/\//.test(b.cover || "") ? b.cover.slice(0, 500) : "",
+    pages: b.pages > 0 && b.pages < 5000 ? b.pages : null }, { onConflict: "isbn", ignoreDuplicates: true });
+}
+
+// ---------- 일기 사진 (비공개 보관함, 공개한 회원 것만 다른 사람도 볼 수 있음) ----------
+const BUCKET = "photos";
+const urlCache = new Map();
+export const canUpload = () => !!user;
+export async function uploadPhoto(blob) {
+  if (!user) throw new Error("login");
+  const c = await client();
+  const path = `${user.id}/${crypto.randomUUID()}.jpg`;
+  const { error } = await c.storage.from(BUCKET).upload(path, blob, { contentType: "image/jpeg", upsert: false });
+  if (error) throw error;
+  return path;
+}
+// 사진 주소(1시간 동안 쓸 수 있는 링크)
+export async function photoUrls(paths) {
+  const need = paths.filter((p) => !urlCache.has(p));
+  if (need.length && user) {
+    try {
+      const c = await client();
+      const { data } = await c.storage.from(BUCKET).createSignedUrls(need, 3600);
+      for (const d of data || []) if (d.signedUrl) urlCache.set(d.path, d.signedUrl);
+    } catch { /* 인터넷 없음 */ }
+  }
+  return paths.map((p) => urlCache.get(p) || "");
+}
+export async function deletePhotos(paths) {
+  const mine = (paths || []).filter((p) => user && p.startsWith(`${user.id}/`));
+  if (!mine.length) return;
+  try { const c = await client(); await c.storage.from(BUCKET).remove(mine); } catch { /* 다음에 */ }
+}
