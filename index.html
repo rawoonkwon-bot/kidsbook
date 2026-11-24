@@ -77,6 +77,16 @@
     </section>
 
     <!-- ===== 소식 (통계) ===== -->
+    <section class="tab" data-tab="board" hidden>
+      <div class="board-head"><h2 class="page-title">게시판</h2><button type="button" class="btn lime" id="bWrite">✏️ 글쓰기</button></div>
+      <div class="seg small" id="boardPick" role="radiogroup" aria-label="게시판 고르기">
+        <button type="button" role="radio" data-b="free" aria-checked="true">자유</button>
+        <button type="button" role="radio" data-b="books" aria-checked="false">책 추천</button>
+        <button type="button" role="radio" data-b="qna" aria-checked="false">질문</button>
+      </div>
+      <ul class="post-list" id="postList"></ul>
+    </section>
+
     <section class="tab" data-tab="stats" hidden>
       <div id="browseWrap">
         <h2 class="page-title">👀 친구들 책장 구경</h2>
@@ -111,6 +121,7 @@
   <nav class="tabbar" aria-label="메뉴">
     <button type="button" data-go="home" aria-current="page"><span data-ico="home"></span>홈</button>
     <button type="button" data-go="port"><span data-ico="calendar"></span>포트폴리오</button>
+    <button type="button" data-go="board"><span data-ico="message"></span>게시판</button>
     <button type="button" data-go="stats"><span data-ico="chart-bar"></span>소식</button>
   </nav>
 
@@ -390,6 +401,7 @@
         <b>설정</b>
         <span></span>
       </div>
+      <button type="button" class="set-row" id="setNick"><span class="si">✍️</span><span class="st"><b>엄마 별명</b><small id="setNickTxt"></small></span><span>›</span></button>
       <button type="button" class="set-row" id="setKids"><span class="si">👧</span><span class="st"><b>자녀 관리</b><small>닉네임 추가 · 수정 · 삭제</small></span><span>›</span></button>
       <button type="button" class="set-row" id="setCats"><span class="si">🗂️</span><span class="st"><b>포트폴리오 카테고리 편집</b><small>이름 · 아이콘 · 순서 · 숨기기 · 추가</small></span><span>›</span></button>
       <button type="button" class="set-row" id="setExport"><span class="si">💾</span><span class="st"><b>내 기록 모두 내려받기</b><small id="lastExport">모든 자녀의 기록을 파일 하나(ZIP)로 저장해요</small></span><span>›</span></button>
@@ -458,6 +470,61 @@
         <button class="btn dark" value="new">책 찾기</button>
       </div>
     </form>
+  </dialog>
+
+  <!-- 엄마 별명 -->
+  <dialog id="nickDialog">
+    <form method="dialog" class="sheet">
+      <h3 id="nTitle">엄마 별명을 정해 주세요</h3>
+      <p class="k-help">게시판에 글을 쓰면 이 별명이 작성자로 보여요. 한글·영어·숫자 2~12자, 띄어쓰기 없이 (예: zooisfun)</p>
+      <input id="nIn" class="sub-input" maxlength="12" autocomplete="off" autocapitalize="off" placeholder="별명" />
+      <p class="err" id="nErr"></p>
+      <div class="row">
+        <button class="btn ghost" value="cancel" id="nCancel" formnovalidate>취소</button>
+        <button type="button" class="btn dark" id="nSave">저장</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 게시판: 글 보기 -->
+  <dialog id="postView" class="page">
+    <div class="page-in">
+      <div class="page-top"><button type="button" class="x-btn" id="pClose" aria-label="닫기">✕</button><span class="post-actions" id="pActions"></span></div>
+      <article class="post">
+        <small class="post-board" id="pBoard"></small>
+        <h2 id="pTitle"></h2>
+        <p class="post-meta" id="pMeta"></p>
+        <div class="post-body" id="pBody"></div>
+        <div id="pPhotos"></div>
+        <button type="button" class="like-btn" id="pLike" hidden></button>
+      </article>
+      <h4 class="r-sub">댓글 <span id="pCnt"></span></h4>
+      <ul class="comments" id="pComments"></ul>
+      <div class="comment-new">
+        <textarea id="pCIn" rows="2" maxlength="1000" placeholder="댓글을 적어 주세요"></textarea>
+        <button type="button" class="btn dark" id="pCSend">등록</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- 게시판: 글쓰기 -->
+  <dialog id="postEdit" class="page">
+    <div class="page-in">
+      <div class="page-top"><button type="button" class="x-btn" id="peClose" aria-label="닫기">✕</button><button type="button" class="pill-btn" id="peSave">올리기</button></div>
+      <div class="seg small" id="peBoard" role="radiogroup" aria-label="게시판">
+        <button type="button" role="radio" data-b="free">자유</button>
+        <button type="button" role="radio" data-b="books">책 추천</button>
+        <button type="button" role="radio" data-b="qna">질문</button>
+      </div>
+      <input id="peTitle" class="title-input" maxlength="100" placeholder="제목" />
+      <textarea id="peBody" rows="12" maxlength="5000" placeholder="내용을 적어 주세요"></textarea>
+      <div class="field">
+        <span>사진 <small id="pePhotoCount">0/10</small></span>
+        <div class="photo-grid" id="pePhotos"></div>
+        <button type="button" class="btn ghost photo-add" id="pePhotoAdd">📷 사진 추가</button>
+        <input type="file" id="pePhotoFile" accept="image/*" multiple hidden />
+      </div>
+    </div>
   </dialog>
 
   <!-- 일기 사진 크게 보기 -->

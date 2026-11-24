@@ -602,3 +602,40 @@ body.peek #dayCats, body.peek .day-sub, body.peek .day-actions, body.peek .day-i
 .day-group .day-item { background: transparent; border-radius: 10px; padding: 6px 4px; border-top: 1px solid rgba(47, 93, 58, .1); }
 .day-group .day-item > span .ico { width: 20px; height: 20px; }
 .day-list { gap: 10px; }
+
+/* 게시판 */
+.board-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.board-head .btn { padding: 10px 16px; font-size: 15px; }
+.post-list { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.post-list .muted { color: var(--muted); font-size: 14px; padding: 18px 4px; text-align: center; }
+.post-row { width: 100%; text-align: left; border: 0; background: var(--card); box-shadow: var(--raise-s); border-radius: 14px; padding: 12px 14px; cursor: pointer; display: flex; flex-direction: column; gap: 6px; color: inherit; font: inherit; }
+.post-row b { font-size: 15px; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.post-row small { display: flex; gap: 10px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+.post-row small span { display: inline-flex; align-items: center; gap: 3px; }
+.post-row small .ico { width: 13px; height: 13px; }
+.post-row.pinned { background: #FFF6D6; }
+.pin { display: inline-block; font-size: 11px; font-weight: 800; color: #1E2420; background: #FFCC00; border-radius: 6px; padding: 1px 6px; margin-right: 6px; vertical-align: 2px; }
+.post { background: var(--card); border-radius: 16px; padding: 16px; box-shadow: var(--raise-s); }
+.post-board { color: var(--forest); font-weight: 700; font-size: 12px; }
+.post h2 { font-size: 20px; margin: 4px 0 6px; line-height: 1.35; word-break: break-word; }
+.post-meta { font-size: 13px; color: var(--muted); margin: 0 0 12px; }
+.post-body { white-space: pre-wrap; word-break: break-word; font-size: 15px; line-height: 1.7; }
+.ph-row.big .ph-thumb { width: 84px; height: 84px; }
+.like-btn { margin-top: 14px; display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 999px; padding: 8px 14px; background: var(--bg); box-shadow: var(--raise-s); color: var(--muted); font-weight: 700; cursor: pointer; }
+.like-btn .ico { width: 18px; height: 18px; }
+.like-btn.on { color: #D4537E; }
+.like-btn.on .ico { fill: #D4537E; }
+.post-actions { display: flex; gap: 6px; }
+.post-actions button { border: 0; background: var(--card); box-shadow: var(--raise-s); border-radius: 999px; padding: 7px 12px; font-size: 13px; font-weight: 700; color: var(--forest); cursor: pointer; }
+.comments { list-style: none; padding: 0; margin: 0 0 12px; display: flex; flex-direction: column; gap: 6px; }
+.comments li { background: var(--card); border-radius: 12px; padding: 8px 12px; }
+.comments li div { display: flex; align-items: center; gap: 8px; }
+.comments li small { color: var(--muted); font-size: 12px; }
+.comments li .x { margin-left: auto; border: 0; background: none; color: var(--muted); cursor: pointer; }
+.comments li p { margin: 4px 0 0; white-space: pre-wrap; word-break: break-word; font-size: 14px; }
+.comments li.muted { color: var(--muted); font-size: 13px; text-align: center; background: none; }
+.comment-new { display: flex; gap: 8px; align-items: flex-end; padding-bottom: 20px; }
+.comment-new textarea { flex: 1; margin: 0; }
+#postEdit .title-input { width: 100%; margin: 12px 0 8px; }
+#postEdit textarea#peBody { width: 100%; }
+body.peek .tabbar [data-go="board"] { display: none; }

@@ -13,6 +13,9 @@ const PARAMS = new URLSearchParams(location.search);
 const PEEK_ID = AUTH.user && !AUTH.offline ? PARAMS.get("peek") : null;
 let PEEK = PEEK_ID ? await sync.fetchUser(PEEK_ID).catch(() => null) : null;
 const mem = new Map();
+// 엄마 별명(게시판 작성자 이름): null = 아직 없음, undefined = 인터넷 문제로 모름
+let PROFILE;
+if (AUTH.user && !AUTH.offline) { try { PROFILE = await sync.loadProfile(); } catch { PROFILE = undefined; } }
 function fillMem(d, kid) {
   mem.clear();
   mem.set("kbc:kids:v1", JSON.stringify(d.kids || []));
@@ -170,6 +173,7 @@ function go(tab) {
   document.querySelectorAll(".tabbar button[aria-current]").forEach((b) => b.setAttribute("aria-current", "page"));
   if (tab === "stats") { renderStats(); renderBrowse(); }
   if (tab === "port") renderCalendar();
+  if (tab === "board") setTimeout(() => renderBoard()); // 게시판 코드가 아래에 있어서 한 박자 뒤에
   window.scrollTo(0, 0);
   history.replaceState(null, "", location.pathname + location.search + (tab === "home" ? "" : `#${tab}`));
 }
@@ -963,7 +967,7 @@ $("entryDialog").addEventListener("close", async () => {
     else {
       for (let i = 0; i < picked.length; i++) {
         toast(`사진 올리는 중 ${i + 1}/${picked.length}`, 60000);
-        try { paths.push(await sync.uploadPhoto(await shrinkPhoto(picked[i].file), cat === "secret")); } catch { /* 이 사진은 건너뜀 */ }
+        try { paths.push(await sync.uploadPhoto(await shrinkPhoto(picked[i].file), cat === "secret" ? "private" : "")); } catch { /* 이 사진은 건너뜀 */ }
       }
       if (paths.length < picked.length) toast(`사진 ${picked.length - paths.length}장은 올리지 못했어요`, 3500);
     }
@@ -1305,6 +1309,7 @@ function openSettings() {
   $("lastExport").textContent = last ? `마지막으로 내려받은 날: ${last}` : "모든 자녀의 기록을 파일 하나(ZIP)로 저장해요";
   $("acctEmail").textContent = sync.currentEmail() ? `${sync.currentEmail()} 로 로그인했어요${AUTH.offline ? " (지금은 인터넷 없음)" : ""}` : "";
   $("setPrivate").checked = !sync.getPublic();
+  $("setNickTxt").textContent = sync.myNick() ? `${sync.myNick()} · 게시판에 이 이름으로 보여요` : "게시판에서 쓸 이름을 정해 주세요";
   $("settingsDialog").showModal();
 }
 $("setPrivate").addEventListener("change", async (e) => {
@@ -1572,7 +1577,7 @@ $("importFile").addEventListener("change", async (e) => {
 // ---------- 시작 ----------
 renderKids();
 render();
-go(["port", "stats"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "home");
+go(["port", "stats", "board"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "home");
 warmUpDetector();
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
 // 지금 store(내 기록 또는 구경 중인 친구 기록)에서 화면 상태를 다시 읽기
@@ -1590,6 +1595,200 @@ function loadState() {
 
 // 화면에 고정된 아이콘 채우기 (탭, 설정, 책 스캔, 책장 제목)
 document.querySelectorAll("[data-ico]").forEach((el) => { el.innerHTML = ico(el.dataset.ico); });
+
+// ---------- 엄마 별명 ----------
+let nickFirst = false;
+function openNick(first = false) {
+  nickFirst = first;
+  $("nTitle").textContent = first ? "엄마 별명을 정해 주세요" : "엄마 별명 바꾸기";
+  $("nIn").value = sync.myNick(); $("nErr").textContent = "";
+  $("nCancel").hidden = first;
+  $("nickDialog").showModal();
+  setTimeout(() => $("nIn").focus(), 50);
+}
+$("nickDialog").addEventListener("cancel", (e) => { if (nickFirst) e.preventDefault(); });
+$("nIn").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $("nSave").click(); } });
+$("nSave").addEventListener("click", async () => {
+  const v = $("nIn").value.trim();
+  if (!/^[0-9A-Za-z가-힣_]{2,12}$/.test(v)) { $("nErr").textContent = "한글·영어·숫자로 2~12자, 띄어쓰기 없이 적어 주세요"; return; }
+  $("nSave").disabled = true; $("nErr").textContent = "";
+  try {
+    await sync.setNick(v);
+    $("nickDialog").close("saved");
+    toast(`반가워요, ${v}님!`);
+    if (nickFirst && !kids.length) openKids(true);
+    boardLoaded = "";
+    if (!$("postView").open && document.querySelector('.tab[data-tab="board"]:not([hidden])')) renderBoard();
+  } catch (err) {
+    $("nErr").textContent = err.message === "taken" ? "다른 분이 쓰고 있는 별명이에요. 다른 별명을 골라 주세요" : "저장하지 못했어요. 인터넷 연결을 확인해 주세요";
+  }
+  $("nSave").disabled = false;
+});
+$("setNick").addEventListener("click", () => { $("settingsDialog").close("away"); openNick(false); });
+
+// ---------- 게시판 ----------
+const BOARDS = { free: "자유", books: "책 추천", qna: "질문" };
+let board = "free", boardLoaded = "", postNow = null;
+const ago = (iso) => {
+  const d = new Date(iso), now = new Date();
+  if (localDay(d) === localDay(now)) return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  return d.getFullYear() === now.getFullYear() ? `${d.getMonth() + 1}/${d.getDate()}` : `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}`;
+};
+async function renderBoard(force = false) {
+  [...$("boardPick").children].forEach((x) => x.setAttribute("aria-checked", String(x.dataset.b === board)));
+  if (!AUTH.user || AUTH.offline) { $("postList").innerHTML = `<li class="muted">게시판은 인터넷에 연결돼 있을 때 볼 수 있어요.</li>`; return; }
+  if (!force && boardLoaded === board) return;
+  boardLoaded = board;
+  $("postList").innerHTML = `<li class="muted">불러오는 중…</li>`;
+  try {
+    const list = await sync.listPosts(board);
+    if (boardLoaded !== board) return;
+    $("postList").innerHTML = list.length ? list.map((p) => `<li><button type="button" class="post-row${p.pinned ? " pinned" : ""}" data-id="${p.id}">
+        <b>${p.pinned ? `<span class="pin">공지</span>` : ""}${esc(p.title)}</b>
+        <small><span>${esc(p.nick)}</span><span>${ago(p.created_at)}</span>${p.nComments ? `<span>${ico("message")} ${p.nComments}</span>` : ""}${p.nLikes ? `<span>${ico("heart")} ${p.nLikes}</span>` : ""}</small>
+      </button></li>`).join("") : `<li class="muted">아직 글이 없어요. 첫 글을 써 보세요!</li>`;
+  } catch {
+    boardLoaded = "";
+    $("postList").innerHTML = `<li class="muted">불러오지 못했어요. 인터넷 연결을 확인해 주세요.</li>`;
+  }
+}
+$("boardPick").addEventListener("click", (e) => { const b = e.target.closest("[data-b]"); if (b) { board = b.dataset.b; renderBoard(); } });
+$("postList").addEventListener("click", (e) => { const b = e.target.closest("[data-id]"); if (b) openPost(b.dataset.id); });
+
+async function openPost(id) {
+  if (!$("postView").open) $("postView").showModal();
+  $("pTitle").textContent = "불러오는 중…"; $("pMeta").textContent = ""; $("pBody").textContent = ""; $("pPhotos").innerHTML = "";
+  $("pComments").innerHTML = ""; $("pActions").innerHTML = ""; $("pLike").hidden = true; $("pBoard").textContent = "";
+  try {
+    const p = await sync.getPost(id);
+    if (!p) { $("postView").close(); toast("지워진 글이에요"); renderBoard(true); return; }
+    postNow = p;
+    paintPost();
+  } catch { $("pTitle").textContent = "불러오지 못했어요. 인터넷 연결을 확인해 주세요."; }
+}
+function paintPost() {
+  const p = postNow, mine = p.user_id === sync.myId(), adm = sync.amAdmin();
+  $("pBoard").textContent = `${BOARDS[p.board] || ""}${p.pinned ? " · 공지" : ""}`;
+  $("pTitle").textContent = p.title;
+  $("pMeta").textContent = `${p.nick} · ${ago(p.created_at)}${p.updated_at && Date.parse(p.updated_at) - Date.parse(p.created_at) > 60000 ? " · 고침" : ""}`;
+  $("pBody").textContent = p.body;
+  $("pPhotos").innerHTML = p.photos?.length ? `<div class="ph-row big" data-paths="${esc(p.photos.join("|"))}"></div>` : "";
+  fillPhotoRows($("pPhotos"));
+  $("pLike").hidden = false;
+  $("pLike").classList.toggle("on", p.liked);
+  $("pLike").innerHTML = `${ico("heart")} 좋아요 ${p.nLikes || ""}`;
+  $("pActions").innerHTML = [
+    adm ? `<button type="button" data-a="pin">${p.pinned ? "공지 풀기" : "공지로 고정"}</button>` : "",
+    mine ? `<button type="button" data-a="edit">고치기</button>` : "",
+    mine || adm ? `<button type="button" data-a="del">지우기</button>` : "",
+  ].join("");
+  $("pCnt").textContent = p.comments.length || "";
+  $("pComments").innerHTML = p.comments.map((c) => `<li><div><b>${esc(c.nick)}</b><small>${ago(c.created_at)}</small>
+      ${c.user_id === sync.myId() || adm ? `<button type="button" class="x" data-c="${c.id}" aria-label="댓글 지우기">✕</button>` : ""}</div><p>${esc(c.body)}</p></li>`).join("")
+    || `<li class="muted">첫 댓글을 남겨 보세요</li>`;
+}
+$("pClose").addEventListener("click", () => $("postView").close());
+$("postView").addEventListener("close", () => { if (!boardLoaded) renderBoard(); }); // 댓글·좋아요 수 새로 고침
+$("pLike").addEventListener("click", async () => {
+  const p = postNow; if (!p) return;
+  const on = !p.liked;
+  p.liked = on; p.nLikes = Math.max(0, (p.nLikes || 0) + (on ? 1 : -1)); paintPost();
+  try { await sync.toggleLike(p.id, on); boardLoaded = ""; }
+  catch { p.liked = !on; p.nLikes += on ? -1 : 1; paintPost(); toast("인터넷 연결을 확인해 주세요"); }
+});
+$("pActions").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-a]"); const p = postNow; if (!b || !p) return;
+  if (b.dataset.a === "edit") { $("postView").close(); openWrite(p); return; }
+  if (b.dataset.a === "del") {
+    if (!confirm("이 글을 지울까요? 댓글도 함께 지워져요. 되돌릴 수 없어요.")) return;
+    try { await sync.deletePost(p); $("postView").close(); toast("글을 지웠어요"); renderBoard(true); }
+    catch { toast("지우지 못했어요. 인터넷 연결을 확인해 주세요"); }
+    return;
+  }
+  if (b.dataset.a === "pin") {
+    try { await sync.setPinned(p.id, !p.pinned); p.pinned = !p.pinned; paintPost(); boardLoaded = ""; toast(p.pinned ? "공지로 고정했어요" : "공지를 풀었어요"); }
+    catch { toast("바꾸지 못했어요"); }
+  }
+});
+$("pComments").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-c]"); if (!b || !postNow) return;
+  if (!confirm("이 댓글을 지울까요?")) return;
+  try { await sync.deleteComment(b.dataset.c); boardLoaded = ""; openPost(postNow.id); }
+  catch { toast("지우지 못했어요"); }
+});
+$("pCSend").addEventListener("click", async () => {
+  const v = $("pCIn").value.trim(); if (!v || !postNow) return;
+  if (!sync.myNick()) { openNick(false); return; }
+  $("pCSend").disabled = true;
+  try { await sync.addComment(postNow.id, v); $("pCIn").value = ""; boardLoaded = ""; await openPost(postNow.id); }
+  catch { toast("댓글을 올리지 못했어요. 인터넷 연결을 확인해 주세요"); }
+  $("pCSend").disabled = false;
+});
+
+// 글쓰기 · 고치기
+let writing = null, wPhotos = []; // wPhotos: [{ path, url }] 또는 [{ file, url }]
+function paintWPhotos() {
+  $("pePhotoCount").textContent = `${wPhotos.length}/${MAX_PHOTOS}`;
+  $("pePhotos").innerHTML = wPhotos.map((p, i) => `<span class="ph"><img src="${esc(p.url)}" alt=""><button type="button" data-rm="${i}" aria-label="사진 빼기">✕</button></span>`).join("");
+  $("pePhotoAdd").hidden = wPhotos.length >= MAX_PHOTOS;
+}
+function openWrite(p = null) {
+  if (!AUTH.user || AUTH.offline) { toast("게시판은 인터넷에 연결돼 있을 때 쓸 수 있어요"); return; }
+  if (!sync.myNick()) { openNick(false); return; }
+  writing = p;
+  wPhotos.forEach((x) => x.file && URL.revokeObjectURL(x.url));
+  wPhotos = (p?.photos || []).map((path) => ({ path, url: "" }));
+  if (p?.photos?.length) sync.photoUrls(p.photos).then((urls) => { const m = new Map(p.photos.map((pa, i) => [pa, urls[i]])); wPhotos.forEach((x) => { if (x.path) x.url = m.get(x.path) || ""; }); paintWPhotos(); });
+  const bd = p?.board || board;
+  [...$("peBoard").children].forEach((x) => x.setAttribute("aria-checked", String(x.dataset.b === bd)));
+  $("peTitle").value = p?.title || ""; $("peBody").value = p?.body || "";
+  $("peSave").textContent = p ? "고치기" : "올리기";
+  paintWPhotos();
+  $("postEdit").showModal();
+}
+$("bWrite").addEventListener("click", () => openWrite());
+$("peBoard").addEventListener("click", (e) => { const b = e.target.closest("[data-b]"); if (b) [...$("peBoard").children].forEach((x) => x.setAttribute("aria-checked", String(x === b))); });
+$("peClose").addEventListener("click", () => {
+  if (($("peTitle").value.trim() || $("peBody").value.trim()) && !writing && !confirm("쓰던 글을 버릴까요?")) return;
+  $("postEdit").close();
+});
+$("pePhotoAdd").addEventListener("click", () => $("pePhotoFile").click());
+$("pePhotoFile").addEventListener("change", () => {
+  const files = [...$("pePhotoFile").files].filter((f) => f.type.startsWith("image/") || /\.(heic|heif)$/i.test(f.name));
+  const room = MAX_PHOTOS - wPhotos.length;
+  if (files.length > room) toast(`사진은 ${MAX_PHOTOS}장까지 넣을 수 있어요`);
+  for (const f of files.slice(0, room)) wPhotos.push({ file: f, url: URL.createObjectURL(f) });
+  $("pePhotoFile").value = "";
+  paintWPhotos();
+});
+$("pePhotos").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-rm]"); if (!b) return;
+  const [x] = wPhotos.splice(Number(b.dataset.rm), 1); if (x.file) URL.revokeObjectURL(x.url); paintWPhotos();
+});
+$("peSave").addEventListener("click", async () => {
+  const title = $("peTitle").value.trim(), body = $("peBody").value.trim();
+  const bd = [...$("peBoard").children].find((x) => x.getAttribute("aria-checked") === "true")?.dataset.b || "free";
+  if (!title) { toast("제목을 적어 주세요"); $("peTitle").focus(); return; }
+  $("peSave").disabled = true;
+  try {
+    const kept = wPhotos.filter((x) => x.path).map((x) => x.path);
+    const fresh = wPhotos.filter((x) => x.file);
+    const paths = [...kept];
+    for (let i = 0; i < fresh.length; i++) {
+      toast(`사진 올리는 중 ${i + 1}/${fresh.length}`, 60000);
+      try { paths.push(await sync.uploadPhoto(await shrinkPhoto(fresh[i].file), "board")); } catch { /* 건너뜀 */ }
+    }
+    const removed = (writing?.photos || []).filter((x) => !kept.includes(x));
+    const id = await sync.savePost({ id: writing?.id, board: bd, title, body, photos: paths });
+    if (removed.length) sync.deletePhotos(removed);
+    fresh.forEach((x) => URL.revokeObjectURL(x.url)); wPhotos = [];
+    $("postEdit").close();
+    toast(writing ? "글을 고쳤어요" : "글을 올렸어요");
+    board = bd; boardLoaded = ""; renderBoard(true);
+    openPost(id);
+  } catch { toast("올리지 못했어요. 인터넷 연결을 확인해 주세요", 3500); }
+  $("peSave").disabled = false;
+});
 
 // ---------- 첫 화면 · 로그인 ----------
 const welcome = $("welcome");
@@ -1641,6 +1840,7 @@ if (PEEK) {
   if (PEEK_ID) { history.replaceState(null, "", location.pathname); toast("지금은 볼 수 없는 책장이에요 (나만 보기로 바뀌었을 수 있어요)", 3500); }
   if (!AUTH.user) showAuth("login", AUTH.error ? "인터넷에 연결한 뒤 다시 열어 주세요." : "");
   else if (sync.RECOVERY) showAuth("newpw");
+  else if (PROFILE === null) setTimeout(() => { hideWelcome(); openNick(true); }, 900);
   else if (!kids.length) setTimeout(() => { hideWelcome(); openKids(true); }, 900);
   else { welcome.addEventListener("click", hideWelcome); setTimeout(hideWelcome, 1300); }
 }

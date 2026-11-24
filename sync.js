@@ -245,11 +245,12 @@ export async function shareBook(b) {
 const BUCKET = "photos";
 const urlCache = new Map();
 export const canUpload = () => !!user;
-// secret=true 면 private 폴더에 저장 → 공개 회원이어도 다른 사람은 못 봄
-export async function uploadPhoto(blob, secret = false) {
+// folder: "private"(비밀 메모, 나만) · "board"(게시판, 회원 모두) · ""(일기, 공개 규칙 따름)
+export async function uploadPhoto(blob, folder = "") {
   if (!user) throw new Error("login");
   const c = await client();
-  const path = `${user.id}/${secret ? "private/" : ""}${crypto.randomUUID()}.jpg`;
+  if (folder === true) folder = "private";
+  const path = `${user.id}/${folder ? `${folder}/` : ""}${crypto.randomUUID()}.jpg`;
   const { error } = await c.storage.from(BUCKET).upload(path, blob, { contentType: "image/jpeg", upsert: false });
   if (error) throw error;
   return path;
@@ -270,4 +271,86 @@ export async function deletePhotos(paths) {
   const mine = (paths || []).filter((p) => user && p.startsWith(`${user.id}/`));
   if (!mine.length) return;
   try { const c = await client(); await c.storage.from(BUCKET).remove(mine); } catch { /* 다음에 */ }
+}
+
+// ---------- 엄마 별명 · 게시판 ----------
+let profile = null, admin = false;
+export const myNick = () => profile?.nick || "";
+export const amAdmin = () => admin;
+export const myId = () => user?.id || "";
+// 별명이 없으면 null, 인터넷 문제로 모르면 예외
+export async function loadProfile() {
+  if (!user) return null;
+  const c = await client();
+  const [{ data: p, error }, { data: a }] = await Promise.all([
+    c.from("profiles").select("nick").eq("user_id", user.id).maybeSingle(),
+    c.from("admins").select("user_id").eq("user_id", user.id).maybeSingle(),
+  ]);
+  if (error) throw error;
+  profile = p || null; admin = !!a;
+  return profile;
+}
+export async function setNick(nick) {
+  const c = await client();
+  const { error } = await c.from("profiles").upsert({ user_id: user.id, nick }, { onConflict: "user_id" });
+  if (error) throw new Error(error.code === "23505" ? "taken" : error.message);
+  profile = { nick };
+}
+const cnt = (x) => (Array.isArray(x) ? x[0]?.count || 0 : 0);
+export async function listPosts(board) {
+  const c = await client();
+  const { data, error } = await c.from("posts")
+    .select("id, board, title, pinned, created_at, user_id, profiles(nick), comments(count), likes(count)")
+    .eq("board", board).order("pinned", { ascending: false }).order("created_at", { ascending: false }).limit(60);
+  if (error) throw error;
+  return (data || []).map((p) => ({ ...p, nick: p.profiles?.nick || "(알 수 없음)", nComments: cnt(p.comments), nLikes: cnt(p.likes) }));
+}
+export async function getPost(id) {
+  const c = await client();
+  const [{ data: post, error }, { data: comments }, { data: mine }] = await Promise.all([
+    c.from("posts").select("id, board, title, body, photos, pinned, created_at, updated_at, user_id, profiles(nick), likes(count)").eq("id", id).maybeSingle(),
+    c.from("comments").select("id, body, created_at, user_id, profiles(nick)").eq("post_id", id).order("created_at"),
+    c.from("likes").select("post_id").eq("post_id", id).eq("user_id", user.id).maybeSingle(),
+  ]);
+  if (error) throw error;
+  if (!post) return null;
+  return { ...post, nick: post.profiles?.nick || "(알 수 없음)", nLikes: cnt(post.likes), liked: !!mine,
+    comments: (comments || []).map((x) => ({ ...x, nick: x.profiles?.nick || "(알 수 없음)" })) };
+}
+export async function savePost({ id, board, title, body, photos }) {
+  const c = await client();
+  if (id) {
+    const { error } = await c.from("posts").update({ board, title, body, photos }).eq("id", id);
+    if (error) throw error;
+    return id;
+  }
+  const { data, error } = await c.from("posts").insert({ board, title, body, photos }).select("id").single();
+  if (error) throw error;
+  return data.id;
+}
+export async function deletePost(post) {
+  const c = await client();
+  const { error } = await c.from("posts").delete().eq("id", post.id);
+  if (error) throw error;
+  if (post.photos?.length) { try { await c.storage.from(BUCKET).remove(post.photos); } catch { /* 무시 */ } }
+}
+export async function setPinned(id, pinned) {
+  const c = await client();
+  const { error } = await c.from("posts").update({ pinned }).eq("id", id);
+  if (error) throw error;
+}
+export async function toggleLike(id, on) {
+  const c = await client();
+  const { error } = on ? await c.from("likes").insert({ post_id: id }) : await c.from("likes").delete().eq("post_id", id).eq("user_id", user.id);
+  if (error && error.code !== "23505") throw error;
+}
+export async function addComment(postId, body) {
+  const c = await client();
+  const { error } = await c.from("comments").insert({ post_id: postId, body });
+  if (error) throw error;
+}
+export async function deleteComment(id) {
+  const c = await client();
+  const { error } = await c.from("comments").delete().eq("id", id);
+  if (error) throw error;
 }
