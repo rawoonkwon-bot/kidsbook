@@ -779,22 +779,27 @@ function fillDay(day) {
         <div class="grow"><b>${esc(r.title)}</b><small>${progressText(r) || "아직 쪽수 기록 없음"}</small></div><span>➕</span></div>`).join("")
       : `<small>읽고 있는 ${c.name} 책이 없어요. 책 스캔으로 새 책을 기록해 보세요.</small>`;
   } else {
+    // 카테고리마다 한 블록: 앞에 카테고리 이름, 안에 그날 기록들
     for (const c of CATS) {
+      let rows = "", n = 0;
       if (c.book || c.hybrid) {
         for (const { r, s } of booksOn(day, c.key)) {
-          html += `<div class="day-item link" data-view="${r.id}">
+          n++;
+          rows += `<div class="day-item link" data-view="${r.id}">
             ${r.cover ? `<img src="${esc(r.cover)}" alt="">` : `<span>${c.svg}</span>`}
             <div class="grow"><b>${esc(r.title)}</b><small>${sessionText(s)}</small></div></div>`;
         }
       }
       if (!c.book) {
         for (const j of journalOn(day, c.key)) {
+          n++;
           const sub = [j.minutes ? fmtMin(j.minutes) : "", j.text || ""].filter(Boolean).join(" · ");
-          html += `<div class="day-item"><span>${c.svg}</span>
+          rows += `<div class="day-item"><span>${c.svg}</span>
             <div class="grow"><b>${esc(j.what || c.name)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}${j.photos?.length ? `<div class="ph-row" data-paths="${esc(j.photos.join("|"))}"></div>` : ""}</div>
             <button type="button" class="x" data-del="${j.id}" aria-label="지우기">✕</button></div>`;
         }
       }
+      if (n) html += `<section class="day-group"><h4 class="dg-head" style="color:${c.color}">${c.svg}<b>${esc(c.name)}</b><small>${n}</small></h4>${rows}</section>`;
     }
     if (!html) html = `<small style="text-align:center">아직 이 날의 기록이 없어요. 위 카테고리를 눌러 기록해 보세요.</small>`;
   }

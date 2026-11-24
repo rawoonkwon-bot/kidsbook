@@ -111,7 +111,7 @@ export class Scanner {
     try { await this.track.applyConstraints({ advanced: [{ torch: on }] }); return true; } catch { return false; }
   }
 
-  // 스캔 화면을 닫을 때: 카메라는 잠시 꺼 두기만 하고(허락 유지), 10분 동안 안 쓰면 완전히 끔
+  // 스캔 화면을 닫을 때: 카메라는 잠시 꺼 두기만 하고(허락 유지), 1분 동안 안 쓰면 완전히 끔
   stop() {
     this.running = false;
     if (this.track) {
@@ -121,7 +121,7 @@ export class Scanner {
     this.video.pause();
     this.video.srcObject = null;
     clearTimeout(this.idleTimer);
-    this.idleTimer = setTimeout(() => this.release(), 10 * 60 * 1000);
+    this.idleTimer = setTimeout(() => this.release(), 60 * 1000);
   }
 
   release() {

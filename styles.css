@@ -592,3 +592,13 @@ body.peek #dayCats, body.peek .day-sub, body.peek .day-actions, body.peek .day-i
 .browse .kid.loading { opacity: .55; }
 .day-actions { flex-wrap: wrap; }
 .day-actions .btn { min-width: 30%; }
+
+/* 포트폴리오 날짜: 카테고리별 블록 */
+.day-group { background: var(--card); border-radius: 14px; padding: 8px 8px 4px; box-shadow: var(--raise-s); }
+.dg-head { display: flex; align-items: center; gap: 6px; margin: 2px 4px 6px; font-size: 14px; }
+.dg-head .ico { width: 18px; height: 18px; }
+.dg-head b { color: var(--ink, #1E2420); }
+.dg-head small { margin-left: auto; font-size: 12px; font-weight: 700; color: #F3EFE6; background: var(--forest); border-radius: 999px; padding: 1px 8px; }
+.day-group .day-item { background: transparent; border-radius: 10px; padding: 6px 4px; border-top: 1px solid rgba(47, 93, 58, .1); }
+.day-group .day-item > span .ico { width: 20px; height: 20px; }
+.day-list { gap: 10px; }
