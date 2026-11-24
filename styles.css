@@ -8,6 +8,7 @@
   --lime-ink: #2C3A00;
   --ko: #E8834E;      /* 한글책 */
   --en: #3E7CB1;      /* 영어책 */
+  --fo: #8E4EC6;      /* 집중듣기 */
   --cal: #C9E2F6;     /* 캘린더 기록한 날 */
   --radius: 18px;
   --shadow: 0 6px 22px rgba(20, 22, 40, .10);
@@ -83,6 +84,7 @@ button.ring-card { cursor: pointer; }
 .shelf-title { margin: 0; font-size: 15px; padding: 5px 12px; border-radius: 999px; display: inline-block; }
 .shelf-title.ko { background: #FFEBDD; color: #B95A26; }
 .shelf-title.en { background: #E1EEF8; color: #2C5F8A; }
+.shelf-title.fo { background: #F1E8FA; color: #6B3FA0; }
 .shelf-title span { font-size: 13px; font-weight: 600; opacity: .8; }
 .shelf {
   list-style: none; padding: 0; margin: 10px 0 0;
@@ -218,6 +220,9 @@ textarea { resize: vertical; line-height: 1.6; }
 .pages-pair input:disabled { opacity: .7; }
 .check { display: flex; align-items: center; gap: 12px; font-size: 19px; font-weight: 800; color: var(--ink); cursor: pointer; margin-top: 6px; }
 .check input { width: 26px; height: 26px; accent-color: #1E8CF0; }
+.min-row { display: flex; align-items: center; gap: 10px; }
+.min-row input { width: 90px; font: inherit; font-size: 20px; text-align: center; border: 1px solid #DADCE3; padding: 12px 8px; background: var(--soft); color: var(--ink); }
+.min-row span { font-size: 18px; color: var(--ink); font-weight: 700; }
 
 /* 3) 마무리 고르기 */
 .grab { width: 60px; height: 5px; border-radius: 9px; background: #D6D8DE; margin: 0 auto 6px; }
@@ -342,7 +347,7 @@ textarea { resize: vertical; line-height: 1.6; }
 .tile b em { font-style: normal; font-size: 14px; color: var(--muted); margin-left: 2px; }
 .split-bar { display: flex; gap: 2px; height: 26px; border-radius: 8px; overflow: hidden; background: var(--soft); }
 .split-bar i { display: block; height: 100%; }
-.split-legend { display: flex; justify-content: space-between; gap: 10px; margin-top: 10px; font-size: 14px; }
+.split-legend { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 10px; margin-top: 10px; font-size: 14px; }
 .split-legend span { display: flex; align-items: center; gap: 6px; }
 .split-legend i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
 .split-legend em { font-style: normal; color: var(--muted); }

@@ -50,6 +50,11 @@
         <ul class="shelf" id="shelfEn"></ul>
         <p class="empty" id="emptyEn">아직 영어책 기록이 없어요.</p>
       </section>
+      <section class="shelf-sec">
+        <h4 class="shelf-title fo">🎧 집중듣기 <span id="countFo"></span></h4>
+        <ul class="shelf" id="shelfFo"></ul>
+        <p class="empty" id="emptyFo">아직 집중듣기 기록이 없어요.</p>
+      </section>
     </section>
 
     <!-- ===== 포트폴리오 ===== -->
@@ -72,7 +77,7 @@
       <h2 class="page-title">독서 통계</h2>
       <div class="tiles" id="statTiles"></div>
 
-      <h3 class="sec-title big">한글책 · 영어책</h3>
+      <h3 class="sec-title big">한글책 · 영어책 · 집중듣기</h3>
       <div class="split" id="statSplit"></div>
 
       <h3 class="sec-title big">다양성 🌈 <small>분야별 읽은 책</small></h3>
@@ -80,6 +85,7 @@
         <button type="button" role="radio" data-f="all" aria-checked="true">전체</button>
         <button type="button" role="radio" data-f="ko">한글책</button>
         <button type="button" role="radio" data-f="en">영어책</button>
+        <button type="button" role="radio" data-f="focus">집중듣기</button>
       </div>
       <div class="hbars" id="statCats"></div>
 
@@ -172,6 +178,7 @@
         <div class="seg" id="shelfPick" role="radiogroup" aria-label="책장">
           <button type="button" role="radio" data-shelf="ko">🇰🇷 한글책</button>
           <button type="button" role="radio" data-shelf="en">🔤 영어책</button>
+          <button type="button" role="radio" data-shelf="focus">🎧 집중듣기</button>
         </div>
       </div>
 
@@ -197,6 +204,10 @@
           <input id="rTotal" type="number" inputmode="numeric" min="1" placeholder="전체" aria-label="전체 페이지" />
         </div>
         <label class="check"><input type="checkbox" id="rDone" /><span>이미 다 읽은 책이에요</span></label>
+      </div>
+      <div class="field" id="focusRow" hidden>
+        <span>🎧 집중듣기 시간</span>
+        <div class="min-row"><input id="rHour" type="number" inputmode="numeric" min="0" placeholder="0" aria-label="시간" /><span>시간</span><input id="rMin" type="number" inputmode="numeric" min="0" max="59" placeholder="0" aria-label="분" /><span>분</span></div>
       </div>
       <p class="timing" id="rTiming"></p>
     </form>
@@ -324,7 +335,7 @@
       </label>
       <label class="field" id="eAmountWrap">
         <span id="eAmountLabel"></span>
-        <div class="pages-row"><input id="eAmount" type="number" inputmode="numeric" min="0" /><span id="eUnit"></span></div>
+        <div class="pages-row"><input id="eHour" type="number" inputmode="numeric" min="0" placeholder="0" aria-label="시간" /><span>시간</span><input id="eAmount" type="number" inputmode="numeric" min="0" max="59" placeholder="0" aria-label="분" /><span id="eUnit"></span></div>
       </label>
       <label class="field" id="eTextWrap">
         <span id="eTextLabel"></span>

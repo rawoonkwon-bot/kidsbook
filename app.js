@@ -7,6 +7,9 @@ const REC_KEY = "kbc:records:v1";
 const BONUS = 50; // 독후활동 보너스 포인트
 const STAMPS_PER_BOARD = 8;
 const BOOK_CATS = ["문학", "자연과학", "사회과학", "역사", "예술", "언어", "기술과학", "철학", "종교", "총류", "기타"];
+const SHELVES = { ko: "🇰🇷 한글책", en: "🔤 영어책", focus: "🎧 집중듣기" };
+const shelfName = (k) => SHELVES[k].split(" ")[1];
+const fmtMin = (m) => (m >= 60 ? `${Math.floor(m / 60)}시간${m % 60 ? ` ${m % 60}분` : ""}` : `${m}분`);
 
 // ---------- 날짜 (한국 시간 기준 YYYY-MM-DD) ----------
 const localDay = (d = new Date()) => {
@@ -45,10 +48,11 @@ saveRecords();
 // ---------- 계산 ----------
 const sessionPages = (s) => (s.from && s.to ? Math.max(0, s.to - s.from + 1) : s.to || 0);
 const pagesOf = (r) => r.sessions.reduce((a, s) => a + sessionPages(s), 0);
+const minsOf = (r) => r.sessions.reduce((a, s) => a + (s.minutes || 0), 0);
 const pointsOf = (r) => pagesOf(r) + (r.bonus ? BONUS : 0);
 const totalPoints = () => records.reduce((a, r) => a + pointsOf(r), 0);
 const pct = (r) => (r.totalPages ? Math.min(100, Math.round((readTo(r) / r.totalPages) * 100)) : 0);
-const sessionText = (s) => (s.from && s.to ? `${s.from}~${s.to}쪽` : s.to ? `~${s.to}쪽` : "쪽수 없음");
+const sessionText = (s) => (s.from && s.to ? `${s.from}~${s.to}쪽` : s.to ? `~${s.to}쪽` : "쪽수 없음") + (s.minutes ? ` · ${fmtMin(s.minutes)}` : "");
 const firstDay = (r) => r.sessions.map((s) => s.day).sort()[0];
 const lastDay = (r) => r.sessions.map((s) => s.day).sort().at(-1);
 function progressText(r) {
@@ -144,7 +148,7 @@ function render() {
       ${r.cover ? `<div class="bgimg" style="background-image:url('${esc(r.cover)}')"></div>` : ""}
       <div>
         <b>${esc(r.title)}</b>
-        <p>#${shelfOf(r) === "ko" ? "한글책" : "영어책"}${r.category ? ` #${esc(r.category)}` : ""}</p>
+        <p>#${shelfName(shelfOf(r))}${r.category ? ` #${esc(r.category)}` : ""}</p>
         <p>${dayDiff(firstDay(r), localDay()) + 1}일 째 읽는 중</p>
         <p>${r.totalPages ? `진도율 : ${pct(r)}% (${readTo(r)} / ${r.totalPages})` : `${readTo(r)}쪽까지 읽었어요`}</p>
         ${r.totalPages ? `<div class="bar"><i style="width:${pct(r)}%"></i></div>` : ""}
@@ -160,7 +164,7 @@ function render() {
     months.map((m) => `<option value="${m}">${m.replace("-", "년 ")}월 (${records.filter((r) => inMonth(r, m)).length})</option>`).join("");
   filter.value = months.includes(cur) ? cur : "all";
   const list = filter.value === "all" ? records : records.filter((r) => inMonth(r, filter.value));
-  for (const [key, suffix] of [["ko", "Ko"], ["en", "En"]]) {
+  for (const [key, suffix] of [["ko", "Ko"], ["en", "En"], ["focus", "Fo"]]) {
     const items = list.filter((r) => shelfOf(r) === key);
     $("shelf" + suffix).innerHTML = items.map(cardHtml).join("");
     $("count" + suffix).textContent = `${items.length}권`;
@@ -237,7 +241,11 @@ $("scanSheet").addEventListener("close", () => {
 let rec = null; // { existing, isbn, book, self }
 let rDay = localDay();
 let chosenShelf = "ko";
-const paintShelf = () => [...$("shelfPick").children].forEach((x) => x.setAttribute("aria-checked", String(x.dataset.shelf === chosenShelf)));
+const paintShelf = () => {
+  [...$("shelfPick").children].forEach((x) => x.setAttribute("aria-checked", String(x.dataset.shelf === chosenShelf)));
+  $("focusRow").hidden = chosenShelf !== "focus";
+};
+let preferShelf = null; // 포트폴리오 날짜 시트에서 스캔하면 그 책장을 먼저 골라 둠
 $("shelfPick").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) { chosenShelf = b.dataset.shelf; paintShelf(); } });
 
 function paintDate() {
@@ -256,6 +264,7 @@ $("dateChips").addEventListener("click", (e) => {
 $("rDate").addEventListener("click", () => { try { $("rDate").showPicker(); } catch { /* 지원 안 하는 브라우저는 기본 동작 */ } });
 $("rDate").addEventListener("change", () => {
   const v = $("rDate").value;
+  if (v > localDay()) toast("오늘 이후 날짜는 고를 수 없어요");
   if (v) rDay = v > localDay() ? localDay() : v;
   paintDate();
 });
@@ -288,7 +297,7 @@ function openRecord({ existing = null, isbn = null, book = null, self = false })
   $("rDesc").textContent = desc; $("rDesc").classList.remove("open");
   $("rDescHead").hidden = !desc;
 
-  chosenShelf = existing ? shelfOf(existing) : (title ? (hasHangul(title) ? "ko" : "en") : (rec.isbn?.startsWith("97911") || rec.isbn?.startsWith("97889") ? "ko" : "en"));
+  chosenShelf = existing ? shelfOf(existing) : preferShelf || (title ? (hasHangul(title) ? "ko" : "en") : (rec.isbn?.startsWith("97911") || rec.isbn?.startsWith("97889") ? "ko" : "en"));
   paintShelf();
   rDay = returnDay || localDay(); paintDate();
 
@@ -296,7 +305,7 @@ function openRecord({ existing = null, isbn = null, book = null, self = false })
   $("soFar").hidden = !prev;
   $("soFar").textContent = prev ? `지난번까지 ${prev}쪽 읽었어요 → 오늘은 ${prev + 1}쪽부터` : "";
   $("rTotal").value = total || "";
-  $("rTo").value = "";
+  $("rTo").value = ""; $("rMin").value = ""; $("rHour").value = "";
   $("rTo").placeholder = prev ? `${prev + 1}쪽부터 몇 쪽까지?` : "몇 쪽까지";
   // 새 책이고 전체 쪽수를 알면 '다 읽은 책'을 기본으로 (한 번에 다 읽는 그림책이 많아서)
   $("rDone").checked = !existing && !!total;
@@ -323,7 +332,11 @@ function saveRecord() {
   if (total && to > total) { toast(`전체 쪽수(${total}쪽)보다 클 수 없어요`); return; }
   if (to <= prev) { toast(`지난번(${prev}쪽)보다 뒤의 쪽을 적어 주세요`); return; }
 
-  const session = { from: prev + 1, to, day: rDay };
+  const minutes = chosenShelf === "focus" ? ((parseInt($("rHour").value, 10) || 0) * 60 + (parseInt($("rMin").value, 10) || 0)) || null : null;
+  if (chosenShelf === "focus" && !minutes) { toast("집중듣기 시간을 적어 주세요"); $("rMin").focus(); return; }
+  if (rDay > localDay()) { rDay = localDay(); paintDate(); toast("오늘 이후 날짜는 고를 수 없어요"); return; }
+
+  const session = { from: prev + 1, to, day: rDay, ...(minutes ? { minutes } : {}) };
   let r;
   if (r0) {
     r = r0;
@@ -364,7 +377,7 @@ function saveRecord() {
 }
 $("rSave").type = "button";
 $("rSave").addEventListener("click", saveRecord);
-["rTo", "rTotal"].forEach((id) => $(id).addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); saveRecord(); } }));
+["rTo", "rTotal", "rHour", "rMin"].forEach((id) => $(id).addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); saveRecord(); } }));
 $("recordPage").addEventListener("close", () => { rec = null; });
 
 // ---------- 3) 다 읽었을 때 마무리 ----------
@@ -452,7 +465,7 @@ function fillView(r) {
   setImg($("vCover"), r.cover);
   $("vTitle").textContent = r.title;
   $("vAuthor").textContent = r.authors || "";
-  $("vMeta").textContent = [shelfOf(r) === "ko" ? "🇰🇷 한글책" : "🔤 영어책", r.totalPages && `${r.totalPages}쪽`, `${pointsOf(r)}점`].filter(Boolean).join(" · ");
+  $("vMeta").textContent = [SHELVES[shelfOf(r)], r.totalPages && `${r.totalPages}쪽`, minsOf(r) && `🎧 ${fmtMin(minsOf(r))}`, `${pointsOf(r)}점`].filter(Boolean).join(" · ");
   $("vProgress").innerHTML = progressText(r)
     ? `<b>${esc(progressText(r))}</b>${r.totalPages ? `<div class="bar"><i style="width:${pct(r)}%"></i></div>` : ""}` : "";
   $("vSessions").innerHTML = [...r.sessions].sort((a, b) => a.day.localeCompare(b.day))
@@ -493,7 +506,7 @@ const CATS = [
   { key: "ko", icon: "📕", name: "한글책", book: true },
   { key: "en", icon: "📘", name: "영어책", book: true },
   { key: "listen", icon: "🎧", name: "흘려듣기", what: "무엇을 들었나요?", whatPh: "예: Peppa Pig 3화", amount: "몇 분 들었나요?", unit: "분" },
-  { key: "focus", icon: "👂", name: "집중듣기", what: "무엇을 들었나요?", whatPh: "예: Magic Tree House 1권", amount: "몇 분 들었나요?", unit: "분" },
+  { key: "focus", icon: "👂", name: "집중듣기", hybrid: true, what: "무엇을 들었나요?", whatPh: "예: Magic Tree House 1권", amount: "몇 분 들었나요?", unit: "분" },
   { key: "math", icon: "➗", name: "수학", what: "무엇을 했나요?", whatPh: "예: 연산 문제집 12~15쪽", amount: "몇 분 했나요?", unit: "분" },
   { key: "etc", icon: "⭐", name: "기타", what: "무엇을 했나요?", whatPh: "예: 피아노 연습", amount: "몇 분 했나요?", unit: "분" },
   { key: "memo", icon: "📝", name: "메모", text: "메모", textPh: "오늘 있었던 일, 칭찬할 점 등" },
@@ -505,7 +518,10 @@ let journal = loadJournal();
 
 const booksOn = (day, shelf) => records.flatMap((r) =>
   r.sessions.filter((s) => s.day === day && shelfOf(r) === shelf).map((s) => ({ r, s })));
-const catsOn = (day) => CATS.filter((c) => (c.book ? booksOn(day, c.key).length : journal.some((j) => j.day === day && j.cat === c.key)));
+// 집중듣기(hybrid)는 스캔한 책 기록 + 직접 적은 기록을 모두 보여 줌
+const journalOn = (day, cat) => journal.filter((j) => j.day === day && j.cat === cat);
+const countOn = (day, c) => (c.book || c.hybrid ? booksOn(day, c.key).length : 0) + (c.book ? 0 : journalOn(day, c.key).length);
+const catsOn = (day) => CATS.filter((c) => countOn(day, c));
 
 let calYM = localDay().slice(0, 7);
 function renderCalendar() {
@@ -546,7 +562,7 @@ function fillDay(day) {
   const [, m, d] = day.split("-").map(Number);
   $("dayTitle").innerHTML = `${m}월 ${d}일에<br>무엇을 기록할까요?`;
   $("dayCats").innerHTML = CATS.map((c) => {
-    const n = c.book ? booksOn(day, c.key).length : journal.filter((j) => j.day === day && j.cat === c.key).length;
+    const n = countOn(day, c);
     return `<button type="button" data-cat="${c.key}" class="${dayPanel === c.key ? "on" : ""}"><span class="ic">${c.icon}</span>${c.name}${n ? `<span class="cnt">${n}</span>` : ""}</button>`;
   }).join("");
 
@@ -557,23 +573,25 @@ function fillDay(day) {
     html += `<div class="day-actions">
         <button type="button" class="btn lime" data-act="scan">📷 책 스캔</button>
         <button type="button" class="btn ghost" data-act="isbn" style="background:var(--soft)">ISBN 입력</button>
+        ${c.hybrid ? `<button type="button" class="btn ghost" data-act="entry" style="background:var(--soft)">✏️ 직접 적기</button>` : ""}
       </div>`;
     html += ongoing.length ? `<small>읽고 있는 ${c.name} (누르면 이 날 읽은 쪽수를 기록해요)</small>` +
       ongoing.map((r) => `<div class="day-item link" data-more="${r.id}">
         ${r.cover ? `<img src="${esc(r.cover)}" alt="">` : `<span>${c.icon}</span>`}
         <div class="grow"><b>${esc(r.title)}</b><small>${progressText(r) || "아직 쪽수 기록 없음"}</small></div><span>➕</span></div>`).join("")
-      : `<small>읽고 있는 ${c.name}이 없어요. 책 스캔으로 새 책을 기록해 보세요.</small>`;
+      : `<small>읽고 있는 ${c.name} 책이 없어요. 책 스캔으로 새 책을 기록해 보세요.</small>`;
   } else {
     for (const c of CATS) {
-      if (c.book) {
+      if (c.book || c.hybrid) {
         for (const { r, s } of booksOn(day, c.key)) {
           html += `<div class="day-item link" data-view="${r.id}">
             ${r.cover ? `<img src="${esc(r.cover)}" alt="">` : `<span>${c.icon}</span>`}
             <div class="grow"><b>${c.icon} ${esc(r.title)}</b><small>${sessionText(s)}</small></div></div>`;
         }
-      } else {
-        for (const j of journal.filter((x) => x.day === day && x.cat === c.key)) {
-          const sub = [j.minutes ? `${j.minutes}${c.unit}` : "", j.text || ""].filter(Boolean).join(" · ");
+      }
+      if (!c.book) {
+        for (const j of journalOn(day, c.key)) {
+          const sub = [j.minutes ? fmtMin(j.minutes) : "", j.text || ""].filter(Boolean).join(" · ");
           html += `<div class="day-item"><span>${c.icon}</span>
             <div class="grow"><b>${esc(j.what || c.name)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}</div>
             <button type="button" class="x" data-del="${j.id}" aria-label="지우기">✕</button></div>`;
@@ -587,7 +605,7 @@ function fillDay(day) {
 $("dayCats").addEventListener("click", (e) => {
   const b = e.target.closest("button[data-cat]"); if (!b) return;
   const c = CAT[b.dataset.cat];
-  if (c.book) { dayPanel = dayPanel === c.key ? null : c.key; fillDay(openDayKey); return; }
+  if (c.book || c.hybrid) { dayPanel = dayPanel === c.key ? null : c.key; fillDay(openDayKey); return; }
   openEntry(c.key);
 });
 $("dayList").addEventListener("click", (e) => {
@@ -599,8 +617,10 @@ $("dayList").addEventListener("click", (e) => {
   }
   // 다른 창을 열기 전에 날짜 시트를 잠시 닫고, 끝나면 다시 돌아옴
   $("dayDialog").close("away"); returnDay = day;
+  preferShelf = dayPanel;
   if (t.dataset.act === "scan") openScanner();
   else if (t.dataset.act === "isbn") openManual();
+  else if (t.dataset.act === "entry") { openDayKey = day; openEntry(dayPanel); }
   else if (t.dataset.more) openRecord({ existing: records.find((r) => r.id === t.dataset.more) });
   else if (t.dataset.view) openView(t.dataset.view);
 });
@@ -623,7 +643,7 @@ function openEntry(cat) {
   const c = CAT[cat]; entryCat = cat;
   $("eTitle").textContent = `${c.icon} ${c.name} · ${prettyDay(openDayKey)}`;
   $("eWhatWrap").hidden = !c.what; $("eWhatLabel").textContent = c.what || ""; $("eWhat").placeholder = c.whatPh || ""; $("eWhat").value = "";
-  $("eAmountWrap").hidden = !c.amount; $("eAmountLabel").textContent = c.amount || ""; $("eUnit").textContent = c.unit || ""; $("eAmount").value = "";
+  $("eAmountWrap").hidden = !c.amount; $("eAmountLabel").textContent = (c.amount || "").replace("몇 분", "얼마나"); $("eUnit").textContent = c.unit || ""; $("eAmount").value = ""; $("eHour").value = "";
   $("eTextWrap").hidden = false; $("eTextLabel").textContent = c.text || "한 줄 메모 (선택)"; $("eText").placeholder = c.textPh || ""; $("eText").value = "";
   $("eText").rows = c.text ? 5 : 2;
   $("dayDialog").close("away"); returnDay = openDayKey || returnDay;
@@ -631,7 +651,7 @@ function openEntry(cat) {
 }
 $("entryDialog").addEventListener("close", () => {
   if ($("entryDialog").returnValue !== "save" || !entryCat) return;
-  const what = $("eWhat").value.trim(), text = $("eText").value.trim(), minutes = parseInt($("eAmount").value, 10) || null;
+  const what = $("eWhat").value.trim(), text = $("eText").value.trim(), minutes = ((parseInt($("eHour").value, 10) || 0) * 60 + (parseInt($("eAmount").value, 10) || 0)) || null;
   if (!what && !text && !minutes) { toast("내용을 적어 주세요"); return; }
   journal.push({ id: crypto.randomUUID?.() || String(Date.now()), day: returnDay || localDay(), cat: entryCat, what, minutes, text });
   saveJournal(); render();
@@ -650,23 +670,26 @@ $("catFilter").addEventListener("click", (e) => {
 function renderStats() {
   const pages = records.reduce((a, r) => a + pagesOf(r), 0);
   const done = records.filter((r) => r.done).length;
+  const focusMins = records.reduce((a, r) => a + minsOf(r), 0) + journal.filter((j) => j.cat === "focus").reduce((a, j) => a + (j.minutes || 0), 0);
+  const recDays = new Set([...records.flatMap((r) => r.sessions.map((s) => s.day)), ...journal.map((j) => j.day)]).size;
   $("statTiles").innerHTML = [
     ["읽은 책", records.length, "권"], ["끝까지 읽은 책", done, "권"],
     ["읽은 쪽수", pages.toLocaleString(), "쪽"], ["독서 포인트", totalPoints().toLocaleString(), "점"],
+    ["집중듣기 시간", fmtMin(focusMins), ""], ["기록한 날", recDays, "일"],
   ].map(([k, v, u]) => `<div class="tile"><small>${k}</small><b>${v}<em>${u}</em></b></div>`).join("");
 
-  // 한글책 / 영어책
-  const ko = records.filter((r) => shelfOf(r) === "ko"), en = records.filter((r) => shelfOf(r) === "en");
-  const sum = ko.length + en.length;
-  const kp = ko.reduce((a, r) => a + pagesOf(r), 0), ep = en.reduce((a, r) => a + pagesOf(r), 0);
+  // 한글책 / 영어책 / 집중듣기
+  const groups = Object.keys(SHELVES).map((k) => {
+    const list = records.filter((r) => shelfOf(r) === k);
+    return { k, n: list.length, p: list.reduce((a, r) => a + pagesOf(r), 0), color: `var(--${k === "focus" ? "fo" : k})` };
+  });
+  const sum = groups.reduce((a, g) => a + g.n, 0);
   $("statSplit").innerHTML = sum ? `
-    <div class="split-bar" role="img" aria-label="한글책 ${ko.length}권, 영어책 ${en.length}권">
-      ${ko.length ? `<i style="width:${(ko.length / sum) * 100}%;background:var(--ko)" title="한글책 ${ko.length}권"></i>` : ""}
-      ${en.length ? `<i style="width:${(en.length / sum) * 100}%;background:var(--en)" title="영어책 ${en.length}권"></i>` : ""}
+    <div class="split-bar" role="img" aria-label="${groups.map((g) => `${shelfName(g.k)} ${g.n}권`).join(", ")}">
+      ${groups.filter((g) => g.n).map((g) => `<i style="width:${(g.n / sum) * 100}%;background:${g.color}" title="${shelfName(g.k)} ${g.n}권"></i>`).join("")}
     </div>
     <div class="split-legend">
-      <span><i style="background:var(--ko)"></i>한글책 <b>${ko.length}권</b> <em>${kp.toLocaleString()}쪽</em></span>
-      <span><i style="background:var(--en)"></i>영어책 <b>${en.length}권</b> <em>${ep.toLocaleString()}쪽</em></span>
+      ${groups.map((g) => `<span><i style="background:${g.color}"></i>${shelfName(g.k)} <b>${g.n}권</b> <em>${g.p.toLocaleString()}쪽</em></span>`).join("")}
     </div>` : `<p class="empty">아직 기록이 없어요</p>`;
 
   // 분야별
@@ -675,7 +698,7 @@ function renderStats() {
   for (const r of pool) { const k = r.category || "미분류"; byCat[k] = (byCat[k] || 0) + 1; }
   const rows = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
   const max = Math.max(1, ...rows.map((x) => x[1]));
-  const color = catFilter === "ko" ? "var(--ko)" : catFilter === "en" ? "var(--en)" : "#4C6EF5";
+  const color = catFilter === "ko" ? "var(--ko)" : catFilter === "en" ? "var(--en)" : catFilter === "focus" ? "var(--fo)" : "#4C6EF5";
   $("statCats").innerHTML = rows.length ? rows.map(([k, v]) => `
     <div class="hbar" title="${esc(k)} ${v}권"><span>${esc(k)}</span>
       <div class="track"><div class="fill" style="width:${(v / max) * 82}%;background:${color}"></div><span class="val">${v}권</span></div></div>`).join("") +
@@ -728,7 +751,7 @@ function closeScanner() {
   $("scanner").hidden = true;
   $("torchBtn").classList.remove("on");
 }
-$("fab").addEventListener("click", () => { returnDay = null; openScanner(); });
+$("fab").addEventListener("click", () => { returnDay = null; preferShelf = null; openScanner(); });
 $("closeScan").addEventListener("click", () => { closeScanner(); maybeReturn(); });
 $("scanManual").addEventListener("click", () => { closeScanner(); openManual(); });
 $("zoom").addEventListener("input", (e) => scanner.setZoom(Number(e.target.value)));
