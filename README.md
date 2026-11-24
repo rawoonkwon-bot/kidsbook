@@ -14,3 +14,5 @@ Vercel 환경변수 `KAKAO_REST_KEY`에 카카오 REST API 키를 넣어야 한�
 환경변수를 바꾼 뒤에는 다시 배포해야 적용돼요.
 
 GitHub main 브랜치에 올리면 Vercel이 자동 배포해요.
+
+<!-- 2026-11-24: NL_CERT_KEY 등록됨 (국립중앙도서관 쪽수) -->
