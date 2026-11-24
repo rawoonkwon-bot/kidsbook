@@ -11,23 +11,25 @@ const $ = (id) => document.getElementById(id);
 const AUTH = await sync.boot();
 const PARAMS = new URLSearchParams(location.search);
 const PEEK_ID = AUTH.user && !AUTH.offline ? PARAMS.get("peek") : null;
-const PEEK = PEEK_ID ? await sync.fetchUser(PEEK_ID).catch(() => null) : null;
+let PEEK = PEEK_ID ? await sync.fetchUser(PEEK_ID).catch(() => null) : null;
 const mem = new Map();
-if (PEEK) {
-  mem.set("kbc:kids:v1", JSON.stringify(PEEK.kids || []));
-  if (PEEK.cats) mem.set("kbc:cats:v1", JSON.stringify(PEEK.cats));
-  mem.set("kbc:records:v1", JSON.stringify(PEEK.records || []));
-  mem.set("kbc:journal:v1", JSON.stringify(PEEK.journal || []));
-  if (PARAMS.get("kid")) mem.set("kbc:activeKid", PARAMS.get("kid"));
+function fillMem(d, kid) {
+  mem.clear();
+  mem.set("kbc:kids:v1", JSON.stringify(d.kids || []));
+  if (d.cats) mem.set("kbc:cats:v1", JSON.stringify(d.cats));
+  mem.set("kbc:records:v1", JSON.stringify(d.records || []));
+  mem.set("kbc:journal:v1", JSON.stringify(d.journal || []));
+  if (kid) mem.set("kbc:activeKid", kid);
 }
+if (PEEK) fillMem(PEEK, PARAMS.get("kid"));
 // 구경할 때는 휴대폰에 아무것도 저장하지 않음(메모리에만). 내 기록은 저장하면 계정에도 올라감
-const store = PEEK
-  ? { getItem: (k) => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => mem.set(k, String(v)), removeItem: (k) => mem.delete(k) }
-  : {
-    getItem: (k) => localStorage.getItem(k),
-    setItem: (k, v) => { if (localStorage.getItem(k) === String(v)) return; localStorage.setItem(k, v); sync.touched(k); },
-    removeItem: (k) => { if (localStorage.getItem(k) === null) return; localStorage.removeItem(k); sync.touched(k); },
-  };
+const memStore = { getItem: (k) => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => mem.set(k, String(v)), removeItem: (k) => mem.delete(k) };
+const localStore = {
+  getItem: (k) => localStorage.getItem(k),
+  setItem: (k, v) => { if (localStorage.getItem(k) === String(v)) return; localStorage.setItem(k, v); sync.touched(k); },
+  removeItem: (k) => { if (localStorage.getItem(k) === null) return; localStorage.removeItem(k); sync.touched(k); },
+};
+let store = PEEK ? memStore : localStore;
 const REC_KEY = "kbc:records:v1";
 const BONUS = 50; // 독후활동 보너스 포인트
 const STAMPS_PER_BOARD = 8;
@@ -768,6 +770,7 @@ function fillDay(day) {
     html += `<div class="day-actions">
         <button type="button" class="btn lime" data-act="scan">📷 책 스캔</button>
         <button type="button" class="btn ghost" data-act="isbn" style="background:var(--soft)">ISBN 입력</button>
+        <button type="button" class="btn ghost" data-act="title" style="background:var(--soft)">바코드 없는 책</button>
         ${c.hybrid ? `<button type="button" class="btn ghost" data-act="entry" style="background:var(--soft)">✏️ 직접 적기</button>` : ""}
       </div>`;
     html += ongoing.length ? `<small>읽고 있는 ${c.name} (누르면 이 날 읽은 쪽수를 기록해요)</small>` +
@@ -844,6 +847,7 @@ $("dayList").addEventListener("click", (e) => {
   preferShelf = dayPanel;
   if (t.dataset.act === "scan") openScanner();
   else if (t.dataset.act === "isbn") openManual();
+  else if (t.dataset.act === "title") openTitle();
   else if (t.dataset.act === "entry") { openDayKey = day; openEntry(dayPanel); }
   else if (t.dataset.more) openRecord({ existing: records.find((r) => r.id === t.dataset.more) });
   else if (t.dataset.view) openView(t.dataset.view);
@@ -1025,6 +1029,36 @@ function closeScanner() {
 $("fab").addEventListener("click", () => { returnDay = null; preferShelf = null; openScanner(); });
 $("closeScan").addEventListener("click", () => { closeScanner(); maybeReturn(); });
 $("scanManual").addEventListener("click", () => { closeScanner(); openManual(); });
+$("scanTitle").addEventListener("click", () => { closeScanner(); openTitle(); });
+// ---------- 바코드(ISBN) 없는 책: 제목으로 등록 ----------
+const normTitle = (t) => (t || "").toLowerCase().replace(/[^a-z0-9가-힣]/g, "");
+function openTitle() {
+  $("tIn").value = ""; $("tMine").innerHTML = "";
+  $("titleDialog").showModal();
+  setTimeout(() => $("tIn").focus(), 50);
+}
+$("tIn").addEventListener("input", () => {
+  const q = normTitle($("tIn").value);
+  const hits = q.length < 2 ? [] : records.filter((r) => normTitle(r.title).includes(q)).slice(0, 5);
+  $("tMine").innerHTML = hits.length ? `<small>내 책장에 있는 책이면 눌러 주세요</small>` + hits.map((r) => `<button type="button" class="find-item" data-id="${r.id}">
+      ${r.cover ? `<img src="${esc(r.cover)}" alt="">` : `<span class="noimg"></span>`}
+      <span><b>${esc(r.title)}</b><small>${esc(progressText(r) || "")}</small></span></button>`).join("") : "";
+});
+$("tIn").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $("titleDialog").close("new"); } });
+$("tMine").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-id]"); if (!b) return;
+  const r = records.find((x) => x.id === b.dataset.id); if (!r) return;
+  $("titleDialog").close("pick");
+  r.done ? startReread(r) : openRecord({ existing: r });
+});
+$("titleDialog").addEventListener("close", () => {
+  const v = $("titleDialog").returnValue;
+  if (v === "pick") return;
+  if (v !== "new") { maybeReturn(); return; }
+  const t = $("tIn").value.trim();
+  openRecord({ self: true, book: { title: t } });
+  if (t.length >= 2) $("rFind").click();
+});
 $("zoom").addEventListener("input", (e) => scanner.setZoom(Number(e.target.value)));
 $("torchBtn").addEventListener("click", async () => {
   const on = !$("torchBtn").classList.contains("on");
@@ -1245,8 +1279,14 @@ $("setLogout").addEventListener("click", async () => {
 
 // ---------- 둘러보기 (공개한 다른 집 책장) ----------
 let browseLoaded = false;
+const peekCache = new Map(); // 친구 기록을 미리 받아 두기 → 누르면 바로 보임
+function prefetchPeek(u) {
+  if (!peekCache.has(u)) peekCache.set(u, sync.fetchUser(u).catch(() => { peekCache.delete(u); return null; }));
+  return peekCache.get(u);
+}
 async function renderBrowse() {
-  if (PEEK || !AUTH.user || AUTH.offline) { $("browseWrap").hidden = true; return; }
+  $("browseWrap").hidden = !!(PEEK || !AUTH.user || AUTH.offline);
+  if ($("browseWrap").hidden) return;
   if (browseLoaded) return;
   browseLoaded = true;
   $("browse").innerHTML = `<small class="muted">불러오는 중…</small>`;
@@ -1256,16 +1296,37 @@ async function renderBrowse() {
     $("browse").innerHTML = items.length
       ? items.map(({ u, k }) => `<button type="button" class="kid" data-u="${esc(u)}" data-k="${esc(k.id)}">${esc(k.nick)}${gradeOf(k) ? ` <small class="grade">${gradeOf(k)}</small>` : ""}</button>`).join("")
       : `<small class="muted">아직 공개된 다른 책장이 없어요.</small>`;
+    [...new Set(items.map((x) => x.u))].slice(0, 8).forEach(prefetchPeek);
   } catch {
     browseLoaded = false;
     $("browse").innerHTML = `<small class="muted">불러오지 못했어요. 인터넷 연결을 확인해 주세요.</small>`;
   }
 }
-$("browse").addEventListener("click", (e) => {
-  const b = e.target.closest("[data-u]");
-  if (b) location.href = `/?peek=${encodeURIComponent(b.dataset.u)}&kid=${encodeURIComponent(b.dataset.k)}`;
+$("browse").addEventListener("pointerdown", (e) => { const b = e.target.closest("[data-u]"); if (b) prefetchPeek(b.dataset.u); });
+$("browse").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-u]"); if (!b) return;
+  b.classList.add("loading");
+  const data = await prefetchPeek(b.dataset.u);
+  b.classList.remove("loading");
+  if (!data) { toast("지금은 볼 수 없는 책장이에요 (나만 보기로 바뀌었을 수 있어요)", 3500); return; }
+  enterPeek(data, b.dataset.k);
 });
-$("peekBack").addEventListener("click", () => { location.href = "/#stats"; });
+// 앱을 다시 열지 않고 화면만 친구 책장으로 바꾸기 (구경하는 동안은 휴대폰에 아무것도 저장하지 않음)
+function enterPeek(data, kid) {
+  fillMem(data, kid);
+  PEEK = data; store = memStore;
+  loadState();
+  document.body.classList.add("peek"); $("peekBar").hidden = false;
+  renderKids(); render(); go("home");
+}
+function exitPeek() {
+  if (PARAMS.get("peek")) { location.href = "/#stats"; return; } // 주소로 들어온 구경은 다시 열기
+  PEEK = null; store = localStore; mem.clear();
+  loadState();
+  document.body.classList.remove("peek"); $("peekBar").hidden = true;
+  renderKids(); render(); go("stats");
+}
+$("peekBack").addEventListener("click", exitPeek);
 $("gearBtn").addEventListener("click", openSettings);
 $("setKids").addEventListener("click", () => { $("settingsDialog").close("away"); openKids(false); });
 $("setCats").addEventListener("click", () => { $("settingsDialog").close("away"); openCats(); });
@@ -1473,6 +1534,19 @@ render();
 go(["port", "stats"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "home");
 warmUpDetector();
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+// 지금 store(내 기록 또는 구경 중인 친구 기록)에서 화면 상태를 다시 읽기
+function loadState() {
+  kids = readJSON(KIDS_KEY, []);
+  activeKid = store.getItem(ACTIVE_KEY);
+  if (!kids.some((k) => k.id === activeKid)) activeKid = kids[0]?.id || null;
+  allRecords = readJSON(REC_KEY, []).map(migrate); viewRecords();
+  allJournal = readJSON(JOURNAL_KEY, []); viewJournal();
+  const cl = readJSON(CATS_KEY, null);
+  catList = (Array.isArray(cl) ? cl : [...DEFAULT_CATS]).map((c) => ({ ...c, icon: toIcon(c.icon) }));
+  refreshCats();
+  $("monthFilter").value = "all";
+}
+
 // 화면에 고정된 아이콘 채우기 (탭, 설정, 책 스캔, 책장 제목)
 document.querySelectorAll("[data-ico]").forEach((el) => { el.innerHTML = ico(el.dataset.ico); });
 

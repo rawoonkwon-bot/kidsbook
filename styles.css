@@ -585,3 +585,10 @@ body.peek #dayCats, body.peek .day-sub, body.peek .day-actions, body.peek .day-i
 .v-times .tally { height: 20px; width: auto; }
 .sessions li.round-h { display: flex; justify-content: space-between; gap: 8px; background: var(--sage-l); border-radius: 10px; padding: 6px 10px; margin-top: 8px; font-size: 13px; color: var(--forest-d); list-style: none; }
 .s-mine.link { cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+
+/* 바코드 없는 책 · 구경 불러오는 중 */
+.scan-alt { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+#titleDialog .sub-input { margin: 4px 0 6px; font-size: 16px; }
+.browse .kid.loading { opacity: .55; }
+.day-actions { flex-wrap: wrap; }
+.day-actions .btn { min-width: 30%; }
