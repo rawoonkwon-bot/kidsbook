@@ -482,3 +482,4 @@ dialog { background: var(--bg); }
 .kid-list .x, .cat-list button { background: var(--card); box-shadow: var(--raise-s); }
 .toast { background: var(--forest-d); }
 .roi.hit { border-color: var(--sage); }
+.logo { width: 26px; height: 42px; display: block; }
