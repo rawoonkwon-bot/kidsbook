@@ -514,3 +514,4 @@ dialog { background: var(--bg); }
 .peek-bar button { border: 0; background: #FFCC00; color: #1E2420; border-radius: 10px; padding: 6px 10px; font-weight: 700; cursor: pointer; flex: none; }
 body.peek #fab, body.peek #gearBtn, body.peek .kid.add, body.peek #vMore, body.peek #vActivity, body.peek #vTotalRow,
 body.peek #dayCats, body.peek .day-sub, body.peek .day-actions, body.peek .day-item .x, body.peek #browseWrap { display: none !important; }
+.browse-help { font-size: 13px; color: var(--muted); margin: -4px 0 10px; }
