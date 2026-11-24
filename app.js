@@ -40,9 +40,32 @@ function migrate(r) {
   }
   return r;
 }
-const loadRecords = () => { try { return (JSON.parse(localStorage.getItem(REC_KEY)) || []).map(migrate); } catch { return []; } };
-const saveRecords = () => localStorage.setItem(REC_KEY, JSON.stringify(records));
-let records = loadRecords();
+const uid = () => crypto.randomUUID?.() || Date.now().toString(36) + Math.random().toString(36).slice(2);
+const readJSON = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
+
+// ---------- 자녀 ----------
+// 모든 기록은 자녀(kid)별로 저장. 화면에는 지금 고른 자녀의 기록만 보여 줌
+const KIDS_KEY = "kbc:kids:v1", ACTIVE_KEY = "kbc:activeKid";
+let kids = readJSON(KIDS_KEY, []);
+let activeKid = localStorage.getItem(ACTIVE_KEY);
+if (!kids.some((k) => k.id === activeKid)) activeKid = kids[0]?.id || null;
+const saveKids = () => {
+  localStorage.setItem(KIDS_KEY, JSON.stringify(kids));
+  if (activeKid) localStorage.setItem(ACTIVE_KEY, activeKid); else localStorage.removeItem(ACTIVE_KEY);
+};
+const mineNow = (x) => !activeKid || !x.kid || x.kid === activeKid;
+
+let allRecords = readJSON(REC_KEY, []).map(migrate);
+let records = [];
+const viewRecords = () => { records = allRecords.filter(mineNow); };
+// 지금 보는 자녀의 기록(records)을 전체 기록에 반영해서 저장
+const saveRecords = () => {
+  for (const r of records) if (!r.kid && activeKid) r.kid = activeKid;
+  const ids = new Set(records.map((r) => r.id));
+  allRecords = [...records, ...allRecords.filter((r) => !ids.has(r.id) && !mineNow(r))];
+  localStorage.setItem(REC_KEY, JSON.stringify(allRecords));
+};
+viewRecords();
 saveRecords();
 
 // ---------- 계산 ----------
@@ -502,19 +525,67 @@ $("viewDialog").addEventListener("close", () => {
 
 // ---------- 포트폴리오 (캘린더 + 날짜별 기록) ----------
 const JOURNAL_KEY = "kbc:journal:v1";
-const CATS = [
-  { key: "ko", icon: "📕", name: "한글책", book: true },
-  { key: "en", icon: "📘", name: "영어책", book: true },
-  { key: "listen", icon: "🎧", name: "흘려듣기", what: "무엇을 들었나요?", whatPh: "예: Peppa Pig 3화", amount: "몇 분 들었나요?", unit: "분" },
-  { key: "focus", icon: "👂", name: "집중듣기", hybrid: true, what: "무엇을 들었나요?", whatPh: "예: Magic Tree House 1권", amount: "몇 분 들었나요?", unit: "분" },
-  { key: "math", icon: "➗", name: "수학", what: "무엇을 했나요?", whatPh: "예: 연산 문제집 12~15쪽", amount: "몇 분 했나요?", unit: "분" },
-  { key: "etc", icon: "⭐", name: "기타", what: "무엇을 했나요?", whatPh: "예: 피아노 연습", amount: "몇 분 했나요?", unit: "분" },
-  { key: "memo", icon: "📝", name: "메모", text: "메모", textPh: "오늘 있었던 일, 칭찬할 점 등" },
+let allJournal = readJSON(JOURNAL_KEY, []);
+let journal = [];
+const viewJournal = () => { journal = allJournal.filter(mineNow); };
+const saveJournal = () => {
+  for (const j of journal) if (!j.kid && activeKid) j.kid = activeKid;
+  const ids = new Set(journal.map((j) => j.id));
+  allJournal = [...allJournal.filter((j) => !ids.has(j.id) && !mineNow(j)), ...journal];
+  localStorage.setItem(JOURNAL_KEY, JSON.stringify(allJournal));
+};
+viewJournal();
+const writeAll = () => {
+  localStorage.setItem(REC_KEY, JSON.stringify(allRecords));
+  localStorage.setItem(JOURNAL_KEY, JSON.stringify(allJournal));
+};
+
+// 카테고리: 사용자가 편집 가능. kind = book(책장) · focus(책장+시간) · time(한 것+시간) · note(메모만)
+const CATS_KEY = "kbc:cats:v1";
+const DEFAULT_CATS = [
+  { key: "ko", icon: "📕", name: "한글책", kind: "book" },
+  { key: "en", icon: "📘", name: "영어책", kind: "book" },
+  { key: "listen", icon: "🎧", name: "흘려듣기", kind: "time" },
+  { key: "focus", icon: "👂", name: "집중듣기", kind: "focus" },
+  { key: "memo", icon: "📝", name: "메모", kind: "note" },
 ];
-const CAT = Object.fromEntries(CATS.map((c) => [c.key, c]));
-const loadJournal = () => { try { return JSON.parse(localStorage.getItem(JOURNAL_KEY)) || []; } catch { return []; } };
-const saveJournal = () => localStorage.setItem(JOURNAL_KEY, JSON.stringify(journal));
-let journal = loadJournal();
+const LEGACY_CATS = [
+  { key: "math", icon: "➗", name: "수학", kind: "time" },
+  { key: "etc", icon: "⭐", name: "기타", kind: "time" },
+];
+const PH = { listen: "예: Peppa Pig 3화", focus: "예: Magic Tree House 1권", math: "예: 연산 문제집 12~15쪽", etc: "예: 피아노 연습" };
+function decorate(c) {
+  const d = { ...c };
+  if (c.kind === "book") d.book = true;
+  if (c.kind === "focus") d.hybrid = true;
+  if (c.kind === "time" || c.kind === "focus") {
+    const listen = c.key === "listen" || c.key === "focus";
+    Object.assign(d, { what: listen ? "무엇을 들었나요?" : "무엇을 했나요?", whatPh: PH[c.key] || "예: 오늘 한 것", amount: "얼마나 했나요?", unit: "분" });
+  }
+  if (c.kind === "note") Object.assign(d, { text: c.key === "memo" ? "메모" : "내용", textPh: "오늘 있었던 일, 칭찬할 점 등" });
+  return d;
+}
+let catList = readJSON(CATS_KEY, null);
+if (!Array.isArray(catList)) {
+  // 처음 한 번: 기본 5개 + 이미 기록이 있는 예전 카테고리(수학·기타)
+  catList = [...DEFAULT_CATS];
+  for (const c of LEGACY_CATS) if (allJournal.some((j) => j.cat === c.key)) catList.splice(catList.length - 1, 0, c);
+  localStorage.setItem(CATS_KEY, JSON.stringify(catList));
+}
+// 기록은 있는데 목록에 없는 예전 카테고리는 다시 넣어 둠 (기록이 안 보이게 되는 일 방지)
+for (const c of LEGACY_CATS) {
+  if (!catList.some((x) => x.key === c.key) && allJournal.some((j) => j.cat === c.key)) {
+    catList.splice(Math.max(0, catList.findIndex((x) => x.key === "memo")), 0, { ...c });
+    localStorage.setItem(CATS_KEY, JSON.stringify(catList));
+  }
+}
+const saveCats = () => localStorage.setItem(CATS_KEY, JSON.stringify(catList));
+let CATS = [], CAT = {};
+const refreshCats = () => {
+  CAT = Object.fromEntries(catList.map((c) => [c.key, decorate(c)]));
+  CATS = catList.filter((c) => !c.hidden).map((c) => CAT[c.key]);
+};
+refreshCats();
 
 const booksOn = (day, shelf) => records.flatMap((r) =>
   r.sessions.filter((s) => s.day === day && shelfOf(r) === shelf).map((s) => ({ r, s })));
@@ -779,8 +850,358 @@ document.querySelectorAll('dialog button[value="cancel"], dialog button[value="c
   b.addEventListener("click", () => b.closest("dialog").close(b.value));
 });
 
+// ---------- 자녀 바 ----------
+function renderKids() {
+  $("kidBar").hidden = !kids.length;
+  $("kidBar").innerHTML = kids.map((k) => `<button type="button" class="kid${k.id === activeKid ? " on" : ""}" data-kid="${k.id}">${esc(k.nick)}</button>`).join("") +
+    `<button type="button" class="kid add" data-kid="+" aria-label="자녀 추가·관리">＋</button>`;
+}
+function setKid(id) {
+  activeKid = id; saveKids();
+  viewRecords(); viewJournal();
+  $("monthFilter").value = "all";
+  renderKids(); render();
+}
+$("kidBar").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-kid]"); if (!b) return;
+  if (b.dataset.kid === "+") openKids(false);
+  else if (b.dataset.kid !== activeKid) setKid(b.dataset.kid);
+});
+
+// ---------- 자녀 등록 · 관리 ----------
+let kidsFirst = false, kidDraft = [];
+function openKids(first) {
+  kidsFirst = first;
+  kidDraft = kids.map((k) => ({ ...k }));
+  if (!kidDraft.length) kidDraft.push({ id: uid(), nick: "" });
+  $("kTitle").textContent = first ? "반가워요! 자녀를 등록해 주세요 🍌" : "자녀 관리";
+  $("kCancel").hidden = first;
+  paintKids();
+  $("kidsDialog").showModal();
+  if (first) setTimeout(() => $("kList").querySelector("input")?.focus(), 50);
+}
+function syncKids() { $("kList").querySelectorAll("input").forEach((inp, i) => (kidDraft[i].nick = inp.value)); }
+function paintKids() {
+  $("kList").innerHTML = kidDraft.map((k, i) => `<li><input class="sub-input" value="${esc(k.nick)}" maxlength="10" placeholder="닉네임 (예: 시운)" aria-label="${i + 1}번째 자녀 닉네임" />
+    ${kidDraft.length > 1 ? `<button type="button" class="x" data-rm="${i}" aria-label="${esc(k.nick || "이 자녀")} 지우기">✕</button>` : ""}</li>`).join("");
+}
+$("kList").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-rm]"); if (!b) return;
+  syncKids(); kidDraft.splice(Number(b.dataset.rm), 1); paintKids();
+});
+$("kList").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $("kSave").click(); } });
+$("kAdd").addEventListener("click", () => {
+  syncKids(); kidDraft.push({ id: uid(), nick: "" }); paintKids();
+  const ins = $("kList").querySelectorAll("input"); ins[ins.length - 1].focus();
+});
+$("kidsDialog").addEventListener("cancel", (e) => { if (kidsFirst) e.preventDefault(); });
+$("kSave").addEventListener("click", () => {
+  syncKids();
+  const nicks = kidDraft.map((k) => k.nick.trim());
+  if (nicks.some((n) => !n)) { toast("닉네임을 모두 적어 주세요"); return; }
+  if (new Set(nicks).size !== nicks.length) { toast("같은 닉네임이 있어요"); return; }
+  saveRecords(); saveJournal();
+  const keep = new Set(kidDraft.map((k) => k.id));
+  const removed = kids.filter((k) => !keep.has(k.id));
+  if (removed.length) {
+    const gone = new Set(removed.map((k) => k.id));
+    const n = allRecords.filter((r) => gone.has(r.kid)).length + allJournal.filter((j) => gone.has(j.kid)).length;
+    if (n && !confirm(`${removed.map((k) => k.nick).join(", ")}의 기록 ${n}개도 함께 지워져요. 되돌릴 수 없어요.\n지울까요? (먼저 설정 → 내 기록 내려받기로 저장해 둘 수 있어요)`)) return;
+    allRecords = allRecords.filter((r) => !gone.has(r.kid));
+    allJournal = allJournal.filter((j) => !gone.has(j.kid));
+  }
+  kids = kidDraft.map((k) => ({ id: k.id, nick: k.nick.trim() }));
+  // 자녀 등록 전에 만든 기록은 첫째 자녀에게
+  for (const x of [...allRecords, ...allJournal]) if (!x.kid) x.kid = kids[0].id;
+  writeAll();
+  if (!kids.some((k) => k.id === activeKid)) activeKid = kids[0].id;
+  $("kidsDialog").close("saved");
+  setKid(activeKid);
+  toast(kidsFirst ? `${kids.map((k) => k.nick).join(", ")} 등록 완료! 🎉` : "자녀 정보를 저장했어요");
+});
+
+// ---------- 카테고리 편집 ----------
+const EMOJIS = ["⭐", "➗", "🎹", "🎻", "⚽", "🏊", "🎨", "✏️", "🧩", "🔬", "🌏", "🈶", "🧘", "🏃", "🎵", "💻", "📖", "🗣️"];
+let catDraft = [], newKind = "time";
+const LOCKED = (c) => c.kind === "book" || c.kind === "focus";
+const KIND_NAME = { book: "책장", focus: "책장+시간", time: "한 것+시간", note: "메모" };
+$("cEmoji").innerHTML = EMOJIS.map((e) => `<button type="button" data-e="${e}" aria-label="${e} 고르기">${e}</button>`).join("");
+$("cEmoji").addEventListener("click", (e) => { const b = e.target.closest("[data-e]"); if (b) $("cNewIcon").value = b.dataset.e; });
+$("cNewKind").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-kind]"); if (!b) return;
+  newKind = b.dataset.kind;
+  [...$("cNewKind").children].forEach((x) => x.setAttribute("aria-checked", String(x === b)));
+});
+function openCats() {
+  catDraft = catList.map((c) => ({ ...c }));
+  $("cNewIcon").value = ""; $("cNewName").value = "";
+  paintCats();
+  $("catsDialog").showModal();
+}
+function syncCats() {
+  $("cList").querySelectorAll("li").forEach((li, i) => {
+    catDraft[i].icon = li.querySelector(".ic-in").value.trim() || catDraft[i].icon;
+    catDraft[i].name = li.querySelector(".nm-in").value;
+  });
+}
+function paintCats() {
+  const last = catDraft.length - 1;
+  $("cList").innerHTML = catDraft.map((c, i) => `<li data-i="${i}" class="${c.hidden ? "off" : ""}" title="${KIND_NAME[c.kind] || ""}">
+    <input class="ic-in" value="${esc(c.icon)}" maxlength="4" aria-label="${esc(c.name)} 아이콘" />
+    <input class="nm-in" value="${esc(c.name)}" maxlength="8" aria-label="카테고리 이름" />
+    <button type="button" data-mv="-1" aria-label="위로" ${i ? "" : "disabled"}>▲</button>
+    <button type="button" data-mv="1" aria-label="아래로" ${i < last ? "" : "disabled"}>▼</button>
+    <button type="button" data-hide aria-label="${c.hidden ? "보이기" : "숨기기"}">${c.hidden ? "🙈" : "👁"}</button>
+    ${LOCKED(c) ? `<span class="lock" title="책장과 연결돼 있어서 숨기기만 돼요">🔒</span>` : `<button type="button" data-rm aria-label="${esc(c.name)} 삭제">🗑</button>`}
+  </li>`).join("");
+}
+$("cList").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  syncCats();
+  const i = Number(b.closest("li").dataset.i);
+  if (b.dataset.mv) { const j = i + Number(b.dataset.mv); [catDraft[i], catDraft[j]] = [catDraft[j], catDraft[i]]; }
+  else if (b.hasAttribute("data-hide")) catDraft[i].hidden = !catDraft[i].hidden;
+  else if (b.hasAttribute("data-rm")) catDraft.splice(i, 1);
+  paintCats();
+});
+$("cAdd").addEventListener("click", () => {
+  syncCats();
+  const name = $("cNewName").value.trim();
+  if (!name) { toast("새 카테고리 이름을 적어 주세요"); $("cNewName").focus(); return; }
+  if (catDraft.some((c) => c.name === name)) { toast("같은 이름이 있어요"); return; }
+  catDraft.push({ key: "c_" + uid().replace(/-/g, "").slice(0, 10), icon: $("cNewIcon").value.trim() || "⭐", name, kind: newKind });
+  $("cNewIcon").value = ""; $("cNewName").value = "";
+  paintCats();
+  toast(`‘${name}’을(를) 추가했어요. 저장을 눌러 주세요`);
+});
+$("cSave").addEventListener("click", () => {
+  syncCats();
+  if (catDraft.some((c) => !c.name.trim())) { toast("이름이 빈 카테고리가 있어요"); return; }
+  const keep = new Set(catDraft.map((c) => c.key));
+  const removed = catList.filter((c) => !keep.has(c.key));
+  if (removed.length) {
+    saveJournal();
+    const gone = new Set(removed.map((c) => c.key));
+    const n = allJournal.filter((j) => gone.has(j.cat)).length;
+    if (n && !confirm(`${removed.map((c) => c.name).join(", ")} 카테고리를 지우면 기록 ${n}개(모든 자녀)도 함께 지워져요. 되돌릴 수 없어요.\n지울까요?`)) return;
+    allJournal = allJournal.filter((j) => !gone.has(j.cat));
+    writeAll(); viewJournal();
+  }
+  catList = catDraft.map((c) => ({ ...c, name: c.name.trim() }));
+  saveCats(); refreshCats();
+  $("catsDialog").close("saved");
+  render();
+  toast("카테고리를 저장했어요");
+});
+
+// ---------- 설정 ----------
+const EXPORT_KEY = "kbc:lastExport";
+function openSettings() {
+  const last = localStorage.getItem(EXPORT_KEY);
+  $("lastExport").textContent = last ? `마지막으로 내려받은 날: ${last}` : "모든 자녀의 기록을 파일 하나(ZIP)로 저장해요";
+  $("settingsDialog").showModal();
+}
+$("gearBtn").addEventListener("click", openSettings);
+$("setKids").addEventListener("click", () => { $("settingsDialog").close("away"); openKids(false); });
+$("setCats").addEventListener("click", () => { $("settingsDialog").close("away"); openCats(); });
+$("setExport").addEventListener("click", () => { exportAll(); });
+$("setImport").addEventListener("click", () => $("importFile").click());
+
+// ---------- 내 기록 내려받기 / 다시 올리기 ----------
+const BACKUP_FORMAT = "banana-bookcode-backup", BACKUP_VERSION = 1;
+const ABOUT = {
+  "이 파일은": "바나나북코드(아이 독서기록 앱)의 모든 기록을 담은 보관용 파일이에요. 앱의 '설정 → 기록 파일 다시 올리기'로 복원할 수 있어요.",
+  kids: "자녀 목록. id, nick(닉네임)",
+  categories: "포트폴리오 카테고리. kind: book=책장(한글책/영어책), focus=집중듣기(책+시간), time=한 것+시간, note=메모. hidden=숨김",
+  records: "책 기록(책 한 권 = 1개). kid=자녀 id, shelf: ko 한글책 / en 영어책 / focus 집중듣기. sessions=읽은 날(day, YYYY-MM-DD)마다 읽은 쪽(from~to)과 집중듣기 시간(minutes, 분). totalPages=전체 쪽수, done=끝까지 읽음, score=별점(1~5), note=독후활동 글, bonus=독후활동 포인트(+50) 받음, category=분야",
+  journal: "포트폴리오 하루 기록. kid=자녀 id, day=날짜, cat=카테고리 key, what=한 것, minutes=시간(분), text=메모",
+  "포인트 규칙": "읽은 쪽수 1쪽 = 1점, 독후활동을 쓰면 +50점. 스탬프는 끝까지 읽은 책 1권에 1개, 8개가 한 판",
+};
+const plainDay = (day) => {
+  const [y, m, d] = day.split("-").map(Number);
+  return `${y}년 ${m}월 ${d}일 (${"일월화수목금토"[new Date(y, m - 1, d).getDay()]})`;
+};
+function backupData() {
+  saveRecords(); saveJournal();
+  return { format: BACKUP_FORMAT, version: BACKUP_VERSION, app: "바나나북코드", site: location.origin, exportedAt: new Date().toISOString(),
+    about: ABOUT, kids, categories: catList, records: allRecords, journal: allJournal };
+}
+function diaryHtml(d) {
+  const catOf = Object.fromEntries(d.categories.map((c) => [c.key, c]));
+  const shelfLabel = { ko: "📕 한글책", en: "📘 영어책", focus: "👂 집중듣기" };
+  const list = d.kids.length ? d.kids : [{ id: undefined, nick: "기록" }];
+  const body = list.map((k) => {
+    const recs = d.records.filter((r) => r.kid === k.id || (!r.kid && k === list[0]));
+    const jr = d.journal.filter((j) => j.kid === k.id || (!j.kid && k === list[0]));
+    const days = {};
+    const add = (day, html) => (days[day] ||= []).push(html);
+    for (const r of recs) for (const s of r.sessions) add(s.day, `<li>${shelfLabel[shelfOf(r)] || "📚"} <b>${esc(r.title)}</b> · ${esc(sessionText(s))}</li>`);
+    for (const j of jr) {
+      const c = catOf[j.cat] || { icon: "•", name: j.cat };
+      add(j.day, `<li>${c.icon} ${esc(c.name)}${j.what ? ` · <b>${esc(j.what)}</b>` : ""}${j.minutes ? ` · ${fmtMin(j.minutes)}` : ""}${j.text ? `<div class="memo">${esc(j.text)}</div>` : ""}</li>`);
+    }
+    const pages = recs.reduce((a, r) => a + pagesOf(r), 0), pts = recs.reduce((a, r) => a + pointsOf(r), 0);
+    return `<section><h2>🍌 ${esc(k.nick)}</h2>
+      <p class="sum">책 ${recs.length}권 · 끝까지 읽은 책 ${recs.filter((r) => r.done).length}권 · ${pages.toLocaleString()}쪽 · 독서 포인트 ${pts.toLocaleString()}점</p>
+      <h3>📅 날짜별 기록</h3>
+      ${Object.keys(days).sort().reverse().map((day) => `<div class="day"><h4>${plainDay(day)}</h4><ul>${days[day].join("")}</ul></div>`).join("") || "<p>기록이 없어요</p>"}
+      <h3>📚 읽은 책</h3>
+      ${recs.length ? `<table><thead><tr><th>책</th><th>책장 · 분야</th><th>읽은 쪽</th><th>별점</th><th>내 생각</th></tr></thead><tbody>
+      ${recs.map((r) => `<tr><td>${r.cover ? `<img src="${esc(r.cover)}" alt="">` : ""}<b>${esc(r.title)}</b><br><small>${esc(r.authors || "")}</small></td>
+        <td>${shelfLabel[shelfOf(r)] || ""}${r.category ? `<br><small>${esc(r.category)}</small>` : ""}</td>
+        <td>${readTo(r)}${r.totalPages ? ` / ${r.totalPages}` : ""}쪽${r.done ? " ✅" : ""}${minsOf(r) ? `<br>🎧 ${fmtMin(minsOf(r))}` : ""}</td>
+        <td>${r.score ? "★".repeat(r.score) : ""}</td><td class="memo">${esc(r.note || "")}</td></tr>`).join("")}</tbody></table>` : "<p>아직 읽은 책이 없어요</p>"}
+    </section>`;
+  }).join("");
+  return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>바나나북코드 기록장</title><style>
+body{font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;max-width:820px;margin:0 auto;padding:24px 18px;color:#15161A;line-height:1.6}
+h1{margin:0}.sub{color:#7C7F8A;margin:4px 0 24px}section{margin-bottom:40px;page-break-after:always}
+h2{border-bottom:3px solid #CFF53A;padding-bottom:4px}.sum{background:#F4F5F8;border-radius:12px;padding:10px 14px}
+.day{break-inside:avoid;margin-bottom:12px}h4{margin:14px 0 4px;color:#3E7CB1}ul{margin:0;padding-left:20px}
+.memo{white-space:pre-line;color:#3A3C44}table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{border-bottom:1px solid #E7E8EE;padding:8px 6px;text-align:left;vertical-align:top}
+td img{width:42px;float:left;margin-right:8px;border-radius:4px}tr{break-inside:avoid}
+</style></head><body><h1>🍌 바나나북코드 기록장</h1>
+<p class="sub">${new Date(d.exportedAt).toLocaleString("ko-KR")}에 내려받음 · 브라우저에서 인쇄하면 PDF로도 저장할 수 있어요</p>${body}</body></html>`;
+}
+
+// ZIP 만들기/읽기 (외부 라이브러리 없이)
+const CRC_T = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+const crc32 = (u8) => { let c = 0xFFFFFFFF; for (let i = 0; i < u8.length; i++) c = CRC_T[(c ^ u8[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+function makeZip(files) {
+  const enc = new TextEncoder(), parts = [], central = [];
+  const t = new Date(), dosT = (t.getHours() << 11) | (t.getMinutes() << 5) | (t.getSeconds() >> 1);
+  const dosD = ((t.getFullYear() - 1980) << 9) | ((t.getMonth() + 1) << 5) | t.getDate();
+  let off = 0;
+  for (const f of files) {
+    const name = enc.encode(f.name), data = enc.encode(f.data), crc = crc32(data);
+    const h = new DataView(new ArrayBuffer(30));
+    h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(6, 0x0800, true);
+    h.setUint16(10, dosT, true); h.setUint16(12, dosD, true); h.setUint32(14, crc, true);
+    h.setUint32(18, data.length, true); h.setUint32(22, data.length, true); h.setUint16(26, name.length, true);
+    parts.push(h.buffer, name, data);
+    const c = new DataView(new ArrayBuffer(46));
+    c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint16(8, 0x0800, true);
+    c.setUint16(12, dosT, true); c.setUint16(14, dosD, true); c.setUint32(16, crc, true);
+    c.setUint32(20, data.length, true); c.setUint32(24, data.length, true); c.setUint16(28, name.length, true); c.setUint32(42, off, true);
+    central.push(c.buffer, name);
+    off += 30 + name.length + data.length;
+  }
+  const size = central.reduce((a, p) => a + p.byteLength, 0);
+  const e = new DataView(new ArrayBuffer(22));
+  e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true);
+  e.setUint32(12, size, true); e.setUint32(16, off, true);
+  return new Blob([...parts, ...central, e.buffer], { type: "application/zip" });
+}
+async function readZipJson(buf) {
+  const v = new DataView(buf), dec = new TextDecoder();
+  let e = buf.byteLength - 22;
+  while (e >= 0 && v.getUint32(e, true) !== 0x06054b50) e--;
+  if (e < 0) throw new Error("not zip");
+  const n = v.getUint16(e + 10, true);
+  let p = v.getUint32(e + 16, true);
+  for (let i = 0; i < n; i++) {
+    const method = v.getUint16(p + 10, true), size = v.getUint32(p + 20, true);
+    const nl = v.getUint16(p + 28, true), xl = v.getUint16(p + 30, true), cl = v.getUint16(p + 32, true), lo = v.getUint32(p + 42, true);
+    const name = dec.decode(new Uint8Array(buf, p + 46, nl));
+    p += 46 + nl + xl + cl;
+    if (!/\.json$/i.test(name) || name.includes("__MACOSX")) continue;
+    const start = lo + 30 + v.getUint16(lo + 26, true) + v.getUint16(lo + 28, true);
+    let bytes = new Uint8Array(buf, start, size);
+    if (method === 8) bytes = new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).arrayBuffer());
+    else if (method !== 0) throw new Error("zip method");
+    return JSON.parse(dec.decode(bytes));
+  }
+  throw new Error("no json");
+}
+async function saveFile(blob, name) {
+  // 홈 화면 앱(PWA)으로 열었을 때는 공유 창으로 저장 (아이폰에서 다운로드가 막히는 경우 대비)
+  const standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone;
+  const file = new File([blob], name, { type: blob.type });
+  if (standalone && navigator.canShare?.({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: name }); return; } catch (e) { if (e.name === "AbortError") return; }
+  }
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.append(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 5000);
+}
+async function exportAll() {
+  const d = backupData();
+  const json = JSON.stringify(d, null, 2);
+  const readme = `바나나북코드 기록 파일 (${localDay()})\r\n\r\n` +
+    `1. 바나나북코드-백업.json : 모든 기록이 들어 있는 보관용 파일이에요.\r\n   앱의 설정 → '기록 파일 다시 올리기'에서 이 ZIP 파일이나 JSON 파일을 올리면 복원돼요.\r\n   AI(Claude, ChatGPT 등)에게 보여 주면 내용을 정리하거나 다른 형식으로 바꿀 수 있어요.\r\n\r\n` +
+    `2. 바나나북코드-기록장.html : 날짜별 일기처럼 읽을 수 있는 기록장이에요.\r\n   브라우저로 열어서 인쇄하면 PDF로 저장할 수 있어요.\r\n`;
+  const blob = makeZip([
+    { name: "바나나북코드-백업.json", data: json },
+    { name: "바나나북코드-기록장.html", data: diaryHtml(d) },
+    { name: "읽어주세요.txt", data: readme },
+  ]);
+  await saveFile(blob, `바나나북코드-기록-${localDay()}.zip`);
+  localStorage.setItem(EXPORT_KEY, localDay());
+  $("lastExport").textContent = `마지막으로 내려받은 날: ${localDay()}`;
+  toast("💾 기록 파일을 내려받았어요");
+}
+function mergeBackup(d) {
+  saveRecords(); saveJournal();
+  const kidMap = {}, n = { k: 0, c: 0, r: 0, s: 0, j: 0 };
+  for (const k of d.kids || []) {
+    const same = kids.find((x) => x.id === k.id) || kids.find((x) => x.nick === k.nick);
+    if (same) kidMap[k.id] = same.id;
+    else { kids.push({ id: k.id || uid(), nick: k.nick || "자녀" }); kidMap[k.id] = kids.at(-1).id; n.k++; }
+  }
+  if (!kids.length) kids.push({ id: uid(), nick: "자녀" });
+  const fallback = activeKid && kids.some((k) => k.id === activeKid) ? activeKid : kids[0].id;
+  const kidOf = (id) => { const m = kidMap[id] || id; return kids.some((k) => k.id === m) ? m : fallback; };
+  for (const c of d.categories || []) {
+    if (c?.key && !catList.some((x) => x.key === c.key)) { catList.push({ key: c.key, icon: c.icon || "⭐", name: c.name || "카테고리", kind: c.kind || "time", hidden: !!c.hidden }); n.c++; }
+  }
+  for (const r0 of d.records || []) {
+    if (!r0?.title) continue;
+    const r = migrate({ ...r0, sessions: (r0.sessions || []).map((s) => ({ ...s })) });
+    r.kid = kidOf(r0.kid); r.id = r.id || uid();
+    const same = allRecords.find((x) => x.id === r.id) || (r.isbn && allRecords.find((x) => x.kid === r.kid && x.isbn === r.isbn));
+    if (!same) { allRecords.push(r); n.r++; n.s += r.sessions.length; continue; }
+    const key = (s) => `${s.day}|${s.from}|${s.to}`;
+    const have = new Set(same.sessions.map(key));
+    for (const s of r.sessions) if (!have.has(key(s))) { same.sessions.push(s); n.s++; }
+    for (const f of ["score", "note", "category", "totalPages", "cover", "description", "authors", "publisher"]) if (!same[f] && r[f]) same[f] = r[f];
+    if (r.bonus) same.bonus = true;
+    if (r.done && !same.done) { same.done = true; same.doneAt = r.doneAt || Date.now(); }
+  }
+  for (const j of d.journal || []) {
+    if (!j?.day || allJournal.some((x) => x.id === j.id)) continue;
+    allJournal.push({ ...j, id: j.id || uid(), kid: kidOf(j.kid) }); n.j++;
+  }
+  writeAll(); saveCats(); refreshCats();
+  activeKid = fallback; saveKids();
+  setKid(activeKid);
+  return n;
+}
+$("importFile").addEventListener("change", async (e) => {
+  const f = e.target.files[0]; e.target.value = "";
+  if (!f) return;
+  let d;
+  try {
+    const buf = await f.arrayBuffer();
+    const head = new TextDecoder().decode(new Uint8Array(buf, 0, Math.min(8, buf.byteLength))).replace(/^\s+/, "").trim();
+    d = head.startsWith("{") ? JSON.parse(new TextDecoder().decode(buf).replace(/^\s+/, "")) : await readZipJson(buf);
+    if (d?.format !== BACKUP_FORMAT) throw new Error("format");
+  } catch {
+    toast("바나나북코드 기록 파일이 아니거나 읽을 수 없어요", 3500); return;
+  }
+  if ((d.version || 1) > BACKUP_VERSION && !confirm("더 새로운 앱에서 만든 파일이에요. 일부 내용이 빠질 수 있어요. 그래도 올릴까요?")) return;
+  if (!confirm(`이 파일에는 자녀 ${d.kids?.length || 0}명, 책 ${d.records?.length || 0}권, 하루 기록 ${d.journal?.length || 0}개가 있어요.\n지금 기록에 합칠까요? (이미 있는 기록은 한 번만 들어가요)`)) return;
+  $("settingsDialog").close();
+  const n = mergeBackup(d);
+  toast(`가져왔어요! 자녀 ${n.k}명 · 책 ${n.r}권 · 읽은 기록 ${n.s}개 · 하루 기록 ${n.j}개`, 4500);
+});
+
 // ---------- 시작 ----------
+renderKids();
 render();
 go(["port", "stats"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "home");
 warmUpDetector();
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+if (!kids.length) openKids(true);

@@ -20,6 +20,8 @@
       <span class="stripes" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
       <h1>바나나북코드</h1>
     </div>
+    <button type="button" class="gear" id="gearBtn" aria-label="설정">⚙️</button>
+    <nav class="kidbar" id="kidBar" aria-label="자녀 고르기" hidden></nav>
   </header>
 
   <main>
@@ -357,6 +359,67 @@
       <div class="row">
         <button class="btn ghost" value="cancel" formnovalidate>취소</button>
         <button class="btn dark" value="ok">찾기</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 설정 -->
+  <dialog id="settingsDialog" class="bottom">
+    <form method="dialog" class="sheet">
+      <div class="sheet-top">
+        <button class="x-btn" value="close" aria-label="닫기">✕</button>
+        <b>설정</b>
+        <span></span>
+      </div>
+      <button type="button" class="set-row" id="setKids"><span class="si">👧</span><span class="st"><b>자녀 관리</b><small>닉네임 추가 · 수정 · 삭제</small></span><span>›</span></button>
+      <button type="button" class="set-row" id="setCats"><span class="si">🗂️</span><span class="st"><b>포트폴리오 카테고리 편집</b><small>이름 · 아이콘 · 순서 · 숨기기 · 추가</small></span><span>›</span></button>
+      <button type="button" class="set-row" id="setExport"><span class="si">💾</span><span class="st"><b>내 기록 모두 내려받기</b><small id="lastExport">모든 자녀의 기록을 파일 하나(ZIP)로 저장해요</small></span><span>›</span></button>
+      <button type="button" class="set-row" id="setImport"><span class="si">📤</span><span class="st"><b>기록 파일 다시 올리기</b><small>내려받은 파일(.zip 또는 .json)로 복원해요</small></span><span>›</span></button>
+      <p class="set-note">🔐 로그인과 포트폴리오 공개 설정은 곧 추가돼요.</p>
+    </form>
+  </dialog>
+  <input type="file" id="importFile" accept=".zip,.json,application/zip,application/json" hidden />
+
+  <!-- 자녀 등록 / 관리 -->
+  <dialog id="kidsDialog">
+    <form method="dialog" class="sheet">
+      <h3 id="kTitle">자녀 관리</h3>
+      <p class="k-help">닉네임은 다른 사람이 포트폴리오를 볼 때 보이는 이름이에요. 실명 대신 별명을 써 주세요.</p>
+      <ul class="kid-list" id="kList"></ul>
+      <button type="button" class="btn ghost add-row" id="kAdd">＋ 자녀 추가</button>
+      <div class="row">
+        <button class="btn ghost" value="cancel" id="kCancel" formnovalidate>취소</button>
+        <button type="button" class="btn dark" id="kSave">저장</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 카테고리 편집 -->
+  <dialog id="catsDialog" class="bottom">
+    <form method="dialog" class="sheet">
+      <div class="sheet-top">
+        <button class="x-btn" value="cancel" aria-label="닫기">✕</button>
+        <b>카테고리 편집</b>
+        <span></span>
+      </div>
+      <p class="k-help">아이콘을 눌러 이모지를 바꾸고, 이름을 고치고, ▲▼로 순서를 바꿔요. 👁를 누르면 숨겨져요. 🔒는 책장과 연결돼 있어서 숨기기만 돼요.</p>
+      <ul class="cat-list" id="cList"></ul>
+      <div class="cat-add">
+        <b>＋ 새 카테고리</b>
+        <div class="cat-add-row">
+          <input id="cNewIcon" class="ic-in" maxlength="4" placeholder="⭐" aria-label="새 카테고리 아이콘" />
+          <input id="cNewName" class="nm-in" maxlength="8" placeholder="이름 (예: 피아노)" aria-label="새 카테고리 이름" />
+        </div>
+        <div class="seg small" id="cNewKind" role="radiogroup" aria-label="기록 방식">
+          <button type="button" role="radio" data-kind="time" aria-checked="true">⏱ 한 것 + 시간</button>
+          <button type="button" role="radio" data-kind="note" aria-checked="false">📝 메모만</button>
+        </div>
+        <div class="emoji-pick" id="cEmoji"></div>
+        <button type="button" class="btn lime" id="cAdd">추가</button>
+      </div>
+      <div class="row">
+        <button class="btn ghost" value="cancel" formnovalidate>취소</button>
+        <button type="button" class="btn dark" id="cSave">저장</button>
       </div>
     </form>
   </dialog>
