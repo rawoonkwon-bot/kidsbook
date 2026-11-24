@@ -112,7 +112,10 @@ saveRecords();
 const sessionPages = (s) => (s.from && s.to ? Math.max(0, s.to - s.from + 1) : s.to || 0);
 const pagesOf = (r) => r.sessions.reduce((a, s) => a + sessionPages(s), 0);
 const minsOf = (r) => r.sessions.reduce((a, s) => a + (s.minutes || 0), 0);
-const pointsOf = (r) => pagesOf(r) + BONUS * (r.bonusRounds || (r.bonus ? [1] : [])).length;
+// 집중듣기는 '들은' 기록: 쪽수·포인트·스탬프·권수에 넣지 않고 시간만 셈
+const isFo = (r) => shelfOf(r) === "focus";
+const readRecs = () => records.filter((r) => !isFo(r));
+const pointsOf = (r) => isFo(r) ? 0 : pagesOf(r) + BONUS * (r.bonusRounds || (r.bonus ? [1] : [])).length;
 const totalPoints = () => records.reduce((a, r) => a + pointsOf(r), 0);
 const pct = (r) => (r.totalPages ? Math.min(100, Math.round((readTo(r) / r.totalPages) * 100)) : 0);
 const sessionText = (s) => (s.from && s.to ? `${s.from}~${s.to}쪽` : s.to ? `~${s.to}쪽` : "쪽수 없음") + (s.minutes ? ` · ${fmtMin(s.minutes)}` : "");
@@ -120,14 +123,14 @@ const firstDay = (r) => r.sessions.map((s) => s.day).sort()[0];
 const lastDay = (r) => r.sessions.map((s) => s.day).sort().at(-1);
 function progressText(r) {
   const to = readTo(r);
-  if (r.done) return `✅ 다 읽었어요!${r.totalPages ? ` (${r.totalPages}쪽)` : ""}${timesRead(r) > 1 ? ` · ${timesRead(r)}번 읽음` : ""}`;
+  if (r.done) return `✅ 다 ${isFo(r) ? "들었어요" : "읽었어요"}!${r.totalPages ? ` (${r.totalPages}쪽)` : ""}${timesRead(r) > 1 ? ` · ${timesRead(r)}번 ${isFo(r) ? "들음" : "읽음"}` : ""}`;
   const nth = roundOf(r) > 1 ? `${roundOf(r)}번째 읽는 중 · ` : "";
   if (!to) return nth ? `${roundOf(r)}번째 읽기 시작` : "";
   return nth + (r.totalPages ? `진도율 ${pct(r)}% (${to} / ${r.totalPages}쪽)` : `${to}쪽까지 읽었어요`);
 }
 const hasHangul = (t) => /[가-힣]/.test(t || "");
 const shelfOf = (r) => r.shelf || (hasHangul(r.title) ? "ko" : "en");
-const stampList = () => records.flatMap((r) => (r.finishes || []).map((f) => ({ r, at: f.at || 0, round: f.round }))).sort((a, b) => a.at - b.at);
+const stampList = () => readRecs().flatMap((r) => (r.finishes || []).map((f) => ({ r, at: f.at || 0, round: f.round }))).sort((a, b) => a.at - b.at);
 
 // ---------- UI 유틸 ----------
 let toastTimer;
@@ -215,7 +218,7 @@ function render() {
   const month = localDay().slice(0, 7);
   const inMonth = (r, m) => r.sessions.some((s) => s.day.startsWith(m));
   // 숫자 링
-  const monthN = records.filter((r) => inMonth(r, month)).length;
+  const monthN = readRecs().filter((r) => inMonth(r, month)).length;
   const stamps = stampList().length;
   const onBoard = stamps === 0 ? 0 : ((stamps - 1) % STAMPS_PER_BOARD) + 1;
   const pts = totalPoints();
@@ -261,7 +264,7 @@ function render() {
   if ($("dayDialog").open && openDayKey) fillDay(openDayKey);
 }
 $("monthFilter").addEventListener("change", render);
-for (const id of ["shelfKo", "shelfEn", "reading"]) {
+for (const id of ["shelfKo", "shelfEn", "shelfFo", "reading"]) {
   const pick = (e) => e.target.closest("[data-id]")?.dataset.id;
   $(id).addEventListener("click", (e) => { const i = pick(e); if (i) openView(i); });
   $(id).addEventListener("keydown", (e) => { if (e.key === "Enter") { const i = pick(e); if (i) openView(i); } });
@@ -342,6 +345,7 @@ let chosenShelf = "ko";
 const paintShelf = () => {
   [...$("shelfPick").children].forEach((x) => x.setAttribute("aria-checked", String(x.dataset.shelf === chosenShelf)));
   $("focusRow").hidden = chosenShelf !== "focus";
+  $("rDone").nextElementSibling.textContent = chosenShelf === "focus" ? "다 들음" : "다 읽음";
 };
 let preferShelf = null; // 포트폴리오 날짜 시트에서 스캔하면 그 책장을 먼저 골라 둠
 $("shelfPick").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) { chosenShelf = b.dataset.shelf; paintShelf(); } });
@@ -509,6 +513,12 @@ function saveRecord() {
   $("monthFilter").value = "all";
   render();
   rec = null;
+  if (isFo(r)) { // 집중듣기: 포인트·스탬프·독후활동 없이 기록만
+    flow = null;
+    $("recordPage").close("saved");
+    toast(finished ? `👂 끝까지 들었어요! (${fmtMin(minutes)})` : `👂 ${to}쪽까지 들었어요 · ${fmtMin(minutes)}`);
+    return;
+  }
   flow = { r, pages: gained };
   $("recordPage").close("saved");
   if (finished) $("finishSheet").showModal();
@@ -663,21 +673,21 @@ function fillView(r) {
   setImg($("vCover"), r.cover);
   $("vTitle").textContent = r.title;
   $("vAuthor").textContent = r.authors || "";
-  $("vMeta").textContent = [SHELVES[shelfOf(r)], r.totalPages && `${r.totalPages}쪽`, minsOf(r) && `${fmtMin(minsOf(r))} 들음`, `${pointsOf(r)}점`].filter(Boolean).join(" · ");
+  $("vMeta").textContent = [SHELVES[shelfOf(r)], r.totalPages && `${r.totalPages}쪽`, minsOf(r) && `${fmtMin(minsOf(r))} 들음`, !isFo(r) && `${pointsOf(r)}점`].filter(Boolean).join(" · ");
   $("vProgress").innerHTML = progressText(r)
     ? `<b>${esc(progressText(r))}</b>${r.totalPages ? `<div class="bar"><i style="width:${pct(r)}%"></i></div>` : ""}` : "";
   const rounds = roundOf(r);
   $("vSessions").innerHTML = Array.from({ length: rounds }, (_, i) => i + 1).map((n) => {
     const ss = roundSessions(r, n).sort((a, b) => a.day.localeCompare(b.day));
     const fin = (r.finishes || []).find((f) => f.round === n);
-    const head = rounds > 1 || fin ? `<li class="round-h"><b>${n}번째</b><span>${ss[0] ? shortDay(ss[0].day) : ""}${fin ? ` ~ ${shortDay(fin.day)} · 다 읽음` : " ~ 읽는 중"}</span></li>` : "";
+    const head = rounds > 1 || fin ? `<li class="round-h"><b>${n}번째</b><span>${ss[0] ? shortDay(ss[0].day) : ""}${fin ? ` ~ ${shortDay(fin.day)} · 다 ${isFo(r) ? "들음" : "읽음"}` : " ~ 읽는 중"}</span></li>` : "";
     return head + ss.map((s) => `<li><span>${prettyDay(s.day)}</span><b>${sessionText(s)}</b></li>`).join("");
   }).join("");
   $("vHome").checked = !!r.home; $("vHome").disabled = !!PEEK;
-  $("vTimes").innerHTML = timesRead(r) ? `${tallySvg(timesRead(r))}<span>${timesRead(r)}번 읽었어요</span>` : "";
+  $("vTimes").innerHTML = timesRead(r) ? `${tallySvg(timesRead(r))}<span>${timesRead(r)}번 ${isFo(r) ? "들었어요" : "읽었어요"}</span>` : "";
   $("vMore").hidden = false;
   $("vMore").textContent = r.done ? `🔁 다시 읽기 (${rounds + 1}번째)` : "➕ 이어서 기록하기";
-  $("vActivity").hidden = !(r.done && !(r.bonusRounds || []).includes(rounds));
+  $("vActivity").hidden = isFo(r) || !(r.done && !(r.bonusRounds || []).includes(rounds));
   $("vScore").textContent = r.score ? `${"★".repeat(r.score)}${"☆".repeat(5 - r.score)}  ${r.score}점` : "주지 않았어요";
   $("vNote").textContent = r.note || "적지 않았어요";
   $("vCat").value = BOOK_CATS.includes(r.category) ? r.category : "";
@@ -1100,12 +1110,12 @@ $("catFilter").addEventListener("click", (e) => {
 function renderStats() {
   const kidNow = kids.find((k) => k.id === activeKid);
   $("statsTitle").textContent = kidNow ? `${kidNow.nick} 독서 통계` : "독서 통계";
-  const pages = records.reduce((a, r) => a + pagesOf(r), 0);
-  const done = records.reduce((a, r) => a + timesRead(r), 0);
+  const pages = readRecs().reduce((a, r) => a + pagesOf(r), 0);
+  const done = readRecs().reduce((a, r) => a + timesRead(r), 0);
   const focusMins = records.reduce((a, r) => a + minsOf(r), 0) + journal.filter((j) => j.cat === "focus").reduce((a, j) => a + (j.minutes || 0), 0);
   const recDays = new Set([...records.flatMap((r) => r.sessions.map((s) => s.day)), ...journal.map((j) => j.day)]).size;
   $("statTiles").innerHTML = [
-    ["읽은 책", records.length, "권"], ["끝까지 읽은 횟수", done, "번"],
+    ["읽은 책", readRecs().length, "권"], ["끝까지 읽은 횟수", done, "번"],
     ["읽은 쪽수", pages.toLocaleString(), "쪽"], ["독서 포인트", totalPoints().toLocaleString(), "점"],
     ["집중듣기 시간", fmtMin(focusMins), ""], ["기록한 날", recDays, "일"],
   ].map(([k, v, u]) => `<div class="tile"><small>${k}</small><b>${v}<em>${u}</em></b></div>`).join("");
@@ -1113,7 +1123,7 @@ function renderStats() {
   // 한글책 / 영어책 / 집중듣기
   const groups = Object.keys(SHELVES).map((k) => {
     const list = records.filter((r) => shelfOf(r) === k);
-    return { k, n: list.length, p: list.reduce((a, r) => a + pagesOf(r), 0), color: `var(--${k === "focus" ? "fo" : k})` };
+    return { k, n: list.length, p: list.reduce((a, r) => a + pagesOf(r), 0), m: list.reduce((a, r) => a + minsOf(r), 0), color: `var(--${k === "focus" ? "fo" : k})` };
   });
   const sum = groups.reduce((a, g) => a + g.n, 0);
   $("statSplit").innerHTML = sum ? `
@@ -1121,7 +1131,7 @@ function renderStats() {
       ${groups.filter((g) => g.n).map((g) => `<i style="width:${(g.n / sum) * 100}%;background:${g.color}" title="${shelfName(g.k)} ${g.n}권"></i>`).join("")}
     </div>
     <div class="split-legend">
-      ${groups.map((g) => `<span><i style="background:${g.color}"></i>${shelfName(g.k)} <b>${g.n}권</b> <em>${g.p.toLocaleString()}쪽</em></span>`).join("")}
+      ${groups.map((g) => `<span><i style="background:${g.color}"></i>${shelfName(g.k)} <b>${g.n}권</b> <em>${g.k === "focus" ? fmtMin(g.m) : g.p.toLocaleString() + "쪽"}</em></span>`).join("")}
     </div>` : `<p class="empty">아직 기록이 없어요</p>`;
 
   // 분야별
@@ -1141,7 +1151,7 @@ function renderStats() {
   const now = new Date();
   const months = Array.from({ length: 6 }, (_, i) => localDay(new Date(now.getFullYear(), now.getMonth() - 5 + i, 1)).slice(0, 7));
   const mp = Object.fromEntries(months.map((m) => [m, 0]));
-  for (const r of records) for (const s of r.sessions) { const m = s.day.slice(0, 7); if (m in mp) mp[m] += sessionPages(s); }
+  for (const r of readRecs()) for (const s of r.sessions) { const m = s.day.slice(0, 7); if (m in mp) mp[m] += sessionPages(s); }
   const mmax = Math.max(1, ...Object.values(mp));
   $("statMonths").innerHTML = months.map((m) => `
     <div class="vbar" title="${m} ${mp[m]}쪽">${mp[m] ? `<b>${mp[m]}</b>` : ""}<i style="height:${(mp[m] / mmax) * 82}%"></i><small>${Number(m.slice(5))}월</small></div>`).join("");
@@ -1566,9 +1576,10 @@ function diaryHtml(d) {
       const c = catOf[j.cat] || { icon: "", name: j.cat };
       add(j.day, `<li>${ICON_EMOJI[toIcon(c.icon)] || "•"} ${esc(c.name)}${j.what ? ` · <b>${esc(j.what)}</b>` : ""}${j.minutes ? ` · ${fmtMin(j.minutes)}` : ""}${j.text ? `<div class="memo">${esc(j.text)}</div>` : ""}${j.photos?.length ? `<div class="memo">📷 사진 ${j.photos.length}장 (앱에서 볼 수 있어요)</div>` : ""}</li>`);
     }
-    const pages = recs.reduce((a, r) => a + pagesOf(r), 0), pts = recs.reduce((a, r) => a + pointsOf(r), 0);
+    const rr = recs.filter((r) => shelfOf(r) !== "focus"), foMin = recs.reduce((a, r) => a + (shelfOf(r) === "focus" ? minsOf(r) : 0), 0) + jr.filter((j) => j.cat === "focus").reduce((a, j) => a + (j.minutes || 0), 0);
+    const pages = rr.reduce((a, r) => a + pagesOf(r), 0), pts = rr.reduce((a, r) => a + pointsOf(r), 0);
     return `<section><h2>🍌 ${esc(k.nick)}${gradeOf(k) ? " " + gradeOf(k) : ""}</h2>
-      <p class="sum">책 ${recs.length}권 · 끝까지 읽은 횟수 ${recs.reduce((a, r) => a + (r.finishes || []).length, 0)}번 · ${pages.toLocaleString()}쪽 · 독서 포인트 ${pts.toLocaleString()}점</p>
+      <p class="sum">책 ${rr.length}권 · 끝까지 읽은 횟수 ${rr.reduce((a, r) => a + (r.finishes || []).length, 0)}번 · ${pages.toLocaleString()}쪽 · 독서 포인트 ${pts.toLocaleString()}점${foMin ? ` · 집중듣기 ${fmtMin(foMin)}` : ""}</p>
       <h3>📅 날짜별 기록</h3>
       ${Object.keys(days).sort().reverse().map((day) => `<div class="day"><h4>${plainDay(day)}</h4><ul>${days[day].join("")}</ul></div>`).join("") || "<p>기록이 없어요</p>"}
       <h3>📚 읽은 책</h3>
