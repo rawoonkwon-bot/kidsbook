@@ -3,6 +3,7 @@ import { lookupBook } from "./lookup.js";
 import { toIsbn13 } from "./isbn.js";
 import * as sync from "./sync.js";
 import { ico, toIcon, ICON_EMOJI, PICK } from "./icons.js";
+import { faceSvg, validFace, FACE_COLORS, FACE_COUNT } from "./faces.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -1383,26 +1384,75 @@ function prefetchPeek(u) {
   if (!peekCache.has(u)) peekCache.set(u, sync.fetchUser(u).catch(() => { peekCache.delete(u); return null; }));
   return peekCache.get(u);
 }
+// 엄마 얼굴 (안 고른 사람은 별명 첫 글자)
+function avatar(nick, face, cls = "av") {
+  if (validFace(face)) return `<span class="${cls}">${faceSvg(face)}</span>`;
+  const n = String(nick || "?");
+  const i = [...n].reduce((a, ch) => a + ch.codePointAt(0), 0) % FACE_COLORS.length;
+  return `<span class="${cls} av-txt" style="background:${FACE_COLORS[i]}">${esc([...n][0].toUpperCase())}</span>`;
+}
+const agoDay = (iso) => {
+  const n = dayDiff(localDay(new Date(iso)), localDay());
+  return n <= 0 ? "오늘 기록" : n === 1 ? "어제 기록" : n < 30 ? `${n}일 전 기록` : "한 달 넘게 쉬는 중";
+};
+const momRow = (m) => `<li><button type="button" class="mom-row" data-u="${esc(m.user_id)}">${avatar(m.nick, m.face)}<span><b>${esc(m.nick)}</b>${m.updated_at ? `<small>${agoDay(m.updated_at)}</small>` : ""}</span>${follows.has(m.user_id) ? `<em>이웃</em>` : ""}</button></li>`;
+let follows = new Map(), followsLoaded = false, momOffset = 0;
 async function renderBrowse() {
   $("browseWrap").hidden = !!(PEEK || !AUTH.user || AUTH.offline);
   if ($("browseWrap").hidden) return;
   if (browseLoaded) return;
   browseLoaded = true;
-  $("browse").innerHTML = `<small class="muted">불러오는 중…</small>`;
+  $("browse").innerHTML = `<li class="muted">불러오는 중…</li>`;
   try {
-    const moms = await sync.listMoms();
-    moms.forEach((m) => momCache.set(m.user_id, m));
-    $("browse").innerHTML = moms.length
-      ? moms.map((m) => `<button type="button" class="kid mom" data-u="${esc(m.user_id)}">${esc(m.nick)}</button>`).join("")
-      : `<small class="muted">아직 공개된 다른 책장이 없어요.</small>`;
-    moms.slice(0, 8).forEach((m) => prefetchPeek(m.user_id));
+    const [nb, page] = await Promise.all([sync.myFollows().catch(() => []), sync.listMoms(0)]);
+    follows = new Map(nb.map((m) => [m.user_id, m])); followsLoaded = true;
+    nb.forEach((m) => momCache.set(m.user_id, { ...momCache.get(m.user_id), ...m }));
+    paintFollows();
+    momOffset = 0; $("browse").innerHTML = "";
+    addMoms(page);
   } catch {
     browseLoaded = false;
-    $("browse").innerHTML = `<small class="muted">불러오지 못했어요. 인터넷 연결을 확인해 주세요.</small>`;
+    $("browse").innerHTML = `<li class="muted">불러오지 못했어요. 인터넷 연결을 확인해 주세요.</li>`;
   }
 }
-$("browse").addEventListener("pointerdown", (e) => { const b = e.target.closest("[data-u]"); if (b) prefetchPeek(b.dataset.u); });
-$("browse").addEventListener("click", (e) => { const b = e.target.closest("[data-u]"); if (b) openMom(b.dataset.u); });
+function paintFollows() {
+  $("nbWrap").hidden = !follows.size;
+  $("nbList").innerHTML = [...follows.values()].map((m) => `<button type="button" class="nb-chip" data-u="${esc(m.user_id)}">${avatar(m.nick, m.face)}${esc(m.nick)}</button>`).join("");
+}
+function addMoms({ list, more }) {
+  momOffset += 20;
+  list.forEach((m) => momCache.set(m.user_id, m));
+  const show = list.filter((m) => !follows.has(m.user_id));
+  $("browse").insertAdjacentHTML("beforeend", show.map(momRow).join(""));
+  if (!$("browse").children.length) $("browse").innerHTML = `<li class="muted">아직 공개된 다른 책장이 없어요.</li>`;
+  $("momMore").hidden = !more;
+  show.slice(0, 6).forEach((m) => prefetchPeek(m.user_id));
+}
+$("momMore").addEventListener("click", async () => {
+  $("momMore").disabled = true;
+  try { addMoms(await sync.listMoms(momOffset)); } catch { toast("불러오지 못했어요. 인터넷 연결을 확인해 주세요"); }
+  $("momMore").disabled = false;
+});
+let momQT = 0;
+$("momQ").addEventListener("input", () => {
+  clearTimeout(momQT);
+  const q = $("momQ").value.trim();
+  $("momMain").hidden = !!q; $("momFound").hidden = !q;
+  if (!q) return;
+  $("momFound").innerHTML = `<li class="muted">찾는 중…</li>`;
+  momQT = setTimeout(async () => {
+    try {
+      const list = await sync.searchMoms(q);
+      if ($("momQ").value.trim() !== q) return;
+      list.forEach((m) => momCache.set(m.user_id, m));
+      $("momFound").innerHTML = list.length ? list.map(momRow).join("") : `<li class="muted">"${esc(q)}" 별명을 찾지 못했어요</li>`;
+    } catch { $("momFound").innerHTML = `<li class="muted">찾지 못했어요. 인터넷 연결을 확인해 주세요.</li>`; }
+  }, 350);
+});
+for (const id of ["browse", "momFound", "nbList"]) {
+  $(id).addEventListener("pointerdown", (e) => { const b = e.target.closest("[data-u]"); if (b) prefetchPeek(b.dataset.u); });
+  $(id).addEventListener("click", (e) => { const b = e.target.closest("[data-u]"); if (b) openMom(b.dataset.u); });
+}
 // 앱을 다시 열지 않고 화면만 친구 책장으로 바꾸기 (구경하는 동안은 휴대폰에 아무것도 저장하지 않음)
 function enterPeek(data, kid) {
   fillMem(data, kid);
@@ -1643,11 +1693,20 @@ function loadState() {
 document.querySelectorAll("[data-ico]").forEach((el) => { el.innerHTML = ico(el.dataset.ico); });
 
 // ---------- 엄마 별명 ----------
-let nickFirst = false;
+let nickFirst = false, nFace = { f: 0, c: 0 };
+function paintFacePick() {
+  $("nFaceNow").innerHTML = faceSvg(nFace);
+  $("nFaces").innerHTML = Array.from({ length: FACE_COUNT }, (_, i) => `<button type="button" class="${i === nFace.f ? "on" : ""}" data-f="${i}" aria-label="표정 ${i + 1}">${faceSvg({ f: i, c: nFace.c })}</button>`).join("");
+  $("nCols").innerHTML = FACE_COLORS.map((x, i) => `<button type="button" class="${i === nFace.c ? "on" : ""}" data-c="${i}" style="background:${x}" aria-label="색 ${i + 1}"></button>`).join("");
+}
+$("nFaces").addEventListener("click", (e) => { const b = e.target.closest("[data-f]"); if (b) { nFace.f = Number(b.dataset.f); paintFacePick(); } });
+$("nCols").addEventListener("click", (e) => { const b = e.target.closest("[data-c]"); if (b) { nFace.c = Number(b.dataset.c); paintFacePick(); } });
 function openNick(first = false) {
   nickFirst = first;
   $("nTitle").textContent = first ? "엄마 별명을 정해 주세요" : "엄마 별명 바꾸기";
   $("nIn").value = sync.myNick(); $("nErr").textContent = "";
+  nFace = validFace(sync.myFace()) ? { ...sync.myFace() } : { f: 0, c: 0 };
+  paintFacePick();
   $("nCancel").hidden = first;
   $("nickDialog").showModal();
   setTimeout(() => $("nIn").focus(), 50);
@@ -1659,7 +1718,7 @@ $("nSave").addEventListener("click", async () => {
   if (!/^[0-9A-Za-z가-힣_]{2,12}$/.test(v)) { $("nErr").textContent = "한글·영어·숫자로 2~12자, 띄어쓰기 없이 적어 주세요"; return; }
   $("nSave").disabled = true; $("nErr").textContent = "";
   try {
-    await sync.setNick(v);
+    await sync.setNick(v, { f: nFace.f, c: nFace.c });
     $("nickDialog").close("saved");
     toast(`반가워요, ${v}님!`);
     if (nickFirst && !kids.length) openKids(true);
@@ -1692,7 +1751,7 @@ async function renderBoard(force = false) {
     if (boardLoaded !== board) return;
     $("postList").innerHTML = list.length ? list.map((p) => `<li><button type="button" class="post-row${p.pinned ? " pinned" : ""}" data-id="${p.id}">
         <b>${p.pinned ? `<span class="pin">공지</span>` : ""}${esc(p.title)}</b>
-        <small><span>${esc(p.nick)}</span><span>${ago(p.created_at)}</span>${p.views ? `<span>${ico("eye")} ${p.views}</span>` : ""}${p.nComments ? `<span>${ico("message")} ${p.nComments}</span>` : ""}${p.nLikes ? `<span>${ico("heart")} ${p.nLikes}</span>` : ""}</small>
+        <small><span class="who">${avatar(p.nick, p.face, "av xs")}${esc(p.nick)}</span><span>${ago(p.created_at)}</span>${p.views ? `<span>${ico("eye")} ${p.views}</span>` : ""}${p.nComments ? `<span>${ico("message")} ${p.nComments}</span>` : ""}${p.nLikes ? `<span>${ico("heart")} ${p.nLikes}</span>` : ""}</small>
       </button></li>`).join("") : `<li class="muted">아직 글이 없어요. 첫 글을 써 보세요!</li>`;
   } catch {
     boardLoaded = "";
@@ -1719,7 +1778,7 @@ async function openPost(id) {
 }
 function paintMeta() {
   const p = postNow;
-  $("pMeta").innerHTML = `<button type="button" class="nick-link" data-u="${esc(p.user_id)}">${esc(p.nick)}</button> · ${ago(p.created_at)}${p.updated_at && Date.parse(p.updated_at) - Date.parse(p.created_at) > 60000 ? " · 고침" : ""} · 조회 ${p.views || 0}`;
+  $("pMeta").innerHTML = `<button type="button" class="nick-link" data-u="${esc(p.user_id)}">${avatar(p.nick, p.face, "av xs")}${esc(p.nick)}</button> · ${ago(p.created_at)}${p.updated_at && Date.parse(p.updated_at) - Date.parse(p.created_at) > 60000 ? " · 고침" : ""} · 조회 ${p.views || 0}`;
 }
 function paintPost() {
   const p = postNow, mine = p.user_id === sync.myId(), adm = sync.amAdmin();
@@ -1985,7 +2044,7 @@ async function renderPopular(force = false) {
         ${img ? `<span class="pop-im">${img}</span>` : ""}
         <b>${esc(p.title)}</b>
         ${img ? "" : `<p>${esc((p.body || "").replace(/\s+/g, " ").slice(0, 70))}</p>`}
-        <small>${esc(p.nick)} · 조회 ${p.views || 0}</small></button>`;
+        <small>${avatar(p.nick, p.face, "av xs")}${esc(p.nick)} · 조회 ${p.views || 0}</small></button>`;
     }).join("");
     fillTopicImgs($("popRow"));
   } catch { popAt = 0; $("popWrap").hidden = true; }
@@ -2005,22 +2064,24 @@ async function openMom(uid, refresh = false) {
   const me = uid === sync.myId();
   const known = momCache.get(uid);
   if (!refresh) {
-    momNow = { uid, nick: known?.nick || (me ? sync.myNick() : ""), posts: [], data: null };
+    momNow = { uid, nick: known?.nick || (me ? sync.myNick() : ""), face: known?.face || (me ? sync.myFace() : null), posts: [], data: null };
     $("mNick").textContent = momNow.nick || "불러오는 중…";
-    $("mAv").textContent = (momNow.nick || " ").slice(0, 1).toUpperCase();
+    $("mAv").innerHTML = momNow.nick ? avatar(momNow.nick, momNow.face, "av big") : "";
+    paintFollowBtn();
+    if (!followsLoaded && !me) sync.myFollows().then((nb) => { follows = new Map(nb.map((m) => [m.user_id, m])); followsLoaded = true; paintFollowBtn(); }).catch(() => {});
     $("mCount").textContent = ""; $("mKids").innerHTML = `<small class="muted">불러오는 중…</small>`;
     $("mTopics").innerHTML = ""; $("mPosts").innerHTML = `<li class="muted">불러오는 중…</li>`;
     $("momPage").showModal();
   }
-  const [nick, data, posts] = await Promise.all([
-    momNow.nick ? momNow.nick : sync.nickOf(uid).catch(() => ""),
+  const [prof, data, posts] = await Promise.all([
+    momNow.nick ? { nick: momNow.nick, face: momNow.face } : sync.profileOf(uid).catch(() => null),
     me ? null : prefetchPeek(uid),
     sync.postsBy(uid).catch(() => null),
   ]);
   if (momNow?.uid !== uid) return;
-  momNow.nick = nick || "(알 수 없음)"; momNow.posts = posts || []; momNow.data = data;
+  momNow.nick = prof?.nick || "(알 수 없음)"; momNow.face = prof?.face || null; momNow.posts = posts || []; momNow.data = data;
   $("mNick").textContent = momNow.nick;
-  $("mAv").textContent = momNow.nick.slice(0, 1).toUpperCase();
+  $("mAv").innerHTML = avatar(momNow.nick, momNow.face, "av big");
   const kl = me ? kids : data?.kids || [];
   $("mKids").innerHTML = kl.length
     ? kl.map((k) => `<button type="button" class="kid" data-k="${esc(k.id)}">${esc(k.nick)}${gradeOf(k) ? ` <small class="grade">${gradeOf(k)}</small>` : ""}</button>`).join("")
@@ -2038,6 +2099,28 @@ async function openMom(uid, refresh = false) {
     : `<li class="muted">아직 쓴 글이 없어요.</li>`;
 }
 $("mClose").addEventListener("click", () => { $("momPage").close(); momNow = null; });
+function paintFollowBtn() {
+  const me = !momNow || momNow.uid === sync.myId();
+  $("mFollow").hidden = me;
+  if (me) return;
+  const on = follows.has(momNow.uid);
+  $("mFollow").classList.toggle("on", on);
+  $("mFollow").textContent = on ? "이웃 ✓" : "＋ 이웃 추가";
+}
+$("mFollow").addEventListener("click", async () => {
+  if (!momNow) return;
+  const { uid, nick, face } = momNow, on = !follows.has(uid);
+  if (!on && !confirm(`${nick}님을 이웃에서 뺄까요?`)) return;
+  $("mFollow").disabled = true;
+  try {
+    await sync.setFollow(uid, on);
+    if (on) follows = new Map([[uid, { user_id: uid, nick, face }], ...follows]); else follows.delete(uid);
+    toast(on ? `${nick}님을 이웃으로 추가했어요` : "이웃에서 뺐어요");
+    browseLoaded = false; if (!document.querySelector('.tab[data-tab="stats"]').hidden) renderBrowse();
+  } catch { toast("바꾸지 못했어요. 인터넷 연결을 확인해 주세요"); }
+  $("mFollow").disabled = false;
+  paintFollowBtn();
+});
 $("mPosts").addEventListener("click", (e) => { const b = e.target.closest("[data-id]"); if (b) openPost(b.dataset.id); });
 $("mKids").addEventListener("click", (e) => {
   const b = e.target.closest("[data-k]"); if (!b || !momNow) return;

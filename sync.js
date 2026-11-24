@@ -276,6 +276,7 @@ export async function deletePhotos(paths) {
 // ---------- 엄마 별명 · 게시판 ----------
 let profile = null, admin = false;
 export const myNick = () => profile?.nick || "";
+export const myFace = () => profile?.face || null;
 export const amAdmin = () => admin;
 export const myId = () => user?.id || "";
 // 별명이 없으면 null, 인터넷 문제로 모르면 예외
@@ -283,38 +284,38 @@ export async function loadProfile() {
   if (!user) return null;
   const c = await client();
   const [{ data: p, error }, { data: a }] = await Promise.all([
-    c.from("profiles").select("nick").eq("user_id", user.id).maybeSingle(),
+    c.from("profiles").select("nick, face").eq("user_id", user.id).maybeSingle(),
     c.from("admins").select("user_id").eq("user_id", user.id).maybeSingle(),
   ]);
   if (error) throw error;
   profile = p || null; admin = !!a;
   return profile;
 }
-export async function setNick(nick) {
+export async function setNick(nick, face = profile?.face || null) {
   const c = await client();
-  const { error } = await c.from("profiles").upsert({ user_id: user.id, nick }, { onConflict: "user_id" });
+  const { error } = await c.from("profiles").upsert({ user_id: user.id, nick, face }, { onConflict: "user_id" });
   if (error) throw new Error(error.code === "23505" ? "taken" : error.message);
-  profile = { nick };
+  profile = { nick, face };
 }
 const cnt = (x) => (Array.isArray(x) ? x[0]?.count || 0 : 0);
 export async function listPosts(board) {
   const c = await client();
   const { data, error } = await c.from("posts")
-    .select("id, board, title, pinned, views, topic, created_at, user_id, profiles(nick), comments(count), likes(count)")
+    .select("id, board, title, pinned, views, topic, created_at, user_id, profiles(nick, face), comments(count), likes(count)")
     .eq("board", board).order("pinned", { ascending: false }).order("created_at", { ascending: false }).limit(60);
   if (error) throw error;
-  return (data || []).map((p) => ({ ...p, nick: p.profiles?.nick || "(알 수 없음)", nComments: cnt(p.comments), nLikes: cnt(p.likes) }));
+  return (data || []).map((p) => ({ ...p, nick: p.profiles?.nick || "(알 수 없음)", face: p.profiles?.face || null, nComments: cnt(p.comments), nLikes: cnt(p.likes) }));
 }
 export async function getPost(id) {
   const c = await client();
   const [{ data: post, error }, { data: comments }, { data: mine }] = await Promise.all([
-    c.from("posts").select("id, board, title, body, photos, pinned, views, topic, created_at, updated_at, user_id, profiles(nick), likes(count)").eq("id", id).maybeSingle(),
+    c.from("posts").select("id, board, title, body, photos, pinned, views, topic, created_at, updated_at, user_id, profiles(nick, face), likes(count)").eq("id", id).maybeSingle(),
     c.from("comments").select("id, body, created_at, user_id, profiles(nick)").eq("post_id", id).order("created_at"),
     c.from("likes").select("post_id").eq("post_id", id).eq("user_id", user.id).maybeSingle(),
   ]);
   if (error) throw error;
   if (!post) return null;
-  return { ...post, nick: post.profiles?.nick || "(알 수 없음)", nLikes: cnt(post.likes), liked: !!mine,
+  return { ...post, nick: post.profiles?.nick || "(알 수 없음)", face: post.profiles?.face || null, nLikes: cnt(post.likes), liked: !!mine,
     comments: (comments || []).map((x) => ({ ...x, nick: x.profiles?.nick || "(알 수 없음)" })) };
 }
 export async function savePost({ id, board, title, body, photos, topic = null }) {
@@ -369,28 +370,64 @@ export async function listPopular(n = 6) {
   const c = await client();
   const since = new Date(Date.now() - 14 * 86400000).toISOString();
   const { data, error } = await c.from("posts")
-    .select("id, board, title, body, photos, topic, views, created_at, user_id, profiles(nick), comments(count), likes(count)")
+    .select("id, board, title, body, photos, topic, views, created_at, user_id, profiles(nick, face), comments(count), likes(count)")
     .gte("created_at", since).order("created_at", { ascending: false }).limit(200);
   if (error) throw error;
-  return (data || []).map((p) => ({ ...p, nick: p.profiles?.nick || "(알 수 없음)", nComments: cnt(p.comments), nLikes: cnt(p.likes) }))
+  return (data || []).map((p) => ({ ...p, nick: p.profiles?.nick || "(알 수 없음)", face: p.profiles?.face || null, nComments: cnt(p.comments), nLikes: cnt(p.likes) }))
     .map((p) => ({ ...p, score: p.nLikes * 3 + p.nComments * 2 + (p.views || 0) }))
     .filter((p) => p.score > 0)
     .sort((a, b) => b.score - a.score || b.created_at.localeCompare(a.created_at)).slice(0, n);
 }
-// 친구들 책장 구경: 책장을 공개한 엄마 별명 목록
-export async function listMoms() {
-  const rows = await listPublic();
+// 친구들 책장 구경: 책장을 공개한 엄마들 (요즘 기록한 순, 20명씩)
+const PAGE = 20;
+async function withProfiles(rows) {
   if (!rows.length) return [];
   const c = await client();
-  const { data, error } = await c.from("profiles").select("user_id, nick").in("user_id", rows.map((r) => r.user_id));
+  const { data, error } = await c.from("profiles").select("user_id, nick, face").in("user_id", rows.map((r) => r.user_id));
   if (error) throw error;
-  const nick = new Map((data || []).map((p) => [p.user_id, p.nick]));
-  return rows.filter((r) => nick.has(r.user_id)).map((r) => ({ user_id: r.user_id, nick: nick.get(r.user_id), kids: Array.isArray(r.kids) ? r.kids : [] }));
+  const pm = new Map((data || []).map((p) => [p.user_id, p]));
+  return rows.filter((r) => pm.has(r.user_id)).map((r) => ({ user_id: r.user_id, nick: pm.get(r.user_id).nick, face: pm.get(r.user_id).face || null,
+    kids: Array.isArray(r.kids) ? r.kids : [], updated_at: r.updated_at }));
 }
-export async function nickOf(uid) {
+export async function listMoms(offset = 0) {
   const c = await client();
-  const { data } = await c.from("profiles").select("nick").eq("user_id", uid).maybeSingle();
-  return data?.nick || "";
+  const { data, error } = await c.from("userdata").select("user_id, kids:data->kids, updated_at")
+    .eq("is_public", true).neq("user_id", user.id).order("updated_at", { ascending: false }).range(offset, offset + PAGE - 1);
+  if (error) throw error;
+  return { list: await withProfiles(data || []), more: (data || []).length === PAGE };
+}
+// 별명으로 찾기 (책장을 공개한 집만)
+export async function searchMoms(q) {
+  const s = String(q || "").replace(/[%_,()\\]/g, "").trim();
+  if (!s) return [];
+  const c = await client();
+  const { data: ps, error } = await c.from("profiles").select("user_id").ilike("nick", `%${s}%`).neq("user_id", user.id).limit(40);
+  if (error) throw error;
+  if (!ps?.length) return [];
+  const { data, error: e2 } = await c.from("userdata").select("user_id, kids:data->kids, updated_at").eq("is_public", true).in("user_id", ps.map((p) => p.user_id));
+  if (e2) throw e2;
+  return (await withProfiles(data || [])).slice(0, 20);
+}
+export async function profileOf(uid) {
+  const c = await client();
+  const { data } = await c.from("profiles").select("nick, face").eq("user_id", uid).maybeSingle();
+  return data || null;
+}
+// 이웃: 내가 추가한 엄마들 (상대 허락 없이, 나만 보는 목록)
+export async function myFollows() {
+  const c = await client();
+  const { data, error } = await c.from("follows").select("target, created_at").eq("user_id", user.id).order("created_at", { ascending: false });
+  if (error) throw error;
+  if (!data?.length) return [];
+  const { data: ps, error: e2 } = await c.from("profiles").select("user_id, nick, face").in("user_id", data.map((f) => f.target));
+  if (e2) throw e2;
+  const pm = new Map((ps || []).map((p) => [p.user_id, p]));
+  return data.filter((f) => pm.has(f.target)).map((f) => ({ user_id: f.target, nick: pm.get(f.target).nick, face: pm.get(f.target).face || null }));
+}
+export async function setFollow(target, on) {
+  const c = await client();
+  const { error } = on ? await c.from("follows").insert({ target }) : await c.from("follows").delete().eq("user_id", user.id).eq("target", target);
+  if (error && error.code !== "23505") throw error;
 }
 // 한 엄마가 쓴 글 (글감 포함)
 export async function postsBy(uid) {

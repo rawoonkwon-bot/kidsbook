@@ -99,7 +99,17 @@
       <div id="browseWrap">
         <h2 class="page-title">👀 친구들 책장 구경</h2>
         <p class="browse-help">엄마 별명을 누르면 그 집 아이들 책장과 쓴 글을 볼 수 있어요 (보기만 돼요)</p>
-        <div class="browse" id="browse"></div>
+        <input id="momQ" class="sub-input mom-q" type="search" placeholder="별명으로 찾기" autocomplete="off" autocapitalize="off" />
+        <ul class="mom-list" id="momFound" hidden></ul>
+        <div id="momMain">
+          <div id="nbWrap" hidden>
+            <h3 class="sec-title">내 이웃</h3>
+            <div class="nb-list" id="nbList"></div>
+          </div>
+          <h3 class="sec-title">요즘 기록한 집</h3>
+          <ul class="mom-list" id="browse"></ul>
+          <button type="button" class="btn ghost mom-more" id="momMore" hidden>더 보기</button>
+        </div>
       </div>
       <h2 class="page-title" id="statsTitle">독서 통계</h2>
       <div class="tiles" id="statTiles"></div>
@@ -490,6 +500,12 @@
       <p class="k-help">게시판에 글을 쓰면 이 별명이 작성자로 보여요. 한글·영어·숫자 2~12자, 띄어쓰기 없이 (예: zooisfun)</p>
       <input id="nIn" class="sub-input" maxlength="12" autocomplete="off" autocapitalize="off" placeholder="별명" />
       <p class="err" id="nErr"></p>
+      <div class="face-pick">
+        <div class="face-now" id="nFaceNow"></div>
+        <div><b>내 얼굴</b><small>표정과 색을 골라요. 게시판과 책장 구경에서 이 얼굴로 보여요</small></div>
+      </div>
+      <div class="face-grid" id="nFaces"></div>
+      <div class="face-cols" id="nCols"></div>
       <div class="row">
         <button class="btn ghost" value="cancel" id="nCancel" formnovalidate>취소</button>
         <button type="button" class="btn dark" id="nSave">저장</button>
@@ -574,7 +590,7 @@
   <dialog id="momPage" class="page">
     <div class="page-in">
       <div class="page-top"><button type="button" class="x-btn" id="mClose" aria-label="닫기">✕</button><span></span></div>
-      <div class="mom-head"><div class="mom-av" id="mAv"></div><div><h2 id="mNick"></h2><p id="mCount"></p></div></div>
+      <div class="mom-head"><div class="mom-av" id="mAv"></div><div class="grow"><h2 id="mNick"></h2><p id="mCount"></p></div><button type="button" class="follow-btn" id="mFollow" hidden></button></div>
       <section id="mKidsSec">
         <h3 class="sec-title">아이 책장</h3>
         <div class="browse" id="mKids"></div>
