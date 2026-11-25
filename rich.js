@@ -112,6 +112,9 @@ export function makeRich(root, { placeholder = "", max = 10, onChange = () => {}
   // 사진 주소를 나중에 채울 때 (고치기)
   function refresh() { for (const b of blocks()) if (b.tagName === "FIGURE") b.querySelector("img").src = b._p.url || ""; }
   const focus = () => { const t = blocks().filter((b) => b.tagName === "TEXTAREA").at(-1); t?.focus(); };
+  // 숨겨진 창에서 글을 채우면 글칸 높이를 못 재서 글이 잘려 보임 → 창이 보이거나 폭이 바뀌면 다시 맞춤
+  let lastW = 0;
+  new ResizeObserver(() => { const w = root.clientWidth; if (!w) { lastW = 0; return; } if (w !== lastW) { lastW = w; blocks().filter((b) => b.tagName === "TEXTAREA").forEach(grow); } }).observe(root);
   set("");
   return { set, get, insert, photos, refresh, focus, clear: () => set("") };
 }
