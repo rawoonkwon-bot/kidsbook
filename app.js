@@ -896,7 +896,9 @@ const booksOn = (day, shelf) => records.flatMap((r) =>
   r.sessions.filter((s) => s.day === day && shelfOf(r) === shelf).map((s) => ({ r, s })));
 // 집중듣기(hybrid)는 스캔한 책 기록 + 직접 적은 기록을 모두 보여 줌
 const journalOn = (day, cat) => journal.filter((j) => j.day === day && j.cat === cat);
-const countOn = (day, c) => (c.book || c.hybrid ? booksOn(day, c.key).length : 0) + journalOn(day, c.key).length;
+// 책 기록이 있는 날, 그 책에 따로 적은 읽은 시간 → 책 줄에 합쳐 보여 줌
+const mergedTime = (day, c, j) => !!(c.book && j.book && j.minutes && booksOn(day, c.key).some(({ r }) => r.id === j.book));
+const countOn = (day, c) => (c.book || c.hybrid ? booksOn(day, c.key).length : 0) + journalOn(day, c.key).filter((j) => !mergedTime(day, c, j)).length;
 const catsOn = (day) => CATS.filter((c) => countOn(day, c));
 
 let calYM = localDay().slice(0, 7);
@@ -964,13 +966,17 @@ function dayGroupsHtml(day) {
     if (c.book || c.hybrid) {
       for (const { r, s } of booksOn(day, c.key)) {
         n++;
+        // 한글책·영어책: 그날 따로 적은 읽은 시간은 책 줄에 같이 (집중듣기처럼 한 줄로)
+        const tj = c.book ? journalOn(day, c.key).filter((j) => j.book === r.id && j.minutes) : [];
+        const chips = tj.map((j) => `<button type="button" class="t-chip" data-edit="${j.id}" aria-label="읽은 시간 고치기">⏱ ${fmtMin(j.minutes)}</button>`).join("");
         rows += `<div class="day-item link" data-view="${r.id}">
           ${r.cover ? `<img src="${esc(r.cover)}" alt="">` : `<span class="noc"></span>`}
-          <div class="grow"><b>${esc(r.title)}</b><small>${sessionText(s)}</small></div></div>`;
+          <div class="grow"><b>${esc(r.title)}</b><small>${sessionText(s)}${chips}</small></div></div>`;
       }
     }
     {
       for (const j of journalOn(day, c.key)) {
+        if (mergedTime(day, c, j)) continue; // 위 책 줄에 이미 보임
         n++;
         // 박스 제목에 종류 이름·아이콘이 있으니, 기록에는 내용만
         const mins = j.minutes ? fmtMin(j.minutes) : "";

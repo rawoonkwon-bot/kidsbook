@@ -1219,3 +1219,6 @@ body.peek #wsOpen { display: none; }
 #tuPrev { background: var(--card); box-shadow: var(--raise-s); color: var(--ink); }
 #tuNext { background: var(--sage); color: var(--forest-d); }
 .tu-nav button:focus { outline: none; }
+
+/* 책 줄에 붙는 읽은 시간 (누르면 고치기) */
+.t-chip { display: inline-flex; align-items: center; margin-left: 8px; border: 0; border-radius: 999px; padding: 2px 9px; background: var(--soft); color: var(--forest); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; vertical-align: 1px; }
