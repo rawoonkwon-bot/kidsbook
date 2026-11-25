@@ -10,6 +10,7 @@ async function kakao(q, key) {
   if (!r.ok) return [];
   return ((await r.json()).documents || []).map((d) => ({
     title: d.title, authors: d.authors || [], publisher: d.publisher || "", cover: https(d.thumbnail), pages: null, source: "카카오",
+    isbn: (String(d.isbn || "").split(" ").find((x) => x.length === 13) || ""),
   }));
 }
 async function openLibrary(q) {
@@ -17,7 +18,7 @@ async function openLibrary(q) {
   if (!r.ok) return [];
   return ((await r.json()).docs || []).map((d) => ({
     title: d.title, authors: (d.author_name || []).slice(0, 2), publisher: d.publisher?.[0] || "",
-    cover: d.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg` : "", pages: d.number_of_pages_median || null, source: "Open Library",
+    cover: d.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg` : "", pages: d.number_of_pages_median || null, source: "Open Library", isbn: "",
   }));
 }
 async function google(q) {
@@ -26,6 +27,7 @@ async function google(q) {
   return ((await r.json()).items || []).map(({ volumeInfo: v = {} }) => ({
     title: v.subtitle ? `${v.title}: ${v.subtitle}` : v.title, authors: v.authors || [], publisher: v.publisher || "",
     cover: https(v.imageLinks?.thumbnail || ""), pages: v.pageCount || null, source: "Google Books",
+    isbn: (v.industryIdentifiers || []).find((x) => x.type === "ISBN_13")?.identifier || "",
   }));
 }
 
