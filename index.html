@@ -445,10 +445,9 @@
         <span id="eTextLabel"></span>
         <textarea id="eText" rows="4"></textarea>
       </label>
-      <div class="field" id="ePhotoWrap" hidden>
-        <span>사진 <small id="ePhotoCount">0/10</small></span>
-        <div class="photo-grid" id="ePhotos"></div>
-        <button type="button" class="btn ghost photo-add" id="ePhotoAdd">📷 사진 추가 (휴대폰 사진첩 · 컴퓨터 파일)</button>
+      <div class="rt-box" id="eRichWrap" hidden>
+        <div class="rt-bar"><button type="button" class="rt-btn" id="ePhotoAdd">📷 사진</button><small id="ePhotoCount">사진 0/10</small></div>
+        <div class="rt" id="eRich"></div>
         <input type="file" id="ePhotoFile" accept="image/*" multiple hidden />
       </div>
       <div class="row">
@@ -671,16 +670,12 @@
     <div class="page-in">
       <div class="page-top"><button type="button" class="x-btn" id="beClose" aria-label="닫기">✕</button><button type="button" class="pill-btn" id="beSave">올리기</button></div>
       <input id="beTitle" class="title-input" maxlength="100" placeholder="제목" />
-      <textarea id="beBody" rows="12" maxlength="20000" placeholder="오늘 이야기를 적어 보세요"></textarea>
-      <div class="field">
-        <span>사진 <small id="bePhotoCount">0/10</small></span>
-        <div class="photo-grid" id="bePhotos"></div>
-        <button type="button" class="btn ghost photo-add" id="bePhotoAdd">📷 사진 추가</button>
+      <div class="rt-box">
+        <div class="rt-bar"><button type="button" class="rt-btn" id="bePhotoAdd">📷 사진</button><button type="button" class="rt-btn" id="beTopicBtn">📚 글감</button><small id="bePhotoCount">사진 0/10</small>
+          <div class="rt-fmt" id="beFmt"><span class="rt-sz" role="group" aria-label="글씨 크기"><button type="button" data-s="1" aria-label="작은 글씨">가</button><button type="button" data-s="2" aria-label="보통 글씨">가</button><button type="button" data-s="3" aria-label="큰 글씨">가</button></span><span class="rt-cl" role="group" aria-label="글씨 색"><button type="button" data-c="0" class="fc-0" aria-label="기본 색"></button><button type="button" data-c="1" class="fc-1" aria-label="주황"></button><button type="button" data-c="2" class="fc-2" aria-label="초록"></button><button type="button" data-c="3" class="fc-3" aria-label="파랑"></button><button type="button" data-c="4" class="fc-4" aria-label="금색"></button></span></div></div>
+        <div id="beTopic" class="rt-topic"></div>
+        <div class="rt" id="beRich"></div>
         <input type="file" id="bePhotoFile" accept="image/*" multiple hidden />
-      </div>
-      <div class="field">
-        <span>글감 <small>책·영화·공연·방송 중 하나를 붙일 수 있어요</small></span>
-        <div id="beTopic"></div>
       </div>
       <div class="field">
         <span>태그 <small>최대 10개 · 적고 엔터</small></span>

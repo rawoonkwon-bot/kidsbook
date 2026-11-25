@@ -4,6 +4,7 @@ import { toIsbn13 } from "./isbn.js";
 import * as sync from "./sync.js";
 import { ico, toIcon, ICON_EMOJI, PICK } from "./icons.js";
 import { faceSvg, validFace, FACE_COLORS, FACE_COUNT } from "./faces.js";
+import { makeRich, makeRichCE, richHtml, plainText, MARK } from "./rich.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -891,7 +892,7 @@ function dayGroupsHtml(day) {
         const main = j.what || mins || c.name;
         const sub = j.what ? [mins, j.text || ""].filter(Boolean).join(" · ") : mins ? j.text || "" : "";
         rows += `<div class="day-item link" data-edit="${j.id}">
-          <div class="grow">${note ? (j.text ? `<p class="dn-text">${esc(j.text)}</p>` : "") : `<b>${esc(main)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}`}${j.photos?.length ? `<div class="ph-row" data-paths="${esc(j.photos.join("|"))}"></div>` : ""}</div>
+          <div class="grow">${note ? richHtml(j.text, j.photos || [], "ph-row", "dn-text") : `<b>${esc(main)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}${j.photos?.length ? `<div class="ph-row" data-paths="${esc(j.photos.join("|"))}"></div>` : ""}`}</div>
           <button type="button" class="x" data-del="${j.id}" aria-label="지우기">✕</button></div>`;
       }
     }
@@ -1020,43 +1021,60 @@ function openEntry(cat, entry = null) {
   $("eAmountWrap").hidden = !c.amount; $("eAmountLabel").textContent = (c.amount || "").replace("몇 분", "얼마나"); $("eUnit").textContent = c.unit || ""; $("eAmount").value = ""; $("eHour").value = "";
   $("eTextWrap").hidden = false; $("eTextLabel").textContent = c.text || "한 줄 메모 (선택)"; $("eText").placeholder = c.textPh || ""; $("eText").value = "";
   $("eText").rows = c.kind === "note" ? 9 : c.text ? 5 : 2;
-  ePhotos.forEach((p) => p.file && URL.revokeObjectURL(p.url)); ePhotos = [];
+  eRich.photos().forEach((p) => p.file && URL.revokeObjectURL(p.url));
+  const isNote = c.kind === "note";
+  $("eTextWrap").hidden = isNote; $("eRichWrap").hidden = !isNote;
+  const items = (entry?.photos || []).map((path) => ({ path, url: "" }));
+  eRich.set(isNote ? entry?.text || "" : "", items);
   if (entry) {
-    $("eWhat").value = entry.what || ""; $("eText").value = entry.text || "";
+    $("eWhat").value = entry.what || ""; $("eText").value = isNote ? "" : entry.text || "";
     if (entry.minutes) { $("eHour").value = Math.floor(entry.minutes / 60) || ""; $("eAmount").value = entry.minutes % 60 || ""; }
-    ePhotos = (entry.photos || []).map((path) => ({ path, url: "" }));
     const paths = entry.photos || [];
     if (paths.length) sync.photoUrls(paths).then((urls) => {
       const map = new Map(paths.map((pa, i) => [pa, urls[i]]));
-      ePhotos.forEach((p) => { if (p.path) p.url = map.get(p.path) || ""; });
-      paintPhotos();
+      items.forEach((p) => { if (p.path) p.url = map.get(p.path) || ""; });
+      eRich.refresh();
     });
   }
-  $("ePhotoWrap").hidden = c.kind !== "note"; paintPhotos();
+  paintPhotos();
   $("dayDialog").close("away"); returnDay = openDayKey || returnDay;
   $("entryDialog").showModal();
 }
 // 일기 사진: 최대 10장, 올리기 전에 작게 줄임(긴 쪽 1280px)
 const MAX_PHOTOS = 10;
-let ePhotos = []; // [{ file, url }]
+// 메모: 사진이 글 사이에 들어감 (도구줄의 📷 사진)
+const eRich = makeRich($("eRich"), { placeholder: "오늘 있었던 일을 적어 보세요", max: MAX_PHOTOS, onChange: (gone) => { if (gone?.file) URL.revokeObjectURL(gone.url); paintPhotos(); } });
 function paintPhotos() {
-  $("ePhotoCount").textContent = `${ePhotos.length}/${MAX_PHOTOS}`;
-  $("ePhotos").innerHTML = ePhotos.map((p, i) => `<span class="ph"><img src="${p.url}" alt=""><button type="button" data-rm="${i}" aria-label="사진 빼기">✕</button></span>`).join("");
-  $("ePhotoAdd").hidden = ePhotos.length >= MAX_PHOTOS;
+  const n = eRich.photos().length;
+  $("ePhotoCount").textContent = `사진 ${n}/${MAX_PHOTOS}`;
+  $("ePhotoAdd").disabled = n >= MAX_PHOTOS;
 }
+const pickImages = (input) => [...input.files].filter((f) => f.type.startsWith("image/") || /\.(heic|heif)$/i.test(f.name));
+$("ePhotoAdd").addEventListener("mousedown", (e) => e.preventDefault()); // 글 쓰던 자리를 놓치지 않게
 $("ePhotoAdd").addEventListener("click", () => $("ePhotoFile").click());
 $("ePhotoFile").addEventListener("change", () => {
-  const files = [...$("ePhotoFile").files].filter((f) => f.type.startsWith("image/") || /\.(heic|heif)$/i.test(f.name));
-  const room = MAX_PHOTOS - ePhotos.length;
+  const files = pickImages($("ePhotoFile"));
+  const room = MAX_PHOTOS - eRich.photos().length;
   if (files.length > room) toast(`사진은 ${MAX_PHOTOS}장까지 넣을 수 있어요`);
-  for (const f of files.slice(0, room)) ePhotos.push({ file: f, url: URL.createObjectURL(f) });
+  eRich.insert(files.slice(0, room).map((f) => ({ file: f, url: URL.createObjectURL(f) })));
   $("ePhotoFile").value = "";
   paintPhotos();
 });
-$("ePhotos").addEventListener("click", (e) => {
-  const b = e.target.closest("[data-rm]"); if (!b) return;
-  const [p] = ePhotos.splice(Number(b.dataset.rm), 1); if (p.file) URL.revokeObjectURL(p.url); paintPhotos();
-});
+// 쓴 순서대로 사진을 올리고, 못 올린 사진 자리는 글에서 뺌 → { body, paths }
+async function uploadRich({ body, items }, folder, skip = false) {
+  const ok = [], paths = [];
+  let tried = 0;
+  for (const it of items) {
+    if (it.path) { ok.push(true); paths.push(it.path); continue; }
+    if (skip) { ok.push(false); continue; }
+    tried++;
+    toast(`사진 올리는 중 ${tried}/${items.filter((x) => x.file).length}`, 60000);
+    try { paths.push(await sync.uploadPhoto(await shrinkPhoto(it.file), folder)); ok.push(true); } catch { ok.push(false); }
+  }
+  let k = 0;
+  const out = body.split("\n").filter((l) => (l.trim() === MARK ? ok[k++] : true)).join("\n").trim();
+  return { body: out, paths, failed: ok.filter((x) => !x).length };
+}
 async function shrinkPhoto(file) {
   const bmp = await createImageBitmap(file, { imageOrientation: "from-image" }).catch(() => createImageBitmap(file));
   const s = Math.min(1, 1280 / Math.max(bmp.width, bmp.height));
@@ -1070,8 +1088,10 @@ $("entryDialog").addEventListener("close", async () => {
   if ($("entryDialog").returnValue !== "save" || !entryCat) return;
   const cat = entryCat; entryCat = null;
   const old = editEntry; editEntry = null;
-  const what = $("eWhat").value.trim(), text = $("eText").value.trim(), minutes = ((parseInt($("eHour").value, 10) || 0) * 60 + (parseInt($("eAmount").value, 10) || 0)) || null;
-  const all = ePhotos; ePhotos = [];
+  const isNote = CAT[cat].kind === "note";
+  const rich = isNote ? eRich.get() : { body: "", items: [] };
+  const what = $("eWhat").value.trim(), text = isNote ? rich.body : $("eText").value.trim(), minutes = ((parseInt($("eHour").value, 10) || 0) * 60 + (parseInt($("eAmount").value, 10) || 0)) || null;
+  const all = rich.items;
   const kept = all.filter((p) => p.path).map((p) => p.path);
   const picked = all.filter((p) => p.file);
   if (!what && !text && !minutes && !all.length) { toast("내용을 적어 주세요"); return; }
@@ -1083,16 +1103,15 @@ $("entryDialog").addEventListener("close", async () => {
   Object.assign(entry, { what, minutes, text });
   if (kept.length) entry.photos = kept; else delete entry.photos;
   if (picked.length) {
-    const paths = [];
-    if (!sync.canUpload()) toast("사진은 인터넷에 연결돼 있을 때 올릴 수 있어요. 글만 저장했어요", 3500);
-    else {
-      for (let i = 0; i < picked.length; i++) {
-        toast(`사진 올리는 중 ${i + 1}/${picked.length}`, 60000);
-        try { paths.push(await sync.uploadPhoto(await shrinkPhoto(picked[i].file), cat === "secret" ? "private" : "")); } catch { /* 이 사진은 건너뜀 */ }
-      }
-      if (paths.length < picked.length) toast(`사진 ${picked.length - paths.length}장은 올리지 못했어요`, 3500);
+    if (!sync.canUpload()) {
+      toast("사진은 인터넷에 연결돼 있을 때 올릴 수 있어요. 글만 저장했어요", 3500);
+      entry.text = (await uploadRich({ body: text, items: all }, "", true)).body;
+    } else {
+      const up = await uploadRich({ body: text, items: all }, cat === "secret" ? "private" : "");
+      entry.text = up.body;
+      if (up.paths.length) entry.photos = up.paths; else delete entry.photos;
+      if (up.failed) toast(`사진 ${up.failed}장은 올리지 못했어요`, 3500);
     }
-    if (paths.length) entry.photos = [...kept, ...paths];
     picked.forEach((p) => URL.revokeObjectURL(p.url));
   }
   if (!old) journal.push(entry);
@@ -1575,7 +1594,7 @@ function diaryHtml(d) {
     for (const r of recs) for (const s of r.sessions) add(s.day, `<li>${shelfLabel[shelfOf(r)] || "📚"} <b>${esc(r.title)}</b> · ${esc(sessionText(s))}</li>`);
     for (const j of jr) {
       const c = catOf[j.cat] || { icon: "", name: j.cat };
-      add(j.day, `<li>${ICON_EMOJI[toIcon(c.icon)] || "•"} ${esc(c.name)}${j.what ? ` · <b>${esc(j.what)}</b>` : ""}${j.minutes ? ` · ${fmtMin(j.minutes)}` : ""}${j.text ? `<div class="memo">${esc(j.text)}</div>` : ""}${j.photos?.length ? `<div class="memo">📷 사진 ${j.photos.length}장 (앱에서 볼 수 있어요)</div>` : ""}</li>`);
+      add(j.day, `<li>${ICON_EMOJI[toIcon(c.icon)] || "•"} ${esc(c.name)}${j.what ? ` · <b>${esc(j.what)}</b>` : ""}${j.minutes ? ` · ${fmtMin(j.minutes)}` : ""}${plainText(j.text) ? `<div class="memo">${esc(plainText(j.text))}</div>` : ""}${j.photos?.length ? `<div class="memo">📷 사진 ${j.photos.length}장 (앱에서 볼 수 있어요)</div>` : ""}</li>`);
     }
     const rr = recs.filter((r) => shelfOf(r) !== "focus"), foMin = recs.reduce((a, r) => a + (shelfOf(r) === "focus" ? minsOf(r) : 0), 0) + jr.filter((j) => j.cat === "focus").reduce((a, j) => a + (j.minutes || 0), 0);
     const pages = rr.reduce((a, r) => a + pagesOf(r), 0), pts = rr.reduce((a, r) => a + pointsOf(r), 0);
@@ -2009,7 +2028,7 @@ let wTopic = null, topicTo = "peTopic"; // 글감을 그릴 곳 (게시판 글�
 function paintWTopic() {
   $(topicTo).innerHTML = wTopic
     ? `<div class="topic-pick">${topicCardHtml(wTopic)}<button type="button" class="x" id="peTopicRm" aria-label="글감 빼기">✕</button></div>`
-    : `<button type="button" class="btn ghost topic-add" id="peTopicAdd">＋ 글감 붙이기</button>`;
+    : topicTo === "beTopic" ? "" : `<button type="button" class="btn ghost topic-add" id="peTopicAdd">＋ 글감 붙이기</button>`;
   fillTopicImgs($(topicTo));
 }
 $("peTopic").addEventListener("click", (e) => {
@@ -2296,9 +2315,10 @@ function paintBlogPost() {
   $("bvTitle").textContent = b.title;
   $("bvTopic").innerHTML = b.topic?.title ? topicCardHtml(b.topic) : "";
   fillTopicImgs($("bvTopic"));
-  $("bvBody").textContent = b.body;
-  $("bvPhotos").innerHTML = b.photos?.length ? `<div class="ph-row big" data-paths="${esc(b.photos.join("|"))}"></div>` : "";
-  fillPhotoRows($("bvPhotos"));
+  // 글 사이사이에 쓴 순서대로 사진 (예전 글은 사진이 맨 뒤)
+  $("bvBody").innerHTML = richHtml(b.body, b.photos || [], "ph-row inl");
+  $("bvPhotos").innerHTML = "";
+  fillPhotoRows($("bvBody"));
   $("bvTags").innerHTML = (b.tags || []).map((t) => `<button type="button" data-tag="${esc(t)}">#${esc(t)}</button>`).join("");
   $("bvActions").innerHTML = [mine ? `<button type="button" data-a="edit">고치기</button>` : "", mine || sync.amAdmin() ? `<button type="button" data-a="del">지우기</button>` : ""].join("");
 }
@@ -2330,13 +2350,14 @@ $("bvActions").addEventListener("click", async (e) => {
 });
 
 // 블로그 글쓰기 · 고치기
-let bEditing = null, bPhotos = [], bTags = [];
+let bEditing = null, bTags = [];
+const bRich = makeRichCE($("beRich"), { placeholder: "오늘 이야기를 적어 보세요", max: MAX_PHOTOS, onChange: (gone) => { if (gone?.file) URL.revokeObjectURL(gone.url); paintBPhotos(); } });
 const MAX_TAGS = 10;
 const cleanTag = (t) => String(t || "").replace(/^#+/, "").replace(/[\s,#]+/g, "").slice(0, 20);
 function paintBPhotos() {
-  $("bePhotoCount").textContent = `${bPhotos.length}/${MAX_PHOTOS}`;
-  $("bePhotos").innerHTML = bPhotos.map((p, i) => `<span class="ph"><img src="${esc(p.url)}" alt=""><button type="button" data-rm="${i}" aria-label="사진 빼기">✕</button></span>`).join("");
-  $("bePhotoAdd").hidden = bPhotos.length >= MAX_PHOTOS;
+  const n = bRich.photos().length;
+  $("bePhotoCount").textContent = `사진 ${n}/${MAX_PHOTOS}`;
+  $("bePhotoAdd").disabled = n >= MAX_PHOTOS;
 }
 function paintBTags() {
   $("beTags").innerHTML = bTags.map((t, i) => `<button type="button" data-rm="${i}" aria-label="태그 빼기">#${esc(t)} ✕</button>`).join("");
@@ -2353,11 +2374,12 @@ function openBlogEdit(b = null) {
   if (!AUTH.user || AUTH.offline) { toast("블로그는 인터넷에 연결돼 있을 때 쓸 수 있어요"); return; }
   if (!sync.myNick()) { openNick(false); return; }
   bEditing = b;
-  bPhotos.forEach((x) => x.file && URL.revokeObjectURL(x.url));
-  bPhotos = (b?.photos || []).map((path) => ({ path, url: "" }));
-  if (b?.photos?.length) sync.photoUrls(b.photos).then((urls) => { const m = new Map(b.photos.map((pa, i) => [pa, urls[i]])); bPhotos.forEach((x) => { if (x.path) x.url = m.get(x.path) || ""; }); paintBPhotos(); });
+  bRich.photos().forEach((x) => x.file && URL.revokeObjectURL(x.url));
+  const items = (b?.photos || []).map((path) => ({ path, url: "" }));
+  bRich.set(b?.body || "", items);
+  if (b?.photos?.length) sync.photoUrls(b.photos).then((urls) => { const m = new Map(b.photos.map((pa, i) => [pa, urls[i]])); items.forEach((x) => { if (x.path) x.url = m.get(x.path) || ""; }); bRich.refresh(); });
   bTags = [...(b?.tags || [])];
-  $("beTitle").value = b?.title || ""; $("beBody").value = b?.body || ""; $("beTagIn").value = "";
+  $("beTitle").value = b?.title || ""; $("beTagIn").value = "";
   $("bePublic").checked = b ? !!b.is_public : true;
   $("beSave").textContent = b ? "고치기" : "올리기";
   if (wTopic?.url) URL.revokeObjectURL(wTopic.url);
@@ -2367,21 +2389,26 @@ function openBlogEdit(b = null) {
   $("blogEdit").scrollTop = 0;
 }
 $("beClose").addEventListener("click", () => {
-  if (($("beTitle").value.trim() || $("beBody").value.trim()) && !bEditing && !confirm("쓰던 글을 버릴까요?")) return;
+  const r = bRich.get();
+  if (($("beTitle").value.trim() || r.body) && !bEditing && !confirm("쓰던 글을 버릴까요?")) return;
   $("blogEdit").close();
 });
+$("bePhotoAdd").addEventListener("mousedown", (e) => e.preventDefault()); // 글 쓰던 자리를 놓치지 않게
 $("bePhotoAdd").addEventListener("click", () => $("bePhotoFile").click());
 $("bePhotoFile").addEventListener("change", () => {
-  const files = [...$("bePhotoFile").files].filter((f) => f.type.startsWith("image/") || /\.(heic|heif)$/i.test(f.name));
-  const room = MAX_PHOTOS - bPhotos.length;
+  const files = pickImages($("bePhotoFile"));
+  const room = MAX_PHOTOS - bRich.photos().length;
   if (files.length > room) toast(`사진은 ${MAX_PHOTOS}장까지 넣을 수 있어요`);
-  for (const f of files.slice(0, room)) bPhotos.push({ file: f, url: URL.createObjectURL(f) });
+  bRich.insert(files.slice(0, room).map((f) => ({ file: f, url: URL.createObjectURL(f) })));
   $("bePhotoFile").value = "";
   paintBPhotos();
 });
-$("bePhotos").addEventListener("click", (e) => {
-  const b = e.target.closest("[data-rm]"); if (!b) return;
-  const [x] = bPhotos.splice(Number(b.dataset.rm), 1); if (x.file) URL.revokeObjectURL(x.url); paintBPhotos();
+$("beTopicBtn").addEventListener("click", () => openTopicPick());
+// 글씨 크기·색: 버튼을 눌러도 고른 글자가 풀리지 않게
+for (const id of ["bePhotoAdd", "beFmt"]) { $(id).addEventListener("pointerdown", (e) => e.preventDefault()); $(id).addEventListener("mousedown", (e) => e.preventDefault()); }
+$("beFmt").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.s) bRich.style("s", b.dataset.s); else bRich.style("c", b.dataset.c);
 });
 $("beTags").addEventListener("click", (e) => { const b = e.target.closest("[data-rm]"); if (b) { bTags.splice(Number(b.dataset.rm), 1); paintBTags(); } });
 $("beTagIn").addEventListener("keydown", (e) => {
@@ -2394,18 +2421,15 @@ $("beTopic").addEventListener("click", (e) => {
   if (e.target.closest("#peTopicAdd") || e.target.closest(".topic-card")) openTopicPick();
 });
 $("beSave").addEventListener("click", async () => {
-  const title = $("beTitle").value.trim(), body = $("beBody").value.trim();
+  const title = $("beTitle").value.trim(), rich = bRich.get();
   if (!title) { toast("제목을 적어 주세요"); $("beTitle").focus(); return; }
   if ($("beTagIn").value.trim()) { addTagsFrom($("beTagIn").value); $("beTagIn").value = ""; }
   $("beSave").disabled = true;
   try {
-    const kept = bPhotos.filter((x) => x.path).map((x) => x.path);
-    const fresh = bPhotos.filter((x) => x.file);
-    const paths = [...kept];
-    for (let i = 0; i < fresh.length; i++) {
-      toast(`사진 올리는 중 ${i + 1}/${fresh.length}`, 60000);
-      try { paths.push(await sync.uploadPhoto(await shrinkPhoto(fresh[i].file), "blog")); } catch { /* 건너뜀 */ }
-    }
+    const kept = rich.items.filter((x) => x.path).map((x) => x.path);
+    const fresh = rich.items.filter((x) => x.file);
+    const up = await uploadRich(rich, "blog");
+    const body = up.body, paths = up.paths;
     const removed = (bEditing?.photos || []).filter((x) => !kept.includes(x));
     let topic = null;
     if (wTopic) {
@@ -2417,7 +2441,7 @@ $("beSave").addEventListener("click", async () => {
     if (oldTp && oldTp !== topic?.photo) removed.push(oldTp);
     const id = await sync.saveBlog({ id: bEditing?.id, title, body, photos: paths, topic, tags: bTags, is_public: $("bePublic").checked });
     if (removed.length) sync.deletePhotos(removed);
-    fresh.forEach((x) => URL.revokeObjectURL(x.url)); bPhotos = [];
+    fresh.forEach((x) => URL.revokeObjectURL(x.url)); bRich.clear();
     if (wTopic?.url) URL.revokeObjectURL(wTopic.url);
     wTopic = null;
     $("blogEdit").close();
