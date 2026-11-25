@@ -284,7 +284,7 @@ export async function loadProfile() {
   if (!user) return null;
   const c = await client();
   const [{ data: p, error }, { data: a }] = await Promise.all([
-    c.from("profiles").select("nick, face").eq("user_id", user.id).maybeSingle(),
+    c.from("profiles").select("nick, face, tu_seen").eq("user_id", user.id).maybeSingle(),
     c.from("admins").select("user_id").eq("user_id", user.id).maybeSingle(),
   ]);
   if (error) throw error;
@@ -295,7 +295,14 @@ export async function setNick(nick, face = profile?.face || null) {
   const c = await client();
   const { error } = await c.from("profiles").upsert({ user_id: user.id, nick, face }, { onConflict: "user_id" });
   if (error) throw new Error(error.code === "23505" ? "taken" : error.message);
-  profile = { nick, face };
+  profile = { ...profile, nick, face };
+}
+// 사용법(튜토리얼)을 봤다고 표시 — 계정당 한 번만 저절로 열려요
+export async function markTutorialSeen() {
+  if (!user) return;
+  const c = await client();
+  await c.from("profiles").update({ tu_seen: true }).eq("user_id", user.id);
+  if (profile) profile.tu_seen = true;
 }
 const cnt = (x) => (Array.isArray(x) ? x[0]?.count || 0 : 0);
 export async function listPosts(board) {

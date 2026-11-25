@@ -2615,8 +2615,9 @@ if (PEEK) {
   if (PEEK_ID) { history.replaceState(null, "", location.pathname); toast("지금은 볼 수 없는 책장이에요 (나만 보기로 바뀌었을 수 있어요)", 3500); }
   if (!AUTH.user) showAuth("login", AUTH.error ? "인터넷에 연결한 뒤 다시 열어 주세요." : "");
   else if (sync.RECOVERY) showAuth("newpw");
-  else if (PROFILE === null) setTimeout(() => { hideWelcome(); openNick(true); }, 900);
+  else if (PROFILE === null) setTimeout(() => { hideWelcome(); openTutorial(() => openNick(true)); }, 900); // 처음 가입: 사용법 → 엄마 별명 → 아이 등록
   else if (!kids.length) setTimeout(() => { hideWelcome(); openKids(true); }, 900);
+  else if (PROFILE && PROFILE.tu_seen === false) setTimeout(() => { hideWelcome(); openTutorial(); }, 900); // 이미 가입한 회원: 사용법 한 번
   else { welcome.addEventListener("click", hideWelcome); setTimeout(hideWelcome, 1300); }
 }
 
@@ -2909,3 +2910,27 @@ $("auActs").addEventListener("click", async (e) => {
     try { const n = await sync.adminDeleteAll(m.user_id); toast(`${n || 0}개를 지웠어요`); boardLoaded = ""; openAdmUser(m.user_id); } catch { toast("지우지 못했어요"); }
   }
 });
+
+// ---------- 처음 사용법 (6장) — 별명이 아직 없는 새 회원에게 한 번, 설정에서 다시 보기 ----------
+let tuAt = 0, tuAfter = null;
+const tuCards = () => [...$("tuTrack").children];
+function tuGo(n) {
+  const cs = tuCards(); tuAt = Math.max(0, Math.min(cs.length - 1, n));
+  $("tuTrack").style.transform = `translateX(${-tuAt * 100}%)`;
+  [...$("tuDots").children].forEach((d, i) => d.classList.toggle("on", i === tuAt));
+  $("tuCnt").textContent = `${tuAt + 1} / ${cs.length}`;
+  $("tuPrev").style.visibility = tuAt ? "visible" : "hidden";
+  $("tuNext").textContent = tuAt === cs.length - 1 ? (tuAfter ? "시작하기 🍌" : "닫기") : "다음";
+}
+function openTutorial(after = null) { tuAfter = after; tuGo(0); $("tutorial").showModal(); }
+function closeTutorial() { const f = tuAfter; tuAfter = null; $("tutorial").close(); if (PROFILE && PROFILE.tu_seen === false) { PROFILE.tu_seen = true; sync.markTutorialSeen().catch(() => {}); } if (f) setTimeout(f, 150); }
+$("tuPrev").addEventListener("click", () => tuGo(tuAt - 1));
+$("tuNext").addEventListener("click", () => (tuAt === tuCards().length - 1 ? closeTutorial() : tuGo(tuAt + 1)));
+$("tuSkip").addEventListener("click", closeTutorial);
+$("tutorial").addEventListener("cancel", (e) => { e.preventDefault(); closeTutorial(); });
+$("tuDots").addEventListener("click", (e) => { const i = [...$("tuDots").children].indexOf(e.target); if (i >= 0) tuGo(i); });
+// 손가락으로 옆으로 밀어서 넘기기
+let tuX = null;
+$("tuTrack").addEventListener("touchstart", (e) => { tuX = e.touches[0].clientX; }, { passive: true });
+$("tuTrack").addEventListener("touchend", (e) => { if (tuX == null) return; const dx = e.changedTouches[0].clientX - tuX; tuX = null; if (Math.abs(dx) > 40) tuGo(tuAt + (dx < 0 ? 1 : -1)); });
+$("setTutorial").addEventListener("click", () => { $("settingsDialog").close("away"); openTutorial(); });

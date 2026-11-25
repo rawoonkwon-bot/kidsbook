@@ -1060,3 +1060,37 @@ body.peek #wsOpen { display: none; }
 .au-acts button { padding: 9px 12px; font-size: 13px; background: var(--card); box-shadow: var(--raise-s); }
 .au-acts button.on { background: #FDECEC; color: #A32D2D; box-shadow: none; }
 .comments li .rp-btn { margin-left: 0; border: 0; background: none; color: var(--muted); font-size: 11px; cursor: pointer; padding: 2px 4px; opacity: .7; }
+
+/* 처음 사용법 */
+.tu-in { display: flex; flex-direction: column; min-height: 100%; overflow: hidden; }
+.tu-top { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--muted); padding-top: 4px; }
+.tu-top button { border: 0; background: none; color: var(--muted); font: inherit; font-size: 14px; cursor: pointer; padding: 6px; }
+.tu-view { flex: 1; overflow: hidden; margin: 0 -4px; padding: 0 4px; }
+.tu-track { display: flex; transition: transform .3s ease; }
+.tu-card { flex: 0 0 100%; text-align: center; padding: 6px 8px 8px; box-sizing: border-box; }
+.tu-art { height: 190px; display: flex; align-items: center; justify-content: center; margin: 6px 0 10px; }
+.tu-art svg { max-width: 100%; height: auto; }
+.tu-card h3 { font-size: 22px; margin: 6px 0 10px; color: var(--forest); line-height: 1.35; }
+.tu-card p { font-size: 15px; line-height: 1.65; color: #55595F; margin: 0 0 8px; }
+.tu-legend { display: grid; grid-template-columns: auto 1fr; gap: 9px 12px; text-align: left; font-size: 14px; margin: 4px 10px 0; align-items: center; }
+.tu-legend .tb { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; font-size: 12px; font-weight: 800; }
+.tu-two { display: inline-flex; gap: 2px; }
+.tu-tally { color: #2F7A45; font-weight: 800; letter-spacing: 1px; }
+.tu-bar { display: inline-block; width: 22px; height: 5px; border-radius: 3px; background: #2F7A45; }
+.tu-names { display: grid; gap: 12px; background: var(--card); box-shadow: var(--raise-s); border-radius: 18px; padding: 14px; margin: 14px 0; text-align: left; }
+.tu-names > div { display: flex; gap: 12px; align-items: flex-start; }
+.tu-ic { width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; flex: none; }
+.tu-names b { display: block; font-size: 15px; }
+.tu-names small { display: block; font-size: 13px; color: var(--muted); line-height: 1.5; margin-top: 2px; }
+.tu-kids { display: flex; gap: 6px; margin-top: 6px; }
+.tu-kids i { font-style: normal; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 99px; background: var(--soft); }
+.tu-kids i.on { background: var(--forest); color: #F3EFE6; }
+.tu-where { font-size: 13px !important; text-align: left; background: var(--card); border-radius: 14px; padding: 10px 12px; color: #55595F; }
+.tu-dots { display: flex; justify-content: center; gap: 6px; margin: 14px 0 12px; }
+.tu-dots i { width: 8px; height: 8px; border-radius: 50%; background: #D8D2C4; cursor: pointer; transition: width .2s; }
+.tu-dots i.on { width: 22px; border-radius: 4px; background: var(--forest); }
+.tu-nav { display: flex; gap: 8px; padding-bottom: calc(env(safe-area-inset-bottom) + 12px); }
+.tu-nav button { flex: 1; border: 0; border-radius: 16px; padding: 15px; font: inherit; font-size: 16px; font-weight: 800; cursor: pointer; }
+#tuPrev { background: var(--card); box-shadow: var(--raise-s); color: var(--ink); }
+#tuNext { background: var(--sage); color: var(--forest-d); }
+.tu-nav button:focus { outline: none; }
