@@ -42,6 +42,12 @@
         <button type="button" class="ring-card" id="ringStampEnBtn" aria-label="영어책 스탬프 보기"><div class="ring en" id="ringStampEn"></div><small>영어책 스탬프</small></button>
       </div>
 
+      <button type="button" class="tb-card" id="tbOpen">
+        <span class="tb-ic" data-ico="book"></span>
+        <span class="tb-txt"><b>교과서 수록도서</b><small id="tbSum">초등 1~6학년 · 중 · 고</small></span>
+        <span class="tb-bar" id="tbBar"><i></i></span><span class="tb-go">›</span>
+      </button>
+
       <div id="popWrap" hidden>
         <div class="pop-head"><h3 class="sec-title">인기글</h3><button type="button" class="link-btn" id="popMore">게시판 가기 ›</button></div>
         <div class="pop-row" id="popRow"></div>
@@ -384,6 +390,19 @@
     <div class="page-in">
       <div class="page-top no-print"><button type="button" class="x-btn" id="certClose" aria-label="닫기">✕</button><button type="button" class="pill-btn" id="certPrint">인쇄 · PDF로 저장</button></div>
       <article class="cert" id="cert"></article>
+    </div>
+  </dialog>
+
+  <!-- 교과서 수록도서 목록 -->
+  <dialog id="tbPage" class="page">
+    <div class="page-in">
+      <div class="page-top"><button type="button" class="x-btn" id="tbClose" aria-label="닫기">✕</button></div>
+      <h2 class="page-title">📚 교과서 수록도서</h2>
+      <p class="ws-help" id="tbHelp">교과서에 실린 책이에요. 우리 아이가 기록한 책은 ✓ 표시가 돼요.</p>
+      <div class="tb-tabs" id="tbTabs" role="tablist" aria-label="학년"></div>
+      <div class="tb-tools"><span id="tbCount"></span></div>
+      <ul class="shelf tb-shelf" id="tbList"></ul>
+      <p class="tmdb-note" id="tbSrc"></p>
     </div>
   </dialog>
 

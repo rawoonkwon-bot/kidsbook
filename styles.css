@@ -1233,3 +1233,28 @@ body.peek #wsOpen { display: none; }
 /* 영상 검색 (TMDB 포스터) */
 .find-item.poster img { width: 46px; height: 69px; }
 .tmdb-note { font-size: 11px; color: var(--muted); line-height: 1.5; margin: 8px 2px 0; }
+
+/* 홈: 교과서 수록도서 카드 */
+.tb-card { width: 100%; display: grid; grid-template-columns: auto 1fr auto; grid-template-rows: auto auto; column-gap: 12px; row-gap: 8px; align-items: center; border: 0; border-radius: 18px; background: var(--card); box-shadow: var(--raise); padding: 14px 16px; margin: 4px 0 18px; font: inherit; color: var(--ink); text-align: left; cursor: pointer; }
+.tb-card .tb-ic { grid-row: 1 / 3; width: 44px; height: 44px; border-radius: 14px; background: #E4EFE3; color: var(--forest); display: grid; place-items: center; }
+.tb-card .tb-ic .ico { width: 24px; height: 24px; }
+.tb-card .tb-txt b { display: block; font-size: 16px; }
+.tb-card .tb-txt small { display: block; font-size: 13px; color: var(--muted); margin-top: 2px; }
+.tb-card .tb-go { grid-row: 1 / 3; grid-column: 3; font-size: 22px; color: var(--muted); }
+.tb-card .tb-bar { grid-column: 2; height: 6px; border-radius: 6px; background: var(--soft); overflow: hidden; }
+.tb-card .tb-bar i { display: block; height: 100%; background: var(--forest); border-radius: 6px; width: 0; }
+/* 교과서 수록도서 목록 */
+.tb-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 4px 0 12px; }
+.tb-tabs button { border: 0; border-radius: 12px; background: var(--card); box-shadow: var(--raise-s); padding: 8px 4px; font: inherit; color: var(--ink); cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 1px; }
+.tb-tabs button b { font-size: 14px; }
+.tb-tabs button small { font-size: 11px; color: var(--muted); }
+.tb-tabs button[aria-selected="true"] { background: var(--forest); color: #F3EFE6; box-shadow: none; }
+.tb-tabs button[aria-selected="true"] small { color: #CFE0CC; }
+.tb-tools { font-size: 13px; color: var(--muted); margin: 0 2px 8px; }
+.tb-shelf { margin-top: 4px; }
+.tb-shelf li { cursor: pointer; }
+.tb-nocover { flex-direction: column; gap: 4px; background: linear-gradient(160deg, #F4EFE3, #E7E0CF); color: var(--ink) !important; }
+.tb-nocover b { font-size: 12px; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.tb-nocover small { font-size: 10px; color: var(--muted); font-weight: 500; }
+#tbSrc { margin-top: 14px; }
+.tb-shelf li.loading { opacity: .5; }

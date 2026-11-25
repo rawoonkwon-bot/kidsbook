@@ -230,6 +230,7 @@ function render() {
   for (const [sh, id] of [["ko", "ringStampKo"], ["en", "ringStampEn"]]) { const o = onBoardOf(sh); $(id).innerHTML = ringSvg(o / STAMPS_PER_BOARD) + `<b>${o}<small>/${STAMPS_PER_BOARD}</small></b>`; }
   $("ringPoint").innerHTML = ringSvg(0) + `<b style="font-size:${pts >= 10000 ? 16 : 19}px">${pts.toLocaleString()}</b>`;
 
+  renderTbCard();
   // 요즘 읽는 중
   const reading = records.filter((r) => !r.done && r.sessions.some((s) => s.to)).sort((a, b) => lastDay(b).localeCompare(lastDay(a)));
   $("readingHead").textContent = `📖 요즘 읽는 중 (${reading.length})`;
@@ -3078,7 +3079,7 @@ $("rKids").addEventListener("click", (e) => {
 
 // ---------- 교과서 수록도서: 제목 옆 학년 동그라미 ----------
 // 바코드(ISBN)가 같으면 바로, 아니면 제목+지은이로 맞춰 봐요 (짧은 제목은 지은이까지 같아야 해요)
-const nT = (s) => String(s || "").toLowerCase().replace(/\[[^\]]*\]|\([^)]*\)/g, "").replace(/[^0-9a-z가-힣]/g, "");
+function nT(s) { return String(s || "").toLowerCase().replace(/\[[^\]]*\]|\([^)]*\)/g, "").replace(/[^0-9a-z가-힣]/g, ""); } // 함수로 둬야 홈 화면(먼저 그림)에서도 쓸 수 있어요
 const TB_I = new Map(), TB_T = [];
 for (const [t, a, g, is] of TEXTBOOK) {
   for (const i of is.split(" ").filter(Boolean)) TB_I.set(i, (TB_I.get(i) || "") + g);
@@ -3094,6 +3095,87 @@ function tbGrades(isbn, title, authors) {
   return [...gs].sort((p, q) => TB_ORDER.indexOf(p) - TB_ORDER.indexOf(q));
 }
 const TB_ORDER = "123456중고";
+
+// ---------- 교과서 수록도서 목록 (홈 카드 → 학년 탭 · 검색 · 읽은 책 표시) ----------
+const TB_TABS = ["1", "2", "3", "4", "5", "6", "중"]; // 고등 목록은 빼기로 함 (책 제목 옆 학년 동그라미에는 그대로)
+function tbName(g) { return g === "중" ? "중학교" : g === "고" ? "고등학교" : `${g}학년`; }
+let tbTab = null;
+// 이 아이가 기록한 책과 교과서 목록 맞춰 보기 → { 목록 번호: 기록 }
+function tbMine() {
+  const hit = new Map();
+  TEXTBOOK.forEach(([t, a, , is], i) => {
+    const isbns = is.split(" ").filter(Boolean), nt0 = nT(t), a0 = a.replace(/\s/g, "");
+    const r = records.find((r) => {
+      if (r.isbn && isbns.includes(r.isbn)) return true;
+      const nt = nT(r.title), au = String(r.authors || "").replace(/\s/g, ""), auOk = a0 && au.includes(a0);
+      return (nt === nt0 && (nt0.length >= 4 || auOk)) || (auOk && ((nt0.length >= 3 && nt.startsWith(nt0)) || (nt.length >= 4 && nt0.startsWith(nt))));
+    });
+    if (r) hit.set(i, r);
+  });
+  return hit;
+}
+function tbKidTab() {
+  const g = gradeOf(kids.find((k) => k.id === activeKid) || {});
+  return /^초[1-6]$/.test(g) ? g[1] : /^(중|고|졸업)/.test(g) ? "중" : "1";
+}
+function renderTbCard() {
+  const g = tbKidTab(), mine = tbMine();
+  const idx = TEXTBOOK.map((x, i) => i).filter((i) => TEXTBOOK[i][2].includes(g));
+  const n = idx.filter((i) => mine.has(i)).length;
+  const kid = kids.find((k) => k.id === activeKid);
+  $("tbSum").textContent = `${kid ? `${kid.nick} · ` : ""}${tbName(g)} ${idx.length}권 중 ${n}권 읽음`;
+  $("tbBar").firstElementChild.style.width = `${idx.length ? (n / idx.length) * 100 : 0}%`;
+}
+let TB_COVER = {}; // "제목|지은이" → 표지 주소 (tbcovers.js, 목록을 열 때 한 번 불러옴)
+function renderTb() {
+  const mine = tbMine();
+  $("tbTabs").innerHTML = TB_TABS.map((g) => {
+    const all = TEXTBOOK.filter((x) => x[2].includes(g)).length;
+    const got = TEXTBOOK.map((x, i) => i).filter((i) => TEXTBOOK[i][2].includes(g) && mine.has(i)).length;
+    return `<button type="button" role="tab" data-g="${g}" aria-selected="${g === tbTab}"><b>${g === "중" ? "중학교" : `${g}학년`}</b><small>${got}/${all}</small></button>`;
+  }).join("");
+  const list = TEXTBOOK.map((x, i) => ({ x, i })).filter(({ x }) => x[2].includes(tbTab));
+  // 읽은 책을 앞으로, 그다음 표지 있는 책
+  list.sort((p, q) => (mine.has(q.i) - mine.has(p.i)) || (!!TB_COVER[q.x[0] + "|" + q.x[1]] - !!TB_COVER[p.x[0] + "|" + p.x[1]]));
+  const got = list.filter(({ i }) => mine.has(i)).length;
+  $("tbCount").textContent = `${tbName(tbTab)} ${list.length}권 · 읽은 책 ${got}권`;
+  $("tbList").innerHTML = list.map(({ x: [t, a], i }) => {
+    const r = mine.get(i), c = r?.cover || TB_COVER[t + "|" + a];
+    return `<li data-i="${i}" title="${esc(t)} · ${esc(a)}">
+      ${c ? `<img class="cover" src="${esc(c)}" alt="${esc(t)}" loading="lazy">` : `<div class="cover tb-nocover"><b>${esc(t)}</b><small>${esc(a)}</small></div>`}
+      ${r ? `<span class="done-badge" aria-label="기록한 책">✓</span>` : ""}</li>`;
+  }).join("");
+  $("tbSrc").textContent = "출처: 교육부·한국교육학술정보원 '독서로' 교과서 수록 도서 + 서점의 학년·학기별 교과서 수록도서 분류 (2026년 11월 정리). 표지는 책 검색으로 찾은 것이라 판이 다를 수 있어요.";
+}
+$("tbOpen").addEventListener("click", async () => {
+  tbTab = tbKidTab();
+  renderTb(); $("tbPage").showModal(); $("tbPage").scrollTop = 0;
+  if (!Object.keys(TB_COVER).length) { try { TB_COVER = (await import("./tbcovers.js")).TB_COVER; renderTb(); } catch {} }
+});
+$("tbClose").addEventListener("click", () => $("tbPage").close());
+$("tbTabs").addEventListener("click", (e) => { const b = e.target.closest("[data-g]"); if (!b) return; tbTab = b.dataset.g; renderTb(); });
+$("tbList").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-i]"); if (!b) return;
+  const i = Number(b.dataset.i), [t, a, , is] = TEXTBOOK[i], r = tbMine().get(i);
+  // 기록한 책도 안 한 책도 책 소개 창부터 (바코드가 없으면 제목·지은이로 찾아서 바코드를 알아냄)
+  let isbn = r?.isbn || is.split(" ").find(Boolean);
+  if (!isbn) {
+    b.classList.add("loading");
+    try {
+      const res = await fetch(`/api/search?q=${encodeURIComponent(t)}`);
+      const list = res.ok ? (await res.json()).results || [] : [];
+      const a0 = a.replace(/\s/g, "").split(/[,·]/)[0].replace(/외.*$/, "");
+      const hit = list.find((x) => x.isbn && nT(x.title).startsWith(nT(t)) && a0 && (x.authors || []).join("").replace(/\s/g, "").includes(a0));
+      isbn = hit?.isbn;
+    } catch {}
+    b.classList.remove("loading");
+  }
+  $("tbPage").close();
+  if (isbn) { openSheet(isbn, null); return; } // 스캔한 것처럼 책 소개 → 기록하기
+  if (r) { openView(r.id); return; } // 기록한 책인데 소개를 못 찾으면 그 책 기록으로
+  openRecord({ self: true, book: { title: t, authors: [a] } }); // 못 찾으면 제목으로 바로 기록
+  $("rFind").click();
+});
 const tbHtml = (gs) => gs.length ? `<span class="tb-gs">${gs.map((g) => { const nm = g === "중" ? "중학교" : g === "고" ? "고등학교" : `초등 ${g}학년`; return `<i class="tb-g${g === "중" ? " m" : g === "고" ? " h" : ""}" title="${nm} 교과서 수록도서" aria-label="${nm} 교과서 수록">${g}</i>`; }).join("")}</span>` : "";
 
 // ---------- 신고 ----------
