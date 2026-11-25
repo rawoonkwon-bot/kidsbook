@@ -701,6 +701,10 @@ $("certPage").addEventListener("close", () => document.body.classList.remove("pr
 
 // ---------- 책장에서 책 눌렀을 때 ----------
 let viewing = null;
+// 책 기록 보기에서 적은 읽은 시간 (포트폴리오 기록에 이 책 표시가 붙어 있음)
+const bookTimes = (r) => journal.filter((j) => j.book === r.id && j.minutes).sort((a, b) => a.day.localeCompare(b.day));
+const bookMins = (r) => bookTimes(r).reduce((a, j) => a + j.minutes, 0);
+let entryBook = null; // 책 기록 보기에서 시간 적기를 눌렀을 때 그 책 id
 $("vCat").innerHTML = `<option value="">미분류</option>` + BOOK_CATS.map((c) => `<option>${c}</option>`).join("");
 function openView(id) {
   const r = records.find((x) => x.id === id); if (!r) return;
@@ -712,7 +716,7 @@ function fillView(r) {
   setImg($("vCover"), r.cover);
   $("vTitle").innerHTML = esc(r.title) + tbHtml(tbGrades(r.isbn, r.title, r.authors));
   $("vAuthor").textContent = r.authors || "";
-  $("vMeta").textContent = [SHELVES[shelfOf(r)], r.totalPages && `${r.totalPages}쪽`, minsOf(r) && `${fmtMin(minsOf(r))} ${isFo(r) ? "들음" : "읽음"}`, !isFo(r) && `${pointsOf(r)}점`].filter(Boolean).join(" · ");
+  $("vMeta").textContent = [SHELVES[shelfOf(r)], r.totalPages && `${r.totalPages}쪽`, (minsOf(r) + bookMins(r)) && `${fmtMin(minsOf(r) + bookMins(r))} ${isFo(r) ? "들음" : "읽음"}`, !isFo(r) && `${pointsOf(r)}점`].filter(Boolean).join(" · ");
   $("vProgress").innerHTML = progressText(r)
     ? `<b>${esc(progressText(r))}</b>${r.totalPages ? `<div class="bar"><i style="width:${pct(r)}%"></i></div>` : ""}` : "";
   const rounds = roundOf(r);
@@ -722,9 +726,12 @@ function fillView(r) {
     const head = rounds > 1 || fin ? `<li class="round-h"><b>${n}번째</b><span>${ss[0] ? shortDay(ss[0].day) : ""}${fin ? ` ~ ${shortDay(fin.day)} · 다 ${isFo(r) ? "들음" : "읽음"}` : ` ~ ${isFo(r) ? "듣는" : "읽는"} 중`}</span></li>` : "";
     return head + ss.map((s) => `<li><span>${prettyDay(s.day)}</span><b>${sessionText(s)}</b></li>`).join("");
   }).join("");
+  const bt = bookTimes(r); // 따로 적은 읽은 시간
+  if (bt.length) $("vSessions").innerHTML += `<li class="round-h"><b>⏱ 읽은 시간</b><span>모두 ${fmtMin(bookMins(r))}</span></li>` + bt.map((x) => `<li><span>${prettyDay(x.day)}</span><b>${fmtMin(x.minutes)}</b></li>`).join("");
   $("vHome").checked = !!r.home; $("vHome").disabled = !!PEEK;
   $("vTimes").innerHTML = timesRead(r) ? `${tallySvg(timesRead(r))}<span>${timesRead(r)}번 ${isFo(r) ? "들었어요" : "읽었어요"}</span>` : "";
   $("vMore").hidden = false;
+  $("vTime").hidden = isFo(r) || !!PEEK; // 한글책·영어책: 읽은 시간은 포트폴리오 기록으로 남김
   $("vMore").textContent = r.done ? `🔁 다시 ${isFo(r) ? "듣기" : "읽기"} (${rounds + 1}번째)` : "➕ 이어서 기록하기";
   $("vSessH").textContent = isFo(r) ? "🎧 들은 기록" : "📖 읽은 기록";
   $("vActivity").hidden = isFo(r) || !(r.done && !(r.bonusRounds || []).includes(rounds));
@@ -758,6 +765,12 @@ $("viewDialog").addEventListener("close", () => {
   if (!r) return;
   if (v === "more") r.done ? startReread(r) : openRecord({ existing: r });
   else if (v === "activity") openActivity(r, { pages: 0, fromFlow: false });
+  else if (v === "time") { // 오늘 읽은 시간 적기 → 포트폴리오 그날 기록으로 저장, 끝나면 이 책으로 돌아옴
+    openDayKey = localDay();
+    openEntry(shelfOf(r));
+    returnDay = null; entryBook = r.id;
+    $("eWhat").value = r.title;
+  }
   else if (v === "delete" && confirm(`'${r.title}' 기록을 모두 지울까요?`)) {
     records = records.filter((x) => x.id !== r.id);
     saveRecords(); render();
@@ -1128,6 +1141,10 @@ async function shrinkPhoto(file) {
   bmp.close?.();
   return new Promise((res, rej) => cv.toBlob((b) => (b ? res(b) : rej(new Error("toBlob"))), "image/jpeg", 0.82));
 }
+$("entryDialog").addEventListener("close", () => { // 책 기록 보기에서 왔으면 그 책으로 돌아가기
+  const id = entryBook; if (!id) return;
+  setTimeout(() => { entryBook = null; if (!document.querySelector("dialog[open]")) openView(id); }, 120);
+});
 $("entryDialog").addEventListener("close", async () => {
   if ($("entryDialog").returnValue !== "save" || !entryCat) return;
   const cat = entryCat; entryCat = null;
@@ -1139,7 +1156,7 @@ $("entryDialog").addEventListener("close", async () => {
   const kept = all.filter((p) => p.path).map((p) => p.path);
   const picked = all.filter((p) => p.file);
   if (!what && !text && !minutes && !all.length) { toast("내용을 적어 주세요"); return; }
-  const entry = old || { id: crypto.randomUUID?.() || String(Date.now()), day: returnDay || localDay(), cat };
+  const entry = old || { id: crypto.randomUUID?.() || String(Date.now()), day: returnDay || localDay(), cat, ...(entryBook ? { book: entryBook } : {}) };
   if (old) {
     const removed = (old.photos || []).filter((p) => !kept.includes(p));
     if (removed.length) sync.deletePhotos(removed);
