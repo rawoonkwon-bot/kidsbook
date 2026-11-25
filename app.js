@@ -2307,7 +2307,7 @@ function paintBlog(root, st) {
   const nb = follows.has(st.uid);
   if (st.cat && st.cat !== NOCAT && !st.cats.some((c) => c.id === st.cat)) st.cat = "";
   const shown = st.cat ? st.list.filter((b) => catOf(st, b) === st.cat) : st.list;
-  root.innerHTML = `
+  root.innerHTML = `<div class="bl-wrap"><aside class="bl-side">
     <div class="bl-head">${avatar(st.nick, st.face, "av big")}<div class="grow"><h2>${esc(st.nick)}님의 블로그</h2><p>글 ${st.list.length}</p></div>
       ${st.me ? `<button type="button" class="follow-btn" data-act="write">✏️ 글쓰기</button>` : `<button type="button" class="follow-btn${nb ? " on" : ""}" data-act="follow">${nb ? "이웃 ✓" : "＋ 이웃 추가"}</button>`}</div>
     ${st.me ? "" : `<section><h3 class="sec-title">아이 책장</h3><div class="browse">${kl.length
@@ -2318,14 +2318,15 @@ function paintBlog(root, st) {
     ${tops.length && !st.cat ? `<section><div class="pop-head"><h3 class="sec-title">글감</h3><button type="button" class="link-btn" data-act="topics" data-t="all">전체보기 ›</button></div>
       <div class="tchips">${Object.keys(TOPIC).filter(n).map((t) => `<button type="button" class="tchip" data-act="topics" data-t="${t}">${ico(TOPIC[t][1])}${TOPIC[t][0]} <span>${n(t)}</span></button>`).join("")}</div></section>` : ""}
     ${tags.length && !st.cat ? `<section><h3 class="sec-title">태그</h3><div class="bl-tags">${tags.slice(0, 20).map((x) => `<button type="button" data-act="tag" data-tag="${esc(x.t)}">#${esc(x.t)} <small>${x.n}</small></button>`).join("")}</div></section>` : ""}
+    </aside><div class="bl-main">
     ${pop.length && !st.cat ? `<section><h3 class="sec-title">인기글</h3><div class="pop-row">${pop.map((b) => `<button type="button" class="pop-card" data-act="post" data-id="${b.id}">
         <span class="pop-im">${blogThumb(b, "pop-img")}</span><b>${esc(b.title)}</b><small>조회 ${b.views}</small></button>`).join("")}</div></section>` : ""}
     <section><div class="pop-head"><h3 class="sec-title">${st.cat ? esc(st.cat === NOCAT ? "미분류" : st.cats.find((c) => c.id === st.cat)?.name || "전체글") : "전체글"}${st.cat ? ` <small class="muted">${shown.length}</small>` : ""}</h3>${st.list.length ? `<span class="bl-view"><button type="button" data-act="view" data-v="list" class="${st.view === "list" ? "on" : ""}">목록</button><button type="button" data-act="view" data-v="grid" class="${st.view === "grid" ? "on" : ""}">사진</button></span>` : ""}</div>
       ${!shown.length ? `<p class="muted bl-msg">${st.me ? (st.cat ? "이 카테고리에는 아직 글이 없어요." : "아직 쓴 글이 없어요. 위의 글쓰기를 눌러 첫 글을 남겨 보세요!") : "아직 공개한 글이 없어요."}</p>`
       : st.view === "grid" ? `<div class="tp-grid">${shown.map((b) => `<button type="button" class="tp-item" data-act="post" data-id="${b.id}">${blogThumb(b, "tp-cover")}<span>${b.is_public ? "" : "🔒 "}${esc(b.title)}</span></button>`).join("")}</div>`
-      : `<ul class="bl-list">${shown.map((b) => `<li><button type="button" class="bl-row" data-act="post" data-id="${b.id}">${blogThumb(b, "bl-th")}<span class="grow"><b>${esc(b.title)}</b>
+      : `<ul class="bl-list">${shown.map((b) => `<li><button type="button" class="bl-row" data-act="post" data-id="${b.id}">${blogThumb(b, "bl-th")}<span class="grow"><b>${esc(b.title)}</b><em class="bl-pv">${esc(plainText(b.body || "").replace(/\s+/g, " ").slice(0, 140))}</em>
           <small>${!st.cat && catOf(st, b) !== NOCAT ? `${esc(st.cats.find((c) => c.id === b.cat).name)} · ` : ""}${ago(b.created_at)}${b.tags?.length ? ` · #${esc(b.tags[0])}` : ""} · ${b.is_public ? `조회 ${b.views || 0}` : "🔒 나만 보기"}</small></span></button></li>`).join("")}</ul>`}
-    </section>`;
+    </section></div></div>`;
   fillTopicImgs(root);
 }
 const blogTops = blogTopics;
