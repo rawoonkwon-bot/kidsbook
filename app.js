@@ -363,12 +363,7 @@ let rDay = localDay();
 let chosenShelf = "ko";
 const paintShelf = () => {
   [...$("shelfPick").children].forEach((x) => x.setAttribute("aria-checked", String(x.dataset.shelf === chosenShelf)));
-  // 시간: 집중듣기는 꼭, 한글책 · 영어책은 적고 싶을 때만
-  const fo = chosenShelf === "focus";
-  $("focusRow").hidden = false;
-  $("timeLabel").textContent = fo ? "집중듣기 시간" : "읽은 시간";
-  $("timeOpt").hidden = fo;
-  $("timeIco").dataset.ico = fo ? "ear" : "clock"; $("timeIco").innerHTML = ico(fo ? "ear" : "clock");
+  $("focusRow").hidden = chosenShelf !== "focus"; // 책 기록에서 시간은 집중듣기만 (한글책·영어책 읽은 시간은 포트폴리오에서)
   $("rDone").nextElementSibling.textContent = chosenShelf === "focus" ? "다 들음" : "완독";
 };
 let preferShelf = null; // 포트폴리오 날짜 시트에서 스캔하면 그 책장을 먼저 골라 둠
@@ -498,7 +493,7 @@ function saveRecord() {
   if (to <= prev) { toast(`지난번(${prev}쪽)보다 뒤의 쪽을 적어 주세요`); return; }
   if (from < 1 || from > to) { toast(`시작 쪽(${from}쪽)이 끝 쪽(${to}쪽)보다 클 수 없어요`); $("rFrom").focus(); return; }
 
-  const minutes = ((parseInt($("rHour").value, 10) || 0) * 60 + (parseInt($("rMin").value, 10) || 0)) || null;
+  const minutes = chosenShelf === "focus" ? ((parseInt($("rHour").value, 10) || 0) * 60 + (parseInt($("rMin").value, 10) || 0)) || null : null;
   if (chosenShelf === "focus" && !minutes) { toast("집중듣기 시간을 적어 주세요"); $("rMin").focus(); return; }
   if (rDay > localDay()) { rDay = localDay(); paintDate(); toast("오늘 이후 날짜는 고를 수 없어요"); return; }
 
@@ -801,13 +796,14 @@ const LEGACY_CATS = [
   { key: "math", icon: "math-symbols", name: "수학", kind: "time" },
   { key: "etc", icon: "star", name: "기타", kind: "time" },
 ];
-const PH = { listen: "예: Peppa Pig 3화", focus: "예: Magic Tree House 1권", math: "예: 연산 문제집 12~15쪽", etc: "예: 피아노 연습" };
+const PH = { ko: "예: 고민해결사무소", en: "예: Magic Tree House 1권", listen: "예: Peppa Pig 3화", focus: "예: Magic Tree House 1권", math: "예: 연산 문제집 12~15쪽", etc: "예: 피아노 연습" };
 // 카테고리마다 아이콘 색
 const CAT_COLOR = { ko: "#2F5D3A", en: "#6F9F97", listen: "#C89B3C", focus: "#D4537E", memo: "#534AB7", math: "#185FA5", etc: "#BA7517", secret: "#5F5E5A" };
 function decorate(c) {
   const d = { ...c, icon: toIcon(c.icon), color: CAT_COLOR[c.key] || "#2F5D3A" };
   d.svg = ico(d.icon, "", d.color);
-  if (c.kind === "book") d.book = true;
+  // 한글책 · 영어책: 스캔한 책 기록 + 포트폴리오에서 따로 적는 읽은 시간 (흘려듣기처럼)
+  if (c.kind === "book") Object.assign(d, { book: true, what: "무엇을 읽었나요?", whatPh: PH[c.key] || "예: 읽은 책", amount: "얼마나 읽었나요?", unit: "분" });
   if (c.kind === "focus") d.hybrid = true;
   if (c.kind === "time" || c.kind === "focus") {
     const listen = c.key === "listen" || c.key === "focus";
@@ -853,7 +849,7 @@ const booksOn = (day, shelf) => records.flatMap((r) =>
   r.sessions.filter((s) => s.day === day && shelfOf(r) === shelf).map((s) => ({ r, s })));
 // 집중듣기(hybrid)는 스캔한 책 기록 + 직접 적은 기록을 모두 보여 줌
 const journalOn = (day, cat) => journal.filter((j) => j.day === day && j.cat === cat);
-const countOn = (day, c) => (c.book || c.hybrid ? booksOn(day, c.key).length : 0) + (c.book ? 0 : journalOn(day, c.key).length);
+const countOn = (day, c) => (c.book || c.hybrid ? booksOn(day, c.key).length : 0) + journalOn(day, c.key).length;
 const catsOn = (day) => CATS.filter((c) => countOn(day, c));
 
 let calYM = localDay().slice(0, 7);
@@ -926,7 +922,7 @@ function dayGroupsHtml(day) {
           <div class="grow"><b>${esc(r.title)}</b><small>${sessionText(s)}</small></div></div>`;
       }
     }
-    if (!c.book) {
+    {
       for (const j of journalOn(day, c.key)) {
         n++;
         // 박스 제목에 종류 이름·아이콘이 있으니, 기록에는 내용만
@@ -968,7 +964,7 @@ function fillDay(day) {
         <button type="button" class="btn lime" data-act="scan">📷 책 스캔</button>
         <button type="button" class="btn ghost" data-act="isbn" style="background:var(--soft)">ISBN 입력</button>
         <button type="button" class="btn ghost" data-act="title" style="background:var(--soft)">바코드 없는 책</button>
-        ${c.hybrid ? `<button type="button" class="btn ghost" data-act="entry" style="background:var(--soft)">✏️ 직접 적기</button>` : ""}
+        ${c.hybrid ? `<button type="button" class="btn ghost" data-act="entry" style="background:var(--soft)">✏️ 직접 적기</button>` : c.book ? `<button type="button" class="btn ghost" data-act="entry" style="background:var(--soft)">⏱ 읽은 시간 적기</button>` : ""}
       </div>`;
     html += ongoing.length ? `<small>읽고 있는 ${c.name} (누르면 이 날 읽은 쪽수를 기록해요)</small>` +
       ongoing.map((r) => `<div class="day-item link" data-more="${r.id}">
@@ -1059,7 +1055,7 @@ let entryCat = null;
 let editEntry = null;
 function openEntry(cat, entry = null) {
   const c = CAT[cat]; entryCat = cat; editEntry = entry;
-  $("eTitle").textContent = `${c.name}${entry ? " 고치기" : ""} · ${prettyDay(entry?.day || openDayKey)}`;
+  $("eTitle").textContent = `${c.name}${c.book ? " 읽은 시간" : ""}${entry ? " 고치기" : ""} · ${prettyDay(entry?.day || openDayKey)}`;
   $("eWhatWrap").hidden = !c.what; $("eWhatLabel").textContent = c.what || ""; $("eWhat").placeholder = c.whatPh || ""; $("eWhat").value = "";
   $("eAmountWrap").hidden = !c.amount; $("eAmountLabel").textContent = (c.amount || "").replace("몇 분", "얼마나"); $("eUnit").textContent = c.unit || ""; $("eAmount").value = ""; $("eHour").value = "";
   $("eTextWrap").hidden = false; $("eTextLabel").textContent = c.text || "한 줄 메모 (선택)"; $("eText").placeholder = c.textPh || ""; $("eText").value = "";
@@ -1180,7 +1176,8 @@ function renderStats() {
   $("statsTitle").textContent = kidNow ? `${kidNow.nick} 독서 통계` : "독서 통계";
   const pages = readRecs().reduce((a, r) => a + pagesOf(r), 0);
   const done = readRecs().reduce((a, r) => a + timesRead(r), 0);
-  const readMins = readRecs().reduce((a, r) => a + minsOf(r), 0);
+  // 책 읽은 시간: 포트폴리오에 적은 한글책·영어책 시간 (+ 예전에 책 기록에 적은 시간)
+  const readMins = readRecs().reduce((a, r) => a + minsOf(r), 0) + journal.filter((j) => (j.cat === "ko" || j.cat === "en") && j.minutes).reduce((a, j) => a + j.minutes, 0);
   const focusMins = records.filter(isFo).reduce((a, r) => a + minsOf(r), 0) + journal.filter((j) => j.cat === "focus").reduce((a, j) => a + (j.minutes || 0), 0);
   const recDays = new Set([...records.flatMap((r) => r.sessions.map((s) => s.day)), ...journal.map((j) => j.day)]).size;
   $("statTiles").innerHTML = [
@@ -1192,7 +1189,8 @@ function renderStats() {
   // 한글책 / 영어책 / 집중듣기
   const groups = Object.keys(SHELVES).map((k) => {
     const list = records.filter((r) => shelfOf(r) === k);
-    return { k, n: list.length, p: list.reduce((a, r) => a + pagesOf(r), 0), m: list.reduce((a, r) => a + minsOf(r), 0), color: `var(--${k === "focus" ? "fo" : k})` };
+    const jm = k === "focus" ? 0 : journal.filter((j) => j.cat === k && j.minutes).reduce((a, j) => a + j.minutes, 0); // 포트폴리오에 적은 읽은 시간
+    return { k, n: list.length, p: list.reduce((a, r) => a + pagesOf(r), 0), m: list.reduce((a, r) => a + minsOf(r), 0) + jm, color: `var(--${k === "focus" ? "fo" : k})` };
   });
   const sum = groups.reduce((a, g) => a + g.n, 0);
   $("statSplit").innerHTML = sum ? `

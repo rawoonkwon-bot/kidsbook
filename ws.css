@@ -34,7 +34,7 @@
 :is(.ws-page, .ws-ansv) .f > i { font-style: normal; padding: 0 2pt; }
 :is(.ws-page, .ws-ansv) .f > i:first-child { border-bottom: .7pt solid currentColor; }
 :is(.ws-page, .ws-ansv) .bx { display: inline-block; width: 1.5em; height: 1.4em; border: .8pt solid #22252A; vertical-align: middle; margin: 0 2pt; }
-:is(.ws-page, .ws-ansv) .rt { border-top: .7pt solid currentColor; padding: 0 1pt; margin-left: -.5pt; }
+:is(.ws-page, .ws-ansv) .rad { border-top: .7pt solid currentColor; padding: 0 1pt; margin-left: -.5pt; }
 :is(.ws-page, .ws-ansv) .dot { position: relative; display: inline-block; }
 :is(.ws-page, .ws-ansv) .dot::after { content: ""; position: absolute; left: 50%; top: -.05em; width: 2.6pt; height: 2.6pt; margin-left: -1.3pt; border-radius: 50%; background: currentColor; }
 :is(.ws-page, .ws-ansv) sup { font-size: .68em; line-height: 0; }

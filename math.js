@@ -122,7 +122,7 @@ function lin(terms) {
 const mono = (c, e) => termH(typeof c === "number" ? Q(c) : c, e, true);
 
 // 근호
-const RT = (r) => `√<span class="rt">${r}</span>`;
+const RT = (r) => `√<span class="rad">${r}</span>`; // (class 이름 "rt"는 블로그 글쓰기 칸과 겹쳐서 "rad")
 function sqf(n) { let c = 1, r = n; for (let k = 2; k * k <= r; k++) while (r % (k * k) === 0) { r /= k * k; c *= k; } return [c, r]; } // √n = c√r
 // 근호식 S: Map r → Q (r=1은 유리수)
 const sur = (...t) => { const m = new Map(); for (const [c, r] of t) sadd1(m, typeof c === "number" ? Q(c) : c, r); return m; };
