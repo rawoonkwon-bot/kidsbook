@@ -488,7 +488,7 @@
         <span id="eWhatLabel"></span>
         <input id="eWhat" class="sub-input" />
       </label>
-      <div class="e-book" id="eBook" hidden><img id="eBookImg" alt=""><button type="button" class="btn ghost ic-btn" id="eFind"><span data-ico="search"></span> 문제집 검색</button></div>
+      <div class="e-book" id="eBook" hidden><img id="eBookImg" alt=""><button type="button" class="btn ghost ic-btn" id="eFind"><span data-ico="search"></span> <span id="eFindTxt">문제집 검색</span></button></div>
       <label class="field" id="eAmountWrap">
         <span id="eAmountLabel"></span>
         <div class="pages-row"><input id="eHour" type="number" inputmode="numeric" min="0" placeholder="0" aria-label="시간" /><span>시간</span><input id="eAmount" type="number" inputmode="numeric" min="0" max="59" placeholder="0" aria-label="분" /><span id="eUnit"></span></div>
@@ -537,6 +537,7 @@
       <button type="button" class="set-row" id="setExport"><span class="si">💾</span><span class="st"><b>내 기록 모두 내려받기</b><small id="lastExport">모든 자녀의 기록을 파일 하나(ZIP)로 저장해요</small></span><span>›</span></button>
       <button type="button" class="set-row" id="setImport"><span class="si">📤</span><span class="st"><b>기록 파일 다시 올리기</b><small>내려받은 파일(.zip 또는 .json)로 복원해요</small></span><span>›</span></button>
       <p class="set-note" id="acctEmail"></p>
+      <p class="set-note">흘려듣기 영상 정보·포스터: TMDB (The Movie Database)<br>This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
       <label class="set-row set-check"><span class="si">🔒</span><span class="st"><b>나만 보기</b><small>체크하면 다른 사람이 우리 아이 책장을 볼 수 없어요</small></span><input type="checkbox" id="setPrivate" /></label>
       <button type="button" class="set-row" id="setAdmin" hidden><span class="si">👑</span><span class="st"><b>회원 관리</b><small>관리자에게만 보여요 · 회원 · 신고된 글</small></span><span>›</span></button>
       <button type="button" class="set-row" id="setLogout"><span class="si">🚪</span><span class="st"><b>로그아웃</b><small>기록은 계정에 남아 있어요</small></span><span>›</span></button>
@@ -596,6 +597,7 @@
       <label class="search-box"><span data-ico="search"></span><input id="tIn" placeholder="책 제목을 입력해 주세요" autocomplete="off" enterkeyhint="search" /></label>
       <div class="find-list" id="tMine"></div>
       <div class="find-list" id="tFound"></div>
+      <p class="tmdb-note" id="tTmdb" hidden>영상 정보 제공: TMDB · This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
       <div class="row">
         <button class="btn ghost" value="cancel" formnovalidate>취소</button>
         <button class="btn dark" value="new" id="tNew">제목으로 직접 기록</button>

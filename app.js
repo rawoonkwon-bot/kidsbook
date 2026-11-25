@@ -1110,7 +1110,10 @@ function openEntry(cat, entry = null) {
   $("eTitle").textContent = `${c.name}${c.book ? " 읽은 시간" : ""}${entry ? " 고치기" : ""} · ${prettyDay(entry?.day || openDayKey)}`;
   // 수학: 문제집을 검색해서 고르면 표지가 함께 남아요
   eCover = entry?.cover || "";
-  $("eBook").hidden = !(cat === "math" || /수학/.test(c.name));
+  // 흘려듣기: 영화·TV를 검색해서 고르면 포스터가 함께 남아요
+  const eMode = cat === "math" || /수학/.test(c.name) ? "workbook" : cat === "listen" ? "media" : null;
+  $("eBook").hidden = !eMode; $("eBook").dataset.mode = eMode || "";
+  $("eFindTxt").textContent = eMode === "media" ? "영상 검색" : "문제집 검색";
   paintECover();
   $("eWhatWrap").hidden = !c.what; $("eWhatLabel").textContent = c.what || ""; $("eWhat").placeholder = c.whatPh || ""; $("eWhat").value = "";
   $("eAmountWrap").hidden = !c.amount; $("eAmountLabel").textContent = (c.amount || "").replace("몇 분", "얼마나"); $("eUnit").textContent = c.unit || ""; $("eAmount").value = ""; $("eHour").value = "";
@@ -1186,7 +1189,7 @@ async function shrinkPhoto(file) {
 }
 let eCover = "";
 function paintECover() { $("eBookImg").hidden = !eCover; if (eCover) $("eBookImg").src = eCover; }
-$("eFind").addEventListener("click", () => openTitle("workbook", (b) => { $("eWhat").value = b.title; eCover = b.cover || ""; paintECover(); }));
+$("eFind").addEventListener("click", () => openTitle($("eBook").dataset.mode || "workbook", (b) => { $("eWhat").value = b.title; eCover = b.cover || ""; paintECover(); }));
 $("eWhat").addEventListener("input", () => { if (eCover) { eCover = ""; paintECover(); } }); // 이름을 고치면 표지는 뺌
 $("entryDialog").addEventListener("close", () => { // 책 기록 보기에서 왔으면 그 책으로 돌아가기
   const id = entryBook; if (!id) return;
@@ -1419,26 +1422,28 @@ const normTitle = (t) => (t || "").toLowerCase().replace(/[^a-z0-9가-힣]/g, ""
 let tMode = "book", tPick = null, tFoundList = [], tTimer = null, tSeq = 0;
 function openTitle(mode = "book", onPick = null) {
   tMode = mode; tPick = onPick;
-  $("tHead").textContent = mode === "workbook" ? "문제집 검색" : "책 검색";
-  $("tIn").placeholder = mode === "workbook" ? "문제집 이름 (예: 디딤돌 초등수학)" : "책 제목을 입력해 주세요";
-  $("tNew").textContent = mode === "workbook" ? "이 이름으로 적기" : "제목으로 직접 기록";
+  $("tHead").textContent = mode === "workbook" ? "문제집 검색" : mode === "media" ? "영상 검색" : "책 검색";
+  $("tIn").placeholder = mode === "workbook" ? "문제집 이름 (예: 디딤돌 초등수학)" : mode === "media" ? "영화·TV 이름 (예: 주토피아)" : "책 제목을 입력해 주세요";
+  $("tNew").textContent = mode === "book" ? "제목으로 직접 기록" : "이 이름으로 적기";
+  $("tTmdb").hidden = mode !== "media";
   $("tIn").value = ""; $("tMine").innerHTML = ""; $("tFound").innerHTML = ""; tFoundList = [];
   $("titleDialog").showModal();
   setTimeout(() => $("tIn").focus(), 50);
 }
 async function tSearch() {
   const q = $("tIn").value.trim(), my = ++tSeq;
-  if (q.length < 2) { $("tFound").innerHTML = ""; return; }
+  if (q.length < (tMode === "media" ? 1 : 2)) { $("tFound").innerHTML = ""; return; }
   $("tFound").innerHTML = `<small>찾는 중…</small>`;
   try {
-    const r = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+    const r = await fetch(`/api/${tMode === "media" ? "media" : "search"}?q=${encodeURIComponent(q)}`);
     const list = r.ok ? (await r.json()).results || [] : [];
     if (my !== tSeq) return; // 그 사이 다시 친 글자가 있으면 버림
     tFoundList = list;
-    $("tFound").innerHTML = list.length ? `<small>찾은 책 · 눌러서 골라요</small>` + list.map((b, i) => `<button type="button" class="find-item" data-f="${i}">
+    const media = tMode === "media";
+    $("tFound").innerHTML = list.length ? `<small>찾은 ${media ? "영상" : "책"} · 눌러서 골라요</small>` + list.map((b, i) => `<button type="button" class="find-item${media ? " poster" : ""}" data-f="${i}">
         ${b.cover ? `<img src="${esc(b.cover)}" alt="" loading="lazy">` : `<span class="noimg"></span>`}
-        <span><b>${esc(b.title)}</b><small>${esc([(b.authors || []).join(", "), b.publisher, b.pages && `${b.pages}쪽`].filter(Boolean).join(" · "))}</small></span></button>`).join("")
-      : `<small>찾지 못했어요. 아래 버튼으로 ${tMode === "workbook" ? "이름을 그대로 적을" : "제목만 적어 기록할"} 수 있어요.</small>`;
+        <span><b>${esc(b.title)}</b><small>${esc(media ? [b.kind, b.year, b.original !== b.title && b.original].filter(Boolean).join(" · ") : [(b.authors || []).join(", "), b.publisher, b.pages && `${b.pages}쪽`].filter(Boolean).join(" · "))}</small></span></button>`).join("")
+      : `<small>찾지 못했어요. 아래 버튼으로 ${tMode === "book" ? "제목만 적어 기록할" : "이름을 그대로 적을"} 수 있어요.</small>`;
   } catch { if (my === tSeq) $("tFound").innerHTML = `<small>찾지 못했어요. 인터넷 연결을 확인해 주세요.</small>`; }
 }
 $("tIn").addEventListener("input", () => {
@@ -1459,13 +1464,13 @@ $("tMine").addEventListener("click", (e) => {
 $("tFound").addEventListener("click", (e) => {
   const t = e.target.closest("[data-f]"); if (!t) return;
   const b = tFoundList[Number(t.dataset.f)]; if (!b) return;
-  if (tMode === "workbook") { $("titleDialog").close("pick"); tPick?.(b); return; }
+  if (tMode !== "book") { $("titleDialog").close("pick"); tPick?.(b); return; }
   $("titleDialog").close("pick");
   openRecord({ self: true, book: { title: b.title, authors: b.authors || [], publisher: b.publisher || "", cover: b.cover || "", pages: b.pages || null } });
 });
 $("titleDialog").addEventListener("close", () => {
   const v = $("titleDialog").returnValue, t = $("tIn").value.trim();
-  if (tMode === "workbook") { if (v === "new" && t) tPick?.({ title: t }); return; }
+  if (tMode !== "book") { if (v === "new" && t) tPick?.({ title: t }); return; }
   if (v === "pick") return;
   if (v !== "new") { maybeReturn(); return; }
   openRecord({ self: true, book: { title: t } });
