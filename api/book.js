@@ -24,12 +24,34 @@ async function fromAladin(isbn, key) {
   return {
     title: it.title, authors: it.author ? [it.author.replace(/\s*\([^)]*\)/g, "").trim()] : [], publisher: it.publisher || "",
     pages: it.subInfo?.itemPage || null, cover: https(it.cover), description: it.description || "", link: https(it.link), source: "알라딘",
+    category: aladinCat(it.categoryName),
   };
+}
+
+// 알라딘 분류 예) "국내도서>어린이>과학/수학/컴퓨터>과학" → 분야 (큰 묶음 이름은 빼고 봄)
+const CAT_RULES = [
+  ["문학", /소설|동화|문학|시집|그림책|만화|명작|고전|에세이|희곡|fiction|literature|picture book|comic/i],
+  ["역사", /역사|위인|전기|인물|history|biograph/i],
+  ["자연과학", /과학|자연|동물|식물|수학|우주|생물|지구|science|math|nature/i],
+  ["예술", /예술|미술|음악|대중문화|art|music/i],
+  ["언어", /언어|한글|영어|국어|외국어|어휘|사전|language|english/i],
+  ["사회과학", /사회|가족|학교|경제|정치|법|교육|문화|society|econom/i],
+  ["기술과학", /기술|요리|건강|공학|컴퓨터|IT|자동차|technolog|cook|health|computer/i],
+  ["종교", /종교|성경|불교|기독교|religio|bible/i],
+  ["철학", /철학|심리|윤리|philosoph|psycholog/i],
+];
+function aladinCat(name) {
+  const parts = String(name || "").split(">").slice(1).filter((x) => !/^(어린이|유아|청소년|초등|중고등|외국도서|국내도서|어린이 영어|ELT|기타)/.test(x.trim()));
+  const text = parts.join(" | ");
+  if (!text) return "";
+  for (const [n, re] of CAT_RULES) if (re.test(text)) return n;
+  return "";
 }
 
 // 국립중앙도서관 KDC(한국십진분류) 첫 자리 → 분야
 const KDC = ["총류", "철학", "종교", "사회과학", "자연과학", "기술과학", "예술", "언어", "문학", "역사"];
 const kdcName = (k) => { const m = String(k || "").match(/\d/); return m ? KDC[Number(m[0])] : ""; };
+const addCodeCat = (c) => { const m = String(c || "").match(/^\d{5}$/); return m ? KDC[Number(m[0][2])] : ""; };
 
 // 국립중앙도서관 ISBN 서지정보: PAGE 값 예) "312 p.", "48p" → 숫자만
 async function fromNL(isbn, key) {
@@ -43,7 +65,8 @@ async function fromNL(isbn, key) {
   return {
     title: doc.TITLE || "", authors: doc.AUTHOR ? [doc.AUTHOR] : [], publisher: doc.PUBLISHER || "",
     pages: pages && pages < 5000 ? pages : null, cover: https(doc.TITLE_URL || ""), description: doc.BOOK_SUMMARY || doc.BOOK_INTRODUCTION || "",
-    category: kdcName(doc.KDC), link: "", source: "국립중앙도서관",
+    // 분야: KDC 가 없으면 부가기호(5자리, 셋째 자리 = 내용분류 첫 숫자)로
+    category: kdcName(doc.KDC) || addCodeCat(doc.EA_ADD_CODE) || addCodeCat(doc.SET_ADD_CODE), link: "", source: "국립중앙도서관",
   };
 }
 
@@ -67,7 +90,7 @@ export default async function handler(req, res) {
 
   // 기본 정보는 카카오 → 알라딘 → 국립중앙도서관 순, 쪽수는 국립중앙도서관 또는 알라딘
   const base = kb || ab || nb;
-  const book = { ...base, pages: nb?.pages || ab?.pages || base.pages || null, category: nb?.category || base.category || "",
+  const book = { ...base, pages: nb?.pages || ab?.pages || base.pages || null, category: nb?.category || ab?.category || base.category || "",
     description: base.description || ab?.description || nb?.description || "" };
   res.setHeader("Cache-Control", "public, s-maxage=86400, stale-while-revalidate=604800");
   return res.status(200).json(book);
