@@ -503,3 +503,20 @@ export async function myAlerts(since) {
   if (error) throw error;
   return data || [];
 }
+
+// ---------- 친구 찾기: 같은 학년 · 같은 책 ----------
+export async function momsByGrade(gi, sy, offset = 0) {
+  const c = await client();
+  const { data, error } = await c.rpc("moms_by_grade", { gi, sy, off: offset });
+  if (error) throw error;
+  return { list: await withProfiles(data || []), more: (data || []).length === PAGE };
+}
+// 우리 아이 책장과 겹치는 책이 많은 집 순서
+export async function momsSameBooks(isbns) {
+  if (!isbns.length) return [];
+  const c = await client();
+  const { data, error } = await c.rpc("moms_same_books", { isbns });
+  if (error) throw error;
+  const n = new Map((data || []).map((r) => [r.user_id, Number(r.n)]));
+  return (await withProfiles(data || [])).map((m) => ({ ...m, n: n.get(m.user_id) || 0 }));
+}

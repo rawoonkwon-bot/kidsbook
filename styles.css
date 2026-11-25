@@ -973,3 +973,17 @@ body.peek #wsOpen { display: none; }
 .al-tx { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .al-tx small { color: var(--muted); font-size: 12px; }
 .al-tx em { font-style: normal; color: var(--ink); opacity: .8; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* 친구 찾기 칩: 학년 · 같은 책 */
+.mom-chips { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 12px; }
+.mom-chips button { border: 0; border-radius: 99px; padding: 8px 14px; font: inherit; font-size: 14px; font-weight: 700; background: var(--card); box-shadow: var(--raise-s); color: var(--ink); cursor: pointer; }
+.mom-chips button.on, .mom-chips button[aria-pressed="true"] { background: var(--forest); color: #F3EFE6; box-shadow: none; }
+.grade-pick { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; padding: 10px; margin: -4px 0 14px; border-radius: 16px; background: var(--card); box-shadow: var(--raise-s); }
+.grade-pick button { position: relative; border: 0; border-radius: 10px; padding: 8px 0; font: inherit; font-size: 13px; font-weight: 700; background: var(--soft); color: var(--ink); cursor: pointer; }
+.grade-pick button.mine::after { content: ""; position: absolute; top: 4px; right: 5px; width: 6px; height: 6px; border-radius: 50%; background: #E8834E; }
+.grade-pick button.on { background: var(--forest); color: #F3EFE6; }
+.grade-pick small { grid-column: 1 / -1; font-size: 11px; color: var(--muted); }
+.grade-pick small::first-letter { color: #E8834E; }
+.res-head { display: flex; justify-content: space-between; align-items: center; margin: 2px 2px 8px; font-size: 15px; }
+.res-head button { border: 0; background: none; color: var(--muted); font: inherit; font-size: 13px; cursor: pointer; }
+#momRes { margin-bottom: 14px; }

@@ -1489,44 +1489,89 @@ const agoDay = (iso) => {
   const n = dayDiff(localDay(new Date(iso)), localDay());
   return n <= 0 ? "오늘 기록" : n === 1 ? "어제 기록" : n < 30 ? `${n}일 전 기록` : "한 달 넘게 쉬는 중";
 };
-const momRow = (m, nbMark = true) => `<li><button type="button" class="mom-tile" data-u="${esc(m.user_id)}">${avatar(m.nick, m.face)}<b>${esc(m.nick)}</b>${m.updated_at ? `<small>${agoDay(m.updated_at).replace(" 기록", "")}</small>` : ""}${nbMark && follows.has(m.user_id) ? `<em>이웃</em>` : ""}</button></li>`;
+const momRow = (m, nbMark = true) => `<li><button type="button" class="mom-tile" data-u="${esc(m.user_id)}">${avatar(m.nick, m.face)}<b>${esc(m.nick)}</b>${m.tag ? `<small>${esc(m.tag)}</small>` : m.updated_at ? `<small>${agoDay(m.updated_at).replace(" 기록", "")}</small>` : ""}${nbMark && follows.has(m.user_id) ? `<em>이웃</em>` : ""}</button></li>`;
 let follows = new Map(), followsLoaded = false, momOffset = 0;
 async function renderBrowse() {
   $("browseWrap").hidden = !!(PEEK || !AUTH.user || AUTH.offline);
   if ($("browseWrap").hidden) return;
   if (browseLoaded) return;
   browseLoaded = true;
-  $("browse").innerHTML = `<li class="muted">불러오는 중…</li>`;
+  $("nbList").innerHTML = `<li class="muted">불러오는 중…</li>`;
   try {
-    const [nb, page] = await Promise.all([sync.myFollows().catch(() => []), sync.listMoms(0)]);
+    const nb = await sync.myFollows();
     follows = new Map(nb.map((m) => [m.user_id, m])); followsLoaded = true;
     nb.forEach((m) => momCache.set(m.user_id, { ...momCache.get(m.user_id), ...m }));
     paintFollows();
-    momOffset = 0; $("browse").innerHTML = "";
-    addMoms(page);
+    nb.slice(0, 6).forEach((m) => prefetchPeek(m.user_id));
   } catch {
     browseLoaded = false;
-    $("browse").innerHTML = `<li class="muted">불러오지 못했어요. 인터넷 연결을 확인해 주세요.</li>`;
+    $("nbList").innerHTML = `<li class="muted">불러오지 못했어요. 인터넷 연결을 확인해 주세요.</li>`;
   }
 }
 function paintFollows() {
-  $("nbWrap").hidden = !follows.size;
-  $("nbList").innerHTML = [...follows.values()].map((m) => momRow({ ...m, updated_at: null }, false)).join("");
+  $("nbList").innerHTML = [...follows.values()].map((m) => momRow({ ...m, updated_at: null }, false)).join("")
+    || `<li class="muted">아직 이웃이 없어요. 위의 학년이나 같은 책으로 친구를 찾아 이웃으로 추가해 보세요.</li>`;
 }
-function addMoms({ list, more }) {
-  momOffset += 20;
-  list.forEach((m) => momCache.set(m.user_id, m));
-  const show = list.filter((m) => !follows.has(m.user_id));
-  $("browse").insertAdjacentHTML("beforeend", show.map(momRow).join(""));
-  if (!$("browse").children.length) $("browse").innerHTML = `<li class="muted">아직 공개된 다른 책장이 없어요.</li>`;
-  $("momMore").hidden = !more;
-  show.slice(0, 6).forEach((m) => prefetchPeek(m.user_id));
+
+// ---------- 친구 찾기 칩: 학년 · 같은 책 읽은 친구 ----------
+let momGrade = -1, momMode = "", momOffset2 = 0;
+function closeMomRes() {
+  momMode = ""; momGrade = -1;
+  $("momRes").hidden = true; $("gradePick").hidden = true;
+  $("chipGrade").setAttribute("aria-expanded", "false"); $("chipGrade").classList.remove("on"); $("chipGradeTx").textContent = "";
+  $("chipSame").setAttribute("aria-pressed", "false");
 }
-$("momMore").addEventListener("click", async () => {
-  $("momMore").disabled = true;
-  try { addMoms(await sync.listMoms(momOffset)); } catch { toast("불러오지 못했어요. 인터넷 연결을 확인해 주세요"); }
-  $("momMore").disabled = false;
+function showMomRes(title) {
+  $("momRes").hidden = false; $("momResTitle").textContent = title;
+  $("momResList").innerHTML = `<li class="muted">찾는 중…</li>`; $("momResMore").hidden = true;
+}
+$("chipGrade").addEventListener("click", () => {
+  const open = $("gradePick").hidden;
+  $("gradePick").hidden = !open; $("chipGrade").setAttribute("aria-expanded", String(open));
+  if (!open) return;
+  const mine = new Set(kids.map(gradeIdx).filter((i) => i >= 0));
+  $("gradePick").innerHTML = GRADES.slice(0, -1).map((g, i) => `<button type="button" data-g="${i}" class="${mine.has(i) ? "mine" : ""}${i === momGrade ? " on" : ""}">${g}</button>`).join("")
+    + (mine.size ? `<small>● 우리 아이 학년</small>` : "");
 });
+$("gradePick").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-g]"); if (!b) return;
+  const g = Number(b.dataset.g);
+  closeMomRes();
+  momMode = "grade"; momGrade = g; momOffset2 = 0;
+  $("chipGrade").classList.add("on"); $("chipGradeTx").textContent = ` · ${GRADES[g]}`;
+  showMomRes(`🎒 ${GRADES[g]} 아이가 있는 집`);
+  try { addRes(await sync.momsByGrade(g, schoolYear(), 0), g); } catch { $("momResList").innerHTML = `<li class="muted">불러오지 못했어요. 인터넷 연결을 확인해 주세요.</li>`; }
+});
+function addRes({ list, more }, g) {
+  if (momMode !== "grade" || g !== momGrade) return;
+  if (!momOffset2) $("momResList").innerHTML = "";
+  momOffset2 += 20;
+  list.forEach((m) => momCache.set(m.user_id, m));
+  $("momResList").insertAdjacentHTML("beforeend", list.map((m) => momRow({ ...m, updated_at: null })).join("")); // 최근에 기록한 집이 먼저 (날짜 표시는 안 함)
+  if (!$("momResList").children.length) $("momResList").innerHTML = `<li class="muted">아직 ${GRADES[g]} 아이가 있는 공개 책장이 없어요.</li>`;
+  $("momResMore").hidden = !more;
+}
+$("momResMore").addEventListener("click", async () => {
+  $("momResMore").disabled = true;
+  try { addRes(await sync.momsByGrade(momGrade, schoolYear(), momOffset2), momGrade); } catch { toast("불러오지 못했어요. 인터넷 연결을 확인해 주세요"); }
+  $("momResMore").disabled = false;
+});
+$("chipSame").addEventListener("click", async () => {
+  if (momMode === "same") { closeMomRes(); return; }
+  closeMomRes();
+  momMode = "same"; $("chipSame").setAttribute("aria-pressed", "true");
+  const k = kidNow();
+  showMomRes(`📚 ${k ? k.nick + " 책장과" : "우리 책장과"} 같은 책을 읽은 친구`);
+  const isbns = [...new Set(records.map((r) => r.isbn).filter((i) => i && /^\d{10,13}$/.test(i)))].slice(0, 500);
+  if (!isbns.length) { $("momResList").innerHTML = `<li class="muted">책을 먼저 기록하면 같은 책을 읽은 친구를 찾아 드려요.</li>`; return; }
+  try {
+    const list = await sync.momsSameBooks(isbns);
+    if (momMode !== "same") return;
+    list.forEach((m) => momCache.set(m.user_id, m));
+    $("momResList").innerHTML = list.map((m) => momRow({ ...m, tag: `같은 책 ${m.n}권` })).join("") || `<li class="muted">아직 같은 책을 읽은 공개 책장이 없어요.</li>`;
+  } catch { $("momResList").innerHTML = `<li class="muted">불러오지 못했어요. 인터넷 연결을 확인해 주세요.</li>`; }
+});
+$("momResClose").addEventListener("click", closeMomRes);
 let momQT = 0;
 $("momQ").addEventListener("input", () => {
   clearTimeout(momQT);
@@ -1543,7 +1588,7 @@ $("momQ").addEventListener("input", () => {
     } catch { $("momFound").innerHTML = `<li class="muted">찾지 못했어요. 인터넷 연결을 확인해 주세요.</li>`; }
   }, 350);
 });
-for (const id of ["browse", "momFound", "nbList"]) {
+for (const id of ["momResList", "momFound", "nbList"]) {
   $(id).addEventListener("pointerdown", (e) => { const b = e.target.closest("[data-u]"); if (b) prefetchPeek(b.dataset.u); });
   $(id).addEventListener("click", (e) => { const b = e.target.closest("[data-u]"); if (b) openMom(b.dataset.u); });
 }

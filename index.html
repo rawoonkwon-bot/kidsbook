@@ -111,13 +111,20 @@
         <input id="momQ" class="sub-input mom-q" type="search" placeholder="별명으로 찾기" autocomplete="off" autocapitalize="off" />
         <ul class="mom-list" id="momFound" hidden></ul>
         <div id="momMain">
-          <div id="nbWrap" hidden>
+          <div class="mom-chips" id="momChips">
+            <button type="button" id="chipGrade" aria-expanded="false">🎒 학년<span id="chipGradeTx"></span> ▾</button>
+            <button type="button" id="chipSame" aria-pressed="false">📚 같은 책 읽은 친구</button>
+          </div>
+          <div class="grade-pick" id="gradePick" hidden></div>
+          <div id="momRes" hidden>
+            <div class="res-head"><b id="momResTitle"></b><button type="button" id="momResClose">✕ 닫기</button></div>
+            <ul class="mom-list" id="momResList"></ul>
+            <button type="button" class="btn ghost mom-more" id="momResMore" hidden>더 보기</button>
+          </div>
+          <div id="nbWrap">
             <h3 class="sec-title">내 이웃</h3>
             <ul class="mom-list" id="nbList"></ul>
           </div>
-          <h3 class="sec-title">요즘 기록한 집</h3>
-          <ul class="mom-list" id="browse"></ul>
-          <button type="button" class="btn ghost mom-more" id="momMore" hidden>더 보기</button>
         </div>
       </div>
       <h2 class="page-title" id="statsTitle">독서 통계</h2>
