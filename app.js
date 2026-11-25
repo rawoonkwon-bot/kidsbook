@@ -664,10 +664,12 @@ function openCert(board) {
   $("certPage").scrollTop = 0;
 }
 $("certClose").addEventListener("click", () => $("certPage").close());
+// 아이폰은 인쇄 창이 뜨기 전에 다음 줄로 넘어가요. 그래서 인쇄용 표시는 창을 닫을 때 지워요 (화면에는 영향 없음)
 $("certPrint").addEventListener("click", () => {
   document.body.classList.add("printing");
-  setTimeout(() => { window.print(); setTimeout(() => document.body.classList.remove("printing"), 500); }, 50);
+  setTimeout(() => window.print(), 50);
 });
+$("certPage").addEventListener("close", () => document.body.classList.remove("printing"));
 
 // ---------- 책장에서 책 눌렀을 때 ----------
 let viewing = null;
@@ -2654,12 +2656,28 @@ $("wsUnits").addEventListener("click", (e) => {
   $("wsOptKick").textContent = `${WSM.kickOf(st)} · ${st.total}단계 중 ${st.no}단계`;
   $("wsOptTitle").textContent = `${st.no}) ${st.title}`;
   $("wsModeWrap").hidden = !st.v;
-  wsSeg("wsMode", "m", wsSel.mode); wsSeg("wsCount", "n", wsSel.count);
+  wsSeg("wsMode", "m", wsSel.mode); paintWsCount();
   $("wsWithAns").checked = wsSel.ans;
   $("wsOpt").showModal();
 });
 $("wsMode").addEventListener("click", (e) => { const b = e.target.closest("[data-m]"); if (b && wsSel) { wsSel.mode = b.dataset.m; wsSeg("wsMode", "m", wsSel.mode); } });
-$("wsCount").addEventListener("click", (e) => { const b = e.target.closest("[data-n]"); if (b && wsSel) { wsSel.count = Number(b.dataset.n); wsSeg("wsCount", "n", wsSel.count); } });
+// 장 수: 1·2·3장 또는 직접 (1~20장)
+function paintWsCount() {
+  const custom = wsSel.custom || ![1, 2, 3].includes(wsSel.count);
+  wsSeg("wsCount", "n", custom ? "c" : wsSel.count);
+  $("wsCntBox").hidden = !custom;
+  $("wsCntIn").value = wsSel.count;
+}
+$("wsCount").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-n]"); if (!b || !wsSel) return;
+  if (b.dataset.n === "c") { wsSel.custom = true; if (wsSel.count < 4) wsSel.count = 4; }
+  else { wsSel.custom = false; wsSel.count = Number(b.dataset.n); }
+  paintWsCount();
+});
+const wsClamp = (n) => Math.max(1, Math.min(20, Math.round(Number(n) || 1)));
+$("wsCntBox").addEventListener("click", (e) => { const b = e.target.closest("[data-d]"); if (b && wsSel) { wsSel.count = wsClamp(wsSel.count + Number(b.dataset.d)); $("wsCntIn").value = wsSel.count; } });
+$("wsCntIn").addEventListener("input", () => { if (wsSel && $("wsCntIn").value) wsSel.count = wsClamp($("wsCntIn").value); });
+$("wsCntIn").addEventListener("change", () => { if (wsSel) { wsSel.count = wsClamp($("wsCntIn").value); $("wsCntIn").value = wsSel.count; } });
 $("wsWithAns").addEventListener("change", () => { if (wsSel) wsSel.ans = $("wsWithAns").checked; });
 $("wsGo").addEventListener("click", () => {
   if (!wsSel) return;
@@ -2690,8 +2708,9 @@ $("wsRe").addEventListener("click", () => {
 });
 $("wsPrint").addEventListener("click", () => {
   document.body.classList.add("printing-ws");
-  setTimeout(() => { window.print(); setTimeout(() => document.body.classList.remove("printing-ws"), 500); }, 50);
+  setTimeout(() => window.print(), 50);
 });
+$("wsPrev").addEventListener("close", () => document.body.classList.remove("printing-ws"));
 $("wsCodeForm").addEventListener("submit", (e) => {
   e.preventDefault();
   const code = $("wsCodeIn").value.trim().toUpperCase();
