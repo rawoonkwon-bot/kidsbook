@@ -667,7 +667,7 @@ $("certClose").addEventListener("click", () => $("certPage").close());
 // 아이폰은 인쇄 창이 뜨기 전에 다음 줄로 넘어가요. 그래서 인쇄용 표시는 창을 닫을 때 지워요 (화면에는 영향 없음)
 $("certPrint").addEventListener("click", () => {
   document.body.classList.add("printing");
-  setTimeout(() => window.print(), 50);
+  window.print(); // 누른 순간 바로 불러야 아이폰이 "자동 프린트 차단"을 띄우지 않아요
 });
 $("certPage").addEventListener("close", () => document.body.classList.remove("printing"));
 
@@ -2708,7 +2708,7 @@ $("wsRe").addEventListener("click", () => {
 });
 $("wsPrint").addEventListener("click", () => {
   document.body.classList.add("printing-ws");
-  setTimeout(() => window.print(), 50);
+  window.print(); // 누른 순간 바로 불러야 아이폰이 "자동 프린트 차단"을 띄우지 않아요
 });
 $("wsPrev").addEventListener("close", () => document.body.classList.remove("printing-ws"));
 $("wsCodeForm").addEventListener("submit", (e) => {
