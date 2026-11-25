@@ -1054,7 +1054,8 @@ function openEntry(cat, entry = null) {
   $("entryDialog").showModal();
 }
 // 일기 사진: 최대 10장, 올리기 전에 작게 줄임(긴 쪽 1280px)
-const MAX_PHOTOS = 10;
+const MAX_PHOTOS = 10; // 한 글에 사진 최대 장수
+const MAX_PHOTO_BYTES = 5 * 1024 * 1024; // 한 장 최대 5MB (올리기 전에 긴 쪽 1280px로 줄여서 보통 0.5MB 아래)
 // 메모: 사진이 글 사이에 들어감 (도구줄의 📷 사진)
 const eRich = makeRich($("eRich"), { placeholder: "오늘 있었던 일을 적어 보세요", max: MAX_PHOTOS, onChange: (gone) => { if (gone?.file) URL.revokeObjectURL(gone.url); paintPhotos(); } });
 function paintPhotos() {
@@ -1082,7 +1083,11 @@ async function uploadRich({ body, items }, folder, skip = false) {
     if (skip) { ok.push(false); continue; }
     tried++;
     toast(`사진 올리는 중 ${tried}/${items.filter((x) => x.file).length}`, 60000);
-    try { paths.push(await sync.uploadPhoto(await shrinkPhoto(it.file), folder)); ok.push(true); } catch { ok.push(false); }
+    try {
+      const blob = await shrinkPhoto(it.file);
+      if (blob.size > MAX_PHOTO_BYTES) throw new Error("big"); // 줄인 뒤에도 5MB 넘으면 뺌
+      paths.push(await sync.uploadPhoto(blob, folder)); ok.push(true);
+    } catch { ok.push(false); }
   }
   let k = 0;
   const out = body.split("\n").filter((l) => (l.trim() === MARK ? ok[k++] : true)).join("\n").trim();
@@ -1912,7 +1917,7 @@ $("postList").addEventListener("click", (e) => { const b = e.target.closest("[da
 
 async function openPost(id) {
   if (!$("postView").open) $("postView").showModal();
-  $("pTitle").textContent = "불러오는 중…"; $("pMeta").textContent = ""; $("pBody").textContent = ""; $("pPhotos").innerHTML = "";
+  $("pTitle").textContent = "불러오는 중…"; $("pMeta").textContent = ""; $("pBody").textContent = "";
   $("pComments").innerHTML = ""; $("pActions").innerHTML = ""; $("pLike").hidden = true; $("pBoard").textContent = "";
   try {
     const p = await sync.getPost(id);
@@ -1936,17 +1941,16 @@ function paintPost() {
   paintMeta();
   $("pTopic").innerHTML = p.topic?.title ? topicCardHtml(p.topic) : "";
   fillTopicImgs($("pTopic"));
-  $("pBody").textContent = p.body;
-  $("pPhotos").innerHTML = p.photos?.length ? `<div class="ph-row big" data-paths="${esc(p.photos.join("|"))}"></div>` : "";
-  fillPhotoRows($("pPhotos"));
+  $("pBody").innerHTML = richHtml(p.body, p.photos || [], "ph-row inl"); // 사진은 글 사이에 (예전 글은 맨 아래)
+  fillPhotoRows($("pBody"));
   $("pLike").hidden = false;
   $("pLike").classList.toggle("on", p.liked);
   $("pLike").innerHTML = `${ico("heart")} 좋아요 ${p.nLikes || ""}`;
   $("pActions").innerHTML = [
-    adm ? `<button type="button" data-a="pin">${p.pinned ? "공지 풀기" : "공지로 고정"}</button>` : "",
-    mine ? `<button type="button" data-a="edit">고치기</button>` : "",
-    mine || adm ? `<button type="button" data-a="del">지우기</button>` : "",
-    !mine && !adm && sync.myId() ? `<button type="button" data-a="report">신고</button>` : "",
+    adm ? actBtn("pin", "pin", p.pinned ? "공지 풀기" : "공지로 고정", p.pinned) : "",
+    mine ? actBtn("edit", "pencil", "고치기") : "",
+    mine || adm ? actBtn("del", "trash", "지우기") : "",
+    !mine && !adm && sync.myId() ? actBtn("report", "flag", "신고") : "",
   ].join("");
   $("pCnt").textContent = p.comments.length || "";
   $("pComments").innerHTML = cmtTree(p.comments, (c) => c.user_id === sync.myId() || adm, !adm);
@@ -2012,23 +2016,31 @@ $("pCSend").addEventListener("click", async () => {
   $("pCSend").disabled = false;
 });
 
-// 글쓰기 · 고치기
-let writing = null, wPhotos = []; // wPhotos: [{ path, url }] 또는 [{ file, url }]
+// 글 위 아이콘 버튼 (공지·고치기·지우기·신고): 마우스를 올리면 설명이 떠요
+function actBtn(a, icon, label, on = false) { return `<button type="button" class="act-ic${on ? " on" : ""}" data-a="${a}" title="${label}" aria-label="${label}">${ico(icon)}</button>`; }
+// 글쓰기 · 고치기 — 사진은 글 쓰던 자리에 들어가요 (블로그처럼)
+let writing = null;
+const pRich = makeRich($("peRich"), { placeholder: "내용을 적어 주세요", max: MAX_PHOTOS, onChange: (gone) => { if (gone?.file) URL.revokeObjectURL(gone.url); paintWPhotos(); } });
 function paintWPhotos() {
-  $("pePhotoCount").textContent = `${wPhotos.length}/${MAX_PHOTOS}`;
-  $("pePhotos").innerHTML = wPhotos.map((p, i) => `<span class="ph"><img src="${esc(p.url)}" alt=""><button type="button" data-rm="${i}" aria-label="사진 빼기">✕</button></span>`).join("");
-  $("pePhotoAdd").hidden = wPhotos.length >= MAX_PHOTOS;
+  const n = pRich.photos().length;
+  $("pePhotoCount").textContent = `사진 ${n}/${MAX_PHOTOS}`;
+  $("pePhotoAdd").disabled = n >= MAX_PHOTOS;
 }
 function openWrite(p = null) {
   if (!AUTH.user || AUTH.offline) { toast("게시판은 인터넷에 연결돼 있을 때 쓸 수 있어요"); return; }
   if (!sync.myNick()) { openNick(false); return; }
   writing = p;
-  wPhotos.forEach((x) => x.file && URL.revokeObjectURL(x.url));
-  wPhotos = (p?.photos || []).map((path) => ({ path, url: "" }));
-  if (p?.photos?.length) sync.photoUrls(p.photos).then((urls) => { const m = new Map(p.photos.map((pa, i) => [pa, urls[i]])); wPhotos.forEach((x) => { if (x.path) x.url = m.get(x.path) || ""; }); paintWPhotos(); });
+  pRich.photos().forEach((x) => x.file && URL.revokeObjectURL(x.url));
+  const items = (p?.photos || []).map((path) => ({ path, url: "" }));
+  // 예전 글(사진이 맨 아래에 따로 있던 글)은 고칠 때 사진 자리를 글 끝에 붙여 줌
+  let body = p?.body || "";
+  const marks = body.split("\n").filter((l) => l.trim() === MARK).length;
+  if (items.length > marks) body = [body.trim(), ...Array(items.length - marks).fill(MARK)].filter(Boolean).join("\n");
+  pRich.set(body, items);
+  if (p?.photos?.length) sync.photoUrls(p.photos).then((urls) => { const m = new Map(p.photos.map((pa, i) => [pa, urls[i]])); items.forEach((x) => { if (x.path) x.url = m.get(x.path) || ""; }); pRich.refresh(); });
   const bd = p?.board || board;
   [...$("peBoard").children].forEach((x) => x.setAttribute("aria-checked", String(x.dataset.b === bd)));
-  $("peTitle").value = p?.title || ""; $("peBody").value = p?.body || "";
+  $("peTitle").value = p?.title || "";
   $("peSave").textContent = p ? "고치기" : "올리기";
   paintWPhotos();
   if (wTopic?.url) URL.revokeObjectURL(wTopic.url);
@@ -2039,35 +2051,31 @@ function openWrite(p = null) {
 $("bWrite").addEventListener("click", () => openWrite());
 $("peBoard").addEventListener("click", (e) => { const b = e.target.closest("[data-b]"); if (b) [...$("peBoard").children].forEach((x) => x.setAttribute("aria-checked", String(x === b))); });
 $("peClose").addEventListener("click", () => {
-  if (($("peTitle").value.trim() || $("peBody").value.trim()) && !writing && !confirm("쓰던 글을 버릴까요?")) return;
+  if (($("peTitle").value.trim() || pRich.get().body) && !writing && !confirm("쓰던 글을 버릴까요?")) return;
   $("postEdit").close();
 });
+for (const ev of ["mousedown", "pointerdown"]) $("pePhotoAdd").addEventListener(ev, (e) => e.preventDefault()); // 글 쓰던 자리를 놓치지 않게
 $("pePhotoAdd").addEventListener("click", () => $("pePhotoFile").click());
 $("pePhotoFile").addEventListener("change", () => {
-  const files = [...$("pePhotoFile").files].filter((f) => f.type.startsWith("image/") || /\.(heic|heif)$/i.test(f.name));
-  const room = MAX_PHOTOS - wPhotos.length;
+  const files = pickImages($("pePhotoFile"));
+  const room = MAX_PHOTOS - pRich.photos().length;
   if (files.length > room) toast(`사진은 ${MAX_PHOTOS}장까지 넣을 수 있어요`);
-  for (const f of files.slice(0, room)) wPhotos.push({ file: f, url: URL.createObjectURL(f) });
+  pRich.insert(files.slice(0, room).map((f) => ({ file: f, url: URL.createObjectURL(f) })));
   $("pePhotoFile").value = "";
   paintWPhotos();
 });
-$("pePhotos").addEventListener("click", (e) => {
-  const b = e.target.closest("[data-rm]"); if (!b) return;
-  const [x] = wPhotos.splice(Number(b.dataset.rm), 1); if (x.file) URL.revokeObjectURL(x.url); paintWPhotos();
-});
 $("peSave").addEventListener("click", async () => {
-  const title = $("peTitle").value.trim(), body = $("peBody").value.trim();
+  const title = $("peTitle").value.trim(), rich = pRich.get();
   const bd = [...$("peBoard").children].find((x) => x.getAttribute("aria-checked") === "true")?.dataset.b || "free";
   if (!title) { toast("제목을 적어 주세요"); $("peTitle").focus(); return; }
+  if (rich.text.length > 5000) { toast("내용은 5,000자까지 쓸 수 있어요"); return; }
   $("peSave").disabled = true;
   try {
-    const kept = wPhotos.filter((x) => x.path).map((x) => x.path);
-    const fresh = wPhotos.filter((x) => x.file);
-    const paths = [...kept];
-    for (let i = 0; i < fresh.length; i++) {
-      toast(`사진 올리는 중 ${i + 1}/${fresh.length}`, 60000);
-      try { paths.push(await sync.uploadPhoto(await shrinkPhoto(fresh[i].file), "board")); } catch { /* 건너뜀 */ }
-    }
+    const kept = rich.items.filter((x) => x.path).map((x) => x.path);
+    const fresh = rich.items.filter((x) => x.file);
+    const up = await uploadRich(rich, "board");
+    const body = up.body, paths = up.paths;
+    if (up.failed) toast(`사진 ${up.failed}장은 올리지 못했어요`, 3000);
     const removed = (writing?.photos || []).filter((x) => !kept.includes(x));
     let topic = null;
     if (wTopic) {
@@ -2081,7 +2089,7 @@ $("peSave").addEventListener("click", async () => {
     if (wTopic?.url) URL.revokeObjectURL(wTopic.url);
     wTopic = null;
     if (removed.length) sync.deletePhotos(removed);
-    fresh.forEach((x) => URL.revokeObjectURL(x.url)); wPhotos = [];
+    fresh.forEach((x) => URL.revokeObjectURL(x.url)); pRich.clear();
     $("postEdit").close();
     toast(writing ? "글을 고쳤어요" : "글을 올렸어요");
     board = bd; boardLoaded = ""; renderBoard(true);
@@ -2214,7 +2222,7 @@ async function renderPopular(force = false) {
       return `<button type="button" class="pop-card" data-id="${p.id}">
         ${img ? `<span class="pop-im">${img}</span>` : ""}
         <b>${esc(p.title)}</b>
-        ${img ? "" : `<p>${esc((p.body || "").replace(/\s+/g, " ").slice(0, 70))}</p>`}
+        ${img ? "" : `<p>${esc(plainText(p.body || "").replace(/\s+/g, " ").slice(0, 70))}</p>`}
         <small>${avatar(p.nick, p.face, "av xs")}${esc(p.nick)} · 조회 ${p.views || 0}</small></button>`;
     }).join("");
     fillTopicImgs($("popRow"));
@@ -2402,7 +2410,7 @@ function paintBlogPost() {
   $("bvPhotos").innerHTML = "";
   fillPhotoRows($("bvBody"));
   $("bvTags").innerHTML = (b.tags || []).map((t) => `<button type="button" data-tag="${esc(t)}">#${esc(t)}</button>`).join("");
-  $("bvActions").innerHTML = [mine ? `<button type="button" data-a="edit">고치기</button>` : "", mine || sync.amAdmin() ? `<button type="button" data-a="del">지우기</button>` : "", !mine && !sync.amAdmin() && sync.myId() ? `<button type="button" data-a="report">신고</button>` : ""].join("");
+  $("bvActions").innerHTML = [mine ? actBtn("edit", "pencil", "고치기") : "", mine || sync.amAdmin() ? actBtn("del", "trash", "지우기") : "", !mine && !sync.amAdmin() && sync.myId() ? actBtn("report", "flag", "신고") : ""].join("");
   // 댓글은 공개 글에만
   $("bvCmtWrap").hidden = !b.is_public;
   $("bvComments").innerHTML = ""; $("bvCnt").textContent = ""; setReTo("bv", null);
@@ -2864,7 +2872,7 @@ $("arClose").addEventListener("click", () => { $("admRepPage").close(); openAdmi
 // 글 한 줄 (신고 목록 · 회원 글 목록 같이 씀)
 const wRow = (w, who, dismiss) => `<li class="w-row"><div><small>${KIND_KO[w.kind] || ""} · ${admDay(w.created_at)}${who ? ` · ${who}` : ""}${!dismiss && w.reports ? ` · <b class="rp">신고 ${w.reports}</b>` : ""}</small>
   ${w.title ? `<b>${w.kind.endsWith("comment") ? "↳ " : ""}${esc(w.title)}</b>` : ""}<p>${esc(plainText(w.body || ""))}</p></div>
-  <span class="w-acts">${w.ref && w.author !== null ? `<button type="button" data-view="${w.kind}" data-ref="${esc(w.ref)}">보기</button>` : ""}<button type="button" class="del" data-del="${w.kind}" data-id="${esc(w.id)}">지우기</button>${dismiss ? `<button type="button" data-dis="${w.kind}" data-id="${esc(w.id)}">괜찮음</button>` : ""}</span></li>`;
+  <span class="w-acts">${w.ref && w.author !== null ? `<button type="button" data-view="${w.kind}" data-ref="${esc(w.ref)}" title="보기" aria-label="보기">${ico("eye")}</button>` : ""}<button type="button" class="del" data-del="${w.kind}" data-id="${esc(w.id)}" title="지우기" aria-label="지우기">${ico("trash")}</button>${dismiss ? `<button type="button" class="ok" data-dis="${w.kind}" data-id="${esc(w.id)}" title="괜찮음 (신고만 정리)" aria-label="괜찮음">${ico("check")}</button>` : ""}</span></li>`;
 async function wAction(e, after) {
   const v = e.target.closest("[data-view]"), d = e.target.closest("[data-del]"), s = e.target.closest("[data-dis]");
   if (v) { v.dataset.view.startsWith("blog") ? openBlogPost(v.dataset.ref) : openPost(v.dataset.ref); return; }
@@ -2882,9 +2890,9 @@ async function openAdmUser(uid) {
   const m = admUser, me = uid === sync.myId();
   $("auHead").innerHTML = `${avatar(m.nick || "?", null, "av")}<div><b>${esc(m.nick || "(별명 없음)")}</b><small>${esc(m.email || "")}</small>
     <small>가입 ${admDay(m.joined)} · 마지막 로그인 ${admDay(m.last_sign_in)} · 아이 ${m.kids}명 · 책 ${m.books}권 · ${m.is_public ? "책장 공개" : "🔒 나만 보기"}</small></div>`;
-  $("auActs").innerHTML = [m.is_public ? `<button type="button" data-act="shelf">📚 책장 보기</button>` : "",
-    me ? "" : `<button type="button" data-act="ban" class="${m.banned ? "on" : ""}">${m.banned ? "✋ 글쓰기 막힘 · 풀기" : "✋ 글쓰기 막기"}</button>`,
-    me ? "" : `<button type="button" data-act="wipe" class="del">🗑 쓴 글 전부 지우기</button>`].join("");
+  $("auActs").innerHTML = [m.is_public ? `<button type="button" data-act="shelf">${ico("bookshelf")}책장 보기</button>` : "",
+    me ? "" : `<button type="button" data-act="ban" class="${m.banned ? "on" : ""}">${ico("hand-stop")}${m.banned ? "글쓰기 막힘 · 풀기" : "글쓰기 막기"}</button>`,
+    me ? "" : `<button type="button" data-act="wipe" class="del">${ico("trash")}쓴 글 전부 지우기</button>`].join("");
   $("auList").innerHTML = `<li class="muted">불러오는 중…</li>`;
   if (!$("admUserPage").open) $("admUserPage").showModal();
   try {

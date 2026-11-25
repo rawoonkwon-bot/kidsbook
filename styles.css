@@ -448,6 +448,7 @@ body { background: var(--bg); }
 .btn.lime { background: var(--forest); color: #F3EFE6; border-color: var(--forest); }
 .btn.dark { background: var(--forest-d); }
 .x-btn { background: var(--card); color: var(--muted); box-shadow: var(--raise-s); }
+.x-btn:focus:not(:focus-visible), dialog .x-btn:focus { outline: none; }
 .pill-btn { background: var(--card); color: var(--forest); border-color: transparent; box-shadow: var(--raise-s); }
 .link-btn { color: var(--forest); }
 dialog { background: var(--bg); }
@@ -630,6 +631,11 @@ body.peek #dayCats, body.peek .day-sub, body.peek .day-actions, body.peek .day-i
 .like-btn.on .ico { fill: #D4537E; }
 .post-actions { display: flex; gap: 6px; }
 .post-actions button { border: 0; background: var(--card); box-shadow: var(--raise-s); border-radius: 999px; padding: 7px 12px; font-size: 13px; font-weight: 700; color: var(--forest); cursor: pointer; }
+.post-actions .act-ic { width: 38px; height: 38px; padding: 0; display: inline-flex; align-items: center; justify-content: center; color: var(--muted); }
+.post-actions .act-ic .ico { width: 20px; height: 20px; }
+.post-actions .act-ic:hover { color: var(--forest); }
+.post-actions .act-ic[data-a="del"]:hover, .post-actions .act-ic[data-a="report"]:hover { color: #A32D2D; }
+.post-actions .act-ic.on, .post-actions .act-ic.on:hover { background: var(--forest); color: #F3EFE6; box-shadow: none; }
 .comments { list-style: none; padding: 0; margin: 0 0 12px; display: flex; flex-direction: column; gap: 6px; }
 .comments li { background: var(--card); border-radius: 12px; padding: 8px 12px; }
 .comments li div { display: flex; align-items: center; gap: 8px; }
@@ -1048,7 +1054,7 @@ body.peek #wsOpen { display: none; }
 .w-row small .rp { color: #A32D2D; }
 .w-row > div > b { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .w-row p { margin: 0; font-size: 13px; color: var(--ink); opacity: .8; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-.w-acts { display: flex; flex-direction: column; gap: 4px; flex: none; }
+.w-acts { display: flex; gap: 4px; flex: none; }
 .w-acts button, .au-acts button { border: 0; border-radius: 10px; padding: 6px 10px; font: inherit; font-size: 12px; font-weight: 700; background: var(--soft); color: var(--ink); cursor: pointer; }
 .w-acts button.del, .au-acts button.del { background: #FDECEC; color: #A32D2D; }
 .au-head { display: flex; gap: 12px; align-items: flex-start; margin: 4px 0 12px; }
@@ -1059,6 +1065,11 @@ body.peek #wsOpen { display: none; }
 .au-acts { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
 .au-acts button { padding: 9px 12px; font-size: 13px; background: var(--card); box-shadow: var(--raise-s); }
 .au-acts button.on { background: #FDECEC; color: #A32D2D; box-shadow: none; }
+.au-acts button { display: inline-flex; align-items: center; gap: 6px; }
+.au-acts button .ico { width: 18px; height: 18px; }
+.w-acts button { width: 36px; height: 36px; padding: 0; display: inline-flex; align-items: center; justify-content: center; color: var(--muted); }
+.w-acts button .ico { width: 19px; height: 19px; }
+.w-acts button.ok { color: var(--forest); }
 .comments li .rp-btn { margin-left: 0; border: 0; background: none; color: var(--muted); font-size: 11px; cursor: pointer; padding: 2px 4px; opacity: .7; }
 
 /* 처음 사용법 */

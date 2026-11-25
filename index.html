@@ -600,7 +600,6 @@
         <p class="post-meta" id="pMeta"></p>
         <div id="pTopic"></div>
         <div class="post-body" id="pBody"></div>
-        <div id="pPhotos"></div>
         <button type="button" class="like-btn" id="pLike" hidden></button>
       </article>
       <h4 class="r-sub">댓글 <span id="pCnt"></span></h4>
@@ -623,16 +622,14 @@
         <button type="button" role="radio" data-b="qna">질문</button>
       </div>
       <input id="peTitle" class="title-input" maxlength="100" placeholder="제목" />
-      <textarea id="peBody" rows="12" maxlength="5000" placeholder="내용을 적어 주세요"></textarea>
+      <div class="rt-box">
+        <div class="rt-bar"><button type="button" class="rt-btn" id="pePhotoAdd">📷 사진</button><small id="pePhotoCount">사진 0/10</small></div>
+        <div class="rt" id="peRich"></div>
+        <input type="file" id="pePhotoFile" accept="image/*" multiple hidden />
+      </div>
       <div class="field">
         <span>글감 <small>책·영화·공연·방송 중 하나를 붙일 수 있어요</small></span>
         <div id="peTopic"></div>
-      </div>
-      <div class="field">
-        <span>사진 <small id="pePhotoCount">0/10</small></span>
-        <div class="photo-grid" id="pePhotos"></div>
-        <button type="button" class="btn ghost photo-add" id="pePhotoAdd">📷 사진 추가</button>
-        <input type="file" id="pePhotoFile" accept="image/*" multiple hidden />
       </div>
     </div>
   </dialog>
@@ -786,7 +783,7 @@
     <div class="page-in">
       <div class="page-top"><button type="button" class="x-btn" id="arClose" aria-label="닫기">✕</button></div>
       <h2 class="page-title">🚨 신고된 글</h2>
-      <p class="muted adm-sub">"괜찮음"을 누르면 신고만 정리되고 글은 그대로 남아요</p>
+      <p class="muted adm-sub">✓ 를 누르면 신고만 정리되고 글은 그대로 남아요</p>
       <ul class="w-list" id="arList"></ul>
     </div>
   </dialog>
