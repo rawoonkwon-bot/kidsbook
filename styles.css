@@ -1222,3 +1222,10 @@ body.peek #wsOpen { display: none; }
 
 /* 책 줄에 붙는 읽은 시간 (누르면 고치기) */
 .t-chip { display: inline-flex; align-items: center; margin-left: 8px; border: 0; border-radius: 999px; padding: 2px 9px; background: var(--soft); color: var(--forest); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; vertical-align: 1px; }
+
+/* 소식: 수학 공부 시간 */
+.tchips3.math em { display: block; font-style: normal; font-size: 11px; color: var(--muted); margin-top: 2px; }
+#mathMonths .vbar b { font-size: 11px; white-space: nowrap; }
+#mathMonths + .tinfo { margin-top: 30px; }
+.sec-ico .ico { width: 22px; height: 22px; vertical-align: -3px; color: #185FA5; }
+#mathWrap { margin-top: 44px; }

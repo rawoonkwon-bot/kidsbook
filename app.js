@@ -1289,8 +1289,37 @@ function renderStats() {
   for (const r of readRecs()) for (const s of r.sessions) { const m = s.day.slice(0, 7); if (m in mp) mp[m] += sessionPages(s); }
   const mmax = Math.max(1, ...Object.values(mp));
   renderTimeChart();
+  renderMath();
   $("statMonths").innerHTML = months.map((m) => `
     <div class="vbar" title="${m} ${mp[m]}쪽">${mp[m] ? `<b>${mp[m]}</b>` : ""}<i style="height:${(mp[m] / mmax) * 82}%"></i><small>${Number(m.slice(5))}월</small></div>`).join("");
+}
+
+// ---------- 소식: 수학 공부 시간 (일평균 · 월평균 · 달마다) ----------
+const isMath = (j) => j.cat === "math" || /수학/.test(CAT[j.cat]?.name || "");
+function renderMath() {
+  const ms = journal.filter((j) => isMath(j) && j.minutes);
+  const hasCat = CATS.some((c) => c.key === "math" || /수학/.test(c.name));
+  $("mathWrap").hidden = !hasCat && !ms.length;
+  if ($("mathWrap").hidden) return;
+  const now = new Date(), thisM = localDay().slice(0, 7);
+  const byDay = {}, byMonth = {};
+  for (const j of ms) { byDay[j.day] = (byDay[j.day] || 0) + j.minutes; const m = j.day.slice(0, 7); byMonth[m] = (byMonth[m] || 0) + j.minutes; }
+  // 일평균: 이번 달 1일부터 오늘까지 모든 날로 나눔 / 월평균: 기록이 있는 달 기준
+  const daysThis = Object.keys(byDay).filter((d) => d.startsWith(thisM));
+  const totThis = byMonth[thisM] || 0, passed = now.getDate();
+  const dayAvg = totThis ? Math.round(totThis / passed) : 0;
+  const mKeys = Object.keys(byMonth);
+  const monAvg = mKeys.length ? Math.round(mKeys.reduce((a, m) => a + byMonth[m], 0) / mKeys.length) : 0;
+  $("mathTotals").innerHTML = [
+    ["하루 평균", dayAvg ? fmtMin(dayAvg) : "-", daysThis.length ? `${passed}일 중 ${daysThis.length}일 공부` : "이번 달 기록 없음"],
+    ["한 달 평균", monAvg ? fmtMin(monAvg) : "-", mKeys.length ? `${mKeys.length}달 기록` : "기록 없음"],
+    [`${now.getMonth() + 1}월 모두`, totThis ? fmtMin(totThis) : "-", ""],
+  ].map(([n, v, s]) => `<div><small>${n}</small><b>${v}</b>${s ? `<em>${s}</em>` : ""}</div>`).join("");
+  const months = Array.from({ length: 6 }, (_, i) => localDay(new Date(now.getFullYear(), now.getMonth() - 5 + i, 1)).slice(0, 7));
+  const mmax = Math.max(1, ...months.map((m) => byMonth[m] || 0));
+  $("mathMonths").innerHTML = months.map((m) => { const v = byMonth[m] || 0; return `
+    <div class="vbar" title="${Number(m.slice(5))}월 ${fmtMin(v)}">${v ? `<b>${fmtMin(v)}</b>` : ""}<i style="height:${(v / mmax) * 78}%;background:#185FA5"></i><small>${Number(m.slice(5))}월</small></div>`; }).join("");
+  $("mathInfo").textContent = ms.length ? "포트폴리오에서 수학을 적은 시간으로 계산해요" : "포트폴리오 수학 칸에 공부한 시간을 적으면 여기에 모여요";
 }
 
 // ---------- 소식: 읽은 시간 그래프 (이번 주 = 요일별 / 한 달 = 주별, 세로는 시간) ----------
