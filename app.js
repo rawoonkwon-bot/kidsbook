@@ -363,7 +363,12 @@ let rDay = localDay();
 let chosenShelf = "ko";
 const paintShelf = () => {
   [...$("shelfPick").children].forEach((x) => x.setAttribute("aria-checked", String(x.dataset.shelf === chosenShelf)));
-  $("focusRow").hidden = chosenShelf !== "focus";
+  // 시간: 집중듣기는 꼭, 한글책 · 영어책은 적고 싶을 때만
+  const fo = chosenShelf === "focus";
+  $("focusRow").hidden = false;
+  $("timeLabel").textContent = fo ? "집중듣기 시간" : "읽은 시간";
+  $("timeOpt").hidden = fo;
+  $("timeIco").dataset.ico = fo ? "ear" : "clock"; $("timeIco").innerHTML = ico(fo ? "ear" : "clock");
   $("rDone").nextElementSibling.textContent = chosenShelf === "focus" ? "다 들음" : "완독";
 };
 let preferShelf = null; // 포트폴리오 날짜 시트에서 스캔하면 그 책장을 먼저 골라 둠
@@ -493,7 +498,7 @@ function saveRecord() {
   if (to <= prev) { toast(`지난번(${prev}쪽)보다 뒤의 쪽을 적어 주세요`); return; }
   if (from < 1 || from > to) { toast(`시작 쪽(${from}쪽)이 끝 쪽(${to}쪽)보다 클 수 없어요`); $("rFrom").focus(); return; }
 
-  const minutes = chosenShelf === "focus" ? ((parseInt($("rHour").value, 10) || 0) * 60 + (parseInt($("rMin").value, 10) || 0)) || null : null;
+  const minutes = ((parseInt($("rHour").value, 10) || 0) * 60 + (parseInt($("rMin").value, 10) || 0)) || null;
   if (chosenShelf === "focus" && !minutes) { toast("집중듣기 시간을 적어 주세요"); $("rMin").focus(); return; }
   if (rDay > localDay()) { rDay = localDay(); paintDate(); toast("오늘 이후 날짜는 고를 수 없어요"); return; }
 
@@ -553,7 +558,7 @@ function saveRecord() {
   flow = { r, pages: gained };
   $("recordPage").close("saved");
   if (finished) $("finishSheet").showModal();
-  else burst(gained, () => toast(`📖 ${to}쪽까지 읽었어요!`));
+  else burst(gained, () => toast(`📖 ${to}쪽까지 읽었어요!${minutes ? ` · ${fmtMin(minutes)}` : ""}`));
 }
 $("rSave").type = "button";
 $("rSave").addEventListener("click", saveRecord);
@@ -712,7 +717,7 @@ function fillView(r) {
   setImg($("vCover"), r.cover);
   $("vTitle").innerHTML = esc(r.title) + tbHtml(tbGrades(r.isbn, r.title, r.authors));
   $("vAuthor").textContent = r.authors || "";
-  $("vMeta").textContent = [SHELVES[shelfOf(r)], r.totalPages && `${r.totalPages}쪽`, minsOf(r) && `${fmtMin(minsOf(r))} 들음`, !isFo(r) && `${pointsOf(r)}점`].filter(Boolean).join(" · ");
+  $("vMeta").textContent = [SHELVES[shelfOf(r)], r.totalPages && `${r.totalPages}쪽`, minsOf(r) && `${fmtMin(minsOf(r))} ${isFo(r) ? "들음" : "읽음"}`, !isFo(r) && `${pointsOf(r)}점`].filter(Boolean).join(" · ");
   $("vProgress").innerHTML = progressText(r)
     ? `<b>${esc(progressText(r))}</b>${r.totalPages ? `<div class="bar"><i style="width:${pct(r)}%"></i></div>` : ""}` : "";
   const rounds = roundOf(r);
@@ -1175,12 +1180,13 @@ function renderStats() {
   $("statsTitle").textContent = kidNow ? `${kidNow.nick} 독서 통계` : "독서 통계";
   const pages = readRecs().reduce((a, r) => a + pagesOf(r), 0);
   const done = readRecs().reduce((a, r) => a + timesRead(r), 0);
-  const focusMins = records.reduce((a, r) => a + minsOf(r), 0) + journal.filter((j) => j.cat === "focus").reduce((a, j) => a + (j.minutes || 0), 0);
+  const readMins = readRecs().reduce((a, r) => a + minsOf(r), 0);
+  const focusMins = records.filter(isFo).reduce((a, r) => a + minsOf(r), 0) + journal.filter((j) => j.cat === "focus").reduce((a, j) => a + (j.minutes || 0), 0);
   const recDays = new Set([...records.flatMap((r) => r.sessions.map((s) => s.day)), ...journal.map((j) => j.day)]).size;
   $("statTiles").innerHTML = [
     ["읽은 책", readRecs().length, "권"], ["끝까지 읽은 횟수", done, "번"],
     ["읽은 쪽수", pages.toLocaleString(), "쪽"], ["독서 포인트", totalPoints().toLocaleString(), "점"],
-    ["집중듣기 시간", fmtMin(focusMins), ""], ["기록한 날", recDays, "일"],
+    ["책 읽은 시간", readMins ? fmtMin(readMins) : "-", ""], ["집중듣기 시간", fmtMin(focusMins), ""], ["기록한 날", recDays, "일"],
   ].map(([k, v, u]) => `<div class="tile"><small>${k}</small><b>${v}<em>${u}</em></b></div>`).join("");
 
   // 한글책 / 영어책 / 집중듣기
@@ -1194,7 +1200,7 @@ function renderStats() {
       ${groups.filter((g) => g.n).map((g) => `<i style="width:${(g.n / sum) * 100}%;background:${g.color}" title="${shelfName(g.k)} ${g.n}권"></i>`).join("")}
     </div>
     <div class="split-legend">
-      ${groups.map((g) => `<span><i style="background:${g.color}"></i>${shelfName(g.k)} <b>${g.n}권</b> <em>${g.k === "focus" ? fmtMin(g.m) : g.p.toLocaleString() + "쪽"}</em></span>`).join("")}
+      ${groups.map((g) => `<span><i style="background:${g.color}"></i>${shelfName(g.k)} <b>${g.n}권</b> <em>${g.k === "focus" ? fmtMin(g.m) : g.p.toLocaleString() + "쪽" + (g.m ? ` · ${fmtMin(g.m)}` : "")}</em></span>`).join("")}
     </div>` : `<p class="empty">아직 기록이 없어요</p>`;
 
   // 분야별
@@ -1696,7 +1702,7 @@ function diaryHtml(d) {
       ${recs.length ? `<table><thead><tr><th>책</th><th>책장 · 분야</th><th>읽은 쪽</th><th>별점</th><th>내 생각</th></tr></thead><tbody>
       ${recs.map((r) => `<tr><td>${r.cover ? `<img src="${esc(r.cover)}" alt="">` : ""}<b>${esc(r.title)}</b><br><small>${esc(r.authors || "")}</small></td>
         <td>${shelfLabel[shelfOf(r)] || ""}${r.category ? `<br><small>${esc(r.category)}</small>` : ""}</td>
-        <td>${readTo(r)}${r.totalPages ? ` / ${r.totalPages}` : ""}쪽${r.done ? " ✅" : ""}${minsOf(r) ? `<br>🎧 ${fmtMin(minsOf(r))}` : ""}</td>
+        <td>${readTo(r)}${r.totalPages ? ` / ${r.totalPages}` : ""}쪽${r.done ? " ✅" : ""}${minsOf(r) ? `<br>${isFo(r) ? "🎧" : "⏱"} ${fmtMin(minsOf(r))}` : ""}</td>
         <td>${r.score ? "★".repeat(r.score) : ""}</td><td class="memo">${esc(r.note || "")}</td></tr>`).join("")}</tbody></table>` : "<p>아직 읽은 책이 없어요</p>"}
     </section>`;
   }).join("");
