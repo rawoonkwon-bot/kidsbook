@@ -2785,8 +2785,9 @@ function tbGrades(isbn, title, authors) {
   const nt = nT(title), au = String(authors || "").replace(/\s/g, "");
   if (nt) for (const [t, a, g] of TB_T) {
     const auOk = a && au.includes(a);
-    if ((nt === t && (t.length >= 4 || auOk)) || (t.length >= 3 && nt.startsWith(t) && auOk)) for (const c of g) gs.add(c);
+    if ((nt === t && (t.length >= 4 || auOk)) || (auOk && ((t.length >= 3 && nt.startsWith(t)) || (nt.length >= 4 && t.startsWith(nt))))) for (const c of g) gs.add(c);
   }
-  return [...gs].sort();
+  return [...gs].sort((p, q) => TB_ORDER.indexOf(p) - TB_ORDER.indexOf(q));
 }
-const tbHtml = (gs) => gs.length ? `<span class="tb-gs">${gs.map((g) => `<i class="tb-g" title="${g}학년 국어 교과서 수록도서" aria-label="${g}학년 교과서 수록">${g}</i>`).join("")}</span>` : "";
+const TB_ORDER = "123456중고";
+const tbHtml = (gs) => gs.length ? `<span class="tb-gs">${gs.map((g) => { const nm = g === "중" ? "중학교" : g === "고" ? "고등학교" : `초등 ${g}학년`; return `<i class="tb-g${g === "중" ? " m" : g === "고" ? " h" : ""}" title="${nm} 교과서 수록도서" aria-label="${nm} 교과서 수록">${g}</i>`; }).join("")}</span>` : "";
