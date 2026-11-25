@@ -81,7 +81,10 @@ button { font: inherit; color: inherit; }
 .sec-title small { font-size: 13px; font-weight: 600; color: var(--muted); margin-left: 4px; }
 
 /* 홈: 숫자 링 */
-.rings { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.rings { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.ring.ko svg circle + circle { stroke: #E8834E; }
+.ring.en svg circle + circle { stroke: #378ADD; }
+.stamp-tabs { margin: 4px 0 12px; }
 .ring-card { background: var(--soft); border: 0; border-radius: 20px; padding: 14px 6px 10px; display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: default; }
 button.ring-card { cursor: pointer; }
 .ring-card small { font-size: 12px; color: var(--muted); font-weight: 700; }
@@ -947,3 +950,26 @@ body.peek #wsOpen { display: none; }
 .rt.ce > div { min-height: 1.7em; }
 .rt.ce.empty::before { content: attr(data-ph); position: absolute; left: 12px; top: 10px; color: var(--muted); pointer-events: none; }
 .rt.ce .rt-ph { margin: 6px 0; -webkit-user-select: none; user-select: none; }
+
+/* 종 알림 · 답글 */
+.top-btns { display: flex; gap: 8px; align-items: center; }
+.bell { position: relative; }
+.bell-n { position: absolute; top: -2px; right: -2px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: #E24B4A; color: #fff; font: 800 11px/18px var(--font, sans-serif); font-style: normal; box-shadow: 0 0 0 2px var(--bg, #F3EFE6); }
+.comments li.re { margin-left: 22px; background: var(--soft); }
+.re-mark { color: var(--muted); font-weight: 700; }
+.comments li .re-btn { border: 0; background: none; color: var(--muted); font-size: 12px; font-weight: 700; cursor: pointer; padding: 2px 4px; }
+.comments li div .re-btn { margin-left: auto; }
+.comments li div .re-btn ~ .x { margin-left: 0; }
+.bell[hidden] { display: none; }
+.reply-to { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; padding: 6px 10px; margin-bottom: 6px; border-radius: 10px; background: var(--soft); }
+.reply-to button { border: 0; background: none; color: var(--muted); font-weight: 700; cursor: pointer; }
+.al-h { margin: 4px 0 2px; }
+.al-sub { font-size: 13px; margin: 0 0 14px; }
+.al-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.al-list li.muted { text-align: center; padding: 30px 0; }
+.al-row { width: 100%; display: flex; gap: 10px; align-items: flex-start; text-align: left; border: 0; border-radius: 14px; padding: 12px; background: var(--card); box-shadow: var(--raise-s); color: var(--ink); cursor: pointer; font: inherit; font-size: 14px; }
+.al-row.new { box-shadow: inset 4px 0 0 #E24B4A, var(--raise-s); }
+.al-ic { font-size: 20px; line-height: 1.2; }
+.al-tx { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.al-tx small { color: var(--muted); font-size: 12px; }
+.al-tx em { font-style: normal; color: var(--ink); opacity: .8; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -131,7 +131,7 @@ function progressText(r) {
 }
 const hasHangul = (t) => /[가-힣]/.test(t || "");
 const shelfOf = (r) => r.shelf || (hasHangul(r.title) ? "ko" : "en");
-const stampList = () => readRecs().flatMap((r) => (r.finishes || []).map((f) => ({ r, at: f.at || 0, round: f.round }))).sort((a, b) => a.at - b.at);
+const stampList = (sh) => readRecs().filter((r) => !sh || shelfOf(r) === sh).flatMap((r) => (r.finishes || []).map((f) => ({ r, at: f.at || 0, round: f.round }))).sort((a, b) => a.at - b.at);
 
 // ---------- UI 유틸 ----------
 let toastTimer;
@@ -221,11 +221,10 @@ function render() {
   const inMonth = (r, m) => r.sessions.some((s) => s.day.startsWith(m));
   // 숫자 링
   const monthN = readRecs().filter((r) => inMonth(r, month)).length;
-  const stamps = stampList().length;
-  const onBoard = stamps === 0 ? 0 : ((stamps - 1) % STAMPS_PER_BOARD) + 1;
+  const onBoardOf = (sh) => { const n = stampList(sh).length; return n === 0 ? 0 : ((n - 1) % STAMPS_PER_BOARD) + 1; };
   const pts = totalPoints();
   $("ringMonth").innerHTML = ringSvg(0) + `<b>${monthN}<small>권</small></b>`;
-  $("ringStamp").innerHTML = ringSvg(onBoard / STAMPS_PER_BOARD) + `<b>${onBoard}<small>/${STAMPS_PER_BOARD}</small></b>`;
+  for (const [sh, id] of [["ko", "ringStampKo"], ["en", "ringStampEn"]]) { const o = onBoardOf(sh); $(id).innerHTML = ringSvg(o / STAMPS_PER_BOARD) + `<b>${o}<small>/${STAMPS_PER_BOARD}</small></b>`; }
   $("ringPoint").innerHTML = ringSvg(0) + `<b style="font-size:${pts >= 10000 ? 16 : 19}px">${pts.toLocaleString()}</b>`;
 
   // 요즘 읽는 중
@@ -271,7 +270,8 @@ for (const id of ["shelfKo", "shelfEn", "shelfFo", "reading"]) {
   $(id).addEventListener("click", (e) => { const i = pick(e); if (i) openView(i); });
   $(id).addEventListener("keydown", (e) => { if (e.key === "Enter") { const i = pick(e); if (i) openView(i); } });
 }
-$("ringStampBtn").addEventListener("click", () => openStamp(null));
+$("ringStampKoBtn").addEventListener("click", () => openStamp(null, "ko"));
+$("ringStampEnBtn").addEventListener("click", () => openStamp(null, "en"));
 
 // ---------- 1) 스캔 후 책 정보 시트 ----------
 let sheet = null; // { isbn, book, existing }
@@ -589,9 +589,14 @@ $("activityPage").addEventListener("cancel", (e) => { e.preventDefault(); finish
 
 // ---------- 5) 독서 스탬프 (한 판 50개, 다 모으면 졸업장) ----------
 const dayOfStamp = (x) => (x.r.finishes || []).find((f) => f.round === x.round)?.day || localDay(new Date(x.at || Date.now()));
-let stampOn = [];
-function openStamp(newId) {
-  const list = stampList();
+let stampOn = [], stampSh = "ko";
+const shWord = (sh) => sh === "en" ? "영어책" : "한글책";
+const rewardKey = (sh) => sh === "en" ? "rewardEn" : "reward";
+function openStamp(newId, sh) {
+  if (newId) { const r = records.find((x) => x.id === newId); if (r) sh = shelfOf(r); }
+  stampSh = sh === "en" ? "en" : "ko";
+  for (const b of $("stampTabs").querySelectorAll("button")) b.setAttribute("aria-checked", String(b.dataset.sh === stampSh));
+  const list = stampList(stampSh);
   const n = list.length;
   const board = n === 0 ? 0 : Math.floor((n - 1) / STAMPS_PER_BOARD);
   const on = (stampOn = list.slice(board * STAMPS_PER_BOARD, board * STAMPS_PER_BOARD + STAMPS_PER_BOARD));
@@ -605,7 +610,7 @@ function openStamp(newId) {
   }).join("");
   const full = on.length === STAMPS_PER_BOARD;
   $("stampDone").hidden = !full;
-  $("stampDone").innerHTML = full ? `<b>🎉 ${STAMPS_PER_BOARD}권 완주!</b><button type="button" class="btn dark" data-cert="${board}">졸업장 보기</button>` : "";
+  $("stampDone").innerHTML = full ? `<b>🎉 ${shWord(stampSh)} ${STAMPS_PER_BOARD}권 완주!</b><button type="button" class="btn dark" data-cert="${board}">졸업장 보기</button>` : "";
   paintReward();
   const boards = Math.floor(n / STAMPS_PER_BOARD);
   $("certList").innerHTML = boards ? `<b>받은 졸업장</b>` + Array.from({ length: boards }, (_, b) => `<button type="button" data-cert="${b}">${b + 1}번째 졸업장 · ${prettyDay(dayOfStamp(list[(b + 1) * STAMPS_PER_BOARD - 1]))}</button>`).join("") : "";
@@ -615,7 +620,7 @@ function openStamp(newId) {
 }
 const kidNow = () => kids.find((k) => k.id === activeKid) || null;
 function paintReward() {
-  const k = kidNow(), rw = k?.reward || "";
+  const k = kidNow(), rw = k?.[rewardKey(stampSh)] || "";
   $("rewardEdit").hidden = true;
   $("reward").innerHTML = rw
     ? `<span class="gift">🎁</span><span><small>${STAMPS_PER_BOARD}개 모으면</small><b>${esc(rw)}</b></span>${PEEK ? "" : `<button type="button" class="link-btn" data-rw>바꾸기</button>`}`
@@ -624,33 +629,34 @@ function paintReward() {
 }
 $("reward").addEventListener("click", (e) => {
   if (!e.target.closest("[data-rw]")) return;
-  $("rewardIn").value = kidNow()?.reward || "";
+  $("rewardIn").value = kidNow()?.[rewardKey(stampSh)] || "";
   $("reward").hidden = true; $("rewardEdit").hidden = false; $("rewardIn").focus();
 });
 $("rewardSave").addEventListener("click", () => {
   const k = kidNow(); if (!k || PEEK) return;
   const v = $("rewardIn").value.trim();
-  if (v) k.reward = v; else delete k.reward;
+  if (v) k[rewardKey(stampSh)] = v; else delete k[rewardKey(stampSh)];
   saveKids(); paintReward();
   toast(v ? "선물을 정했어요" : "선물을 지웠어요");
 });
 $("rewardIn").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $("rewardSave").click(); } });
 $("stampGrid").addEventListener("click", (e) => { const b = e.target.closest("[data-i]"); if (b && stampOn[b.dataset.i]) openView(stampOn[b.dataset.i].r.id); });
 $("stampPage").addEventListener("click", (e) => { const b = e.target.closest("[data-cert]"); if (b) openCert(Number(b.dataset.cert)); });
+$("stampTabs").addEventListener("click", (e) => { const b = e.target.closest("[data-sh]"); if (b && b.dataset.sh !== stampSh) openStamp(null, b.dataset.sh); });
 
 // 독서 졸업장
 function openCert(board) {
-  const list = stampList().slice(board * STAMPS_PER_BOARD, (board + 1) * STAMPS_PER_BOARD);
+  const list = stampList(stampSh).slice(board * STAMPS_PER_BOARD, (board + 1) * STAMPS_PER_BOARD);
   if (list.length < STAMPS_PER_BOARD) return;
   const k = kidNow(), d = (x) => { const [y, m, dd] = dayOfStamp(x).split("-"); return `${y}년 ${Number(m)}월 ${Number(dd)}일`; };
   $("cert").innerHTML = `
     <img class="cert-logo" src="/logo.svg" alt="">
     <p class="cert-kicker">바나나북코드</p>
     <h2>독서 졸업장</h2>
-    <p class="cert-no">${board + 1}번째 스탬프판</p>
+    <p class="cert-no">${shWord(stampSh)} ${board + 1}번째 스탬프판</p>
     <p class="cert-name"><b>${esc(k?.nick || "")}</b>${k && gradeOf(k) ? ` <small>${gradeOf(k)}</small>` : ""}</p>
-    <p class="cert-body">위 어린이는 ${d(list[0])}부터 ${d(list.at(-1))}까지<br>책 <b>${STAMPS_PER_BOARD}권</b>을 끝까지 읽었기에<br>이 졸업장을 드립니다.</p>
-    ${k?.reward ? `<p class="cert-reward">🎁 약속한 선물: <b>${esc(k.reward)}</b></p>` : ""}
+    <p class="cert-body">위 어린이는 ${d(list[0])}부터 ${d(list.at(-1))}까지<br>${shWord(stampSh)} <b>${STAMPS_PER_BOARD}권</b>을 끝까지 읽었기에<br>이 졸업장을 드립니다.</p>
+    ${k?.[rewardKey(stampSh)] ? `<p class="cert-reward">🎁 약속한 선물: <b>${esc(k[rewardKey(stampSh)])}</b></p>` : ""}
     <ol class="cert-books">${list.map((x) => `<li>${esc(x.r.title)}${x.round > 1 ? ` <small>(${x.round}번째)</small>` : ""}</li>`).join("")}</ol>
     <p class="cert-date">${d(list.at(-1))}</p>`;
   $("certPage").showModal();
@@ -1888,10 +1894,28 @@ function paintPost() {
     mine || adm ? `<button type="button" data-a="del">지우기</button>` : "",
   ].join("");
   $("pCnt").textContent = p.comments.length || "";
-  $("pComments").innerHTML = p.comments.map((c) => `<li><div><b>${esc(c.nick)}</b><small>${ago(c.created_at)}</small>
-      ${c.user_id === sync.myId() || adm ? `<button type="button" class="x" data-c="${c.id}" aria-label="댓글 지우기">✕</button>` : ""}</div><p>${esc(c.body)}</p></li>`).join("")
+  $("pComments").innerHTML = cmtTree(p.comments, (c) => c.user_id === sync.myId() || adm);
+  setReTo("p", null);
+}
+// 댓글 + 답글 (한 단계) — 답글의 답글도 같은 댓글 아래에 붙어요
+function cmtTree(list, canDel) {
+  const ids = new Set(list.map((c) => c.id));
+  const top = list.filter((c) => !c.parent_id || !ids.has(c.parent_id));
+  const row = (c, root) => `<li${root !== c.id ? ` class="re"` : ""}><div>${root !== c.id ? `<span class="re-mark">↳</span>` : ""}<b>${esc(c.nick)}</b><small>${ago(c.created_at)}</small>
+      ${sync.myId() ? `<button type="button" class="re-btn" data-r="${root}" data-n="${esc(c.nick)}">답글</button>` : ""}${canDel(c) ? `<button type="button" class="x" data-c="${c.id}" aria-label="댓글 지우기">✕</button>` : ""}</div><p>${esc(c.body)}</p></li>`;
+  return top.map((c) => row(c, c.id) + list.filter((r) => r.parent_id === c.id).map((r) => row(r, c.id)).join("")).join("")
     || `<li class="muted">첫 댓글을 남겨 보세요</li>`;
 }
+const reTo = {}; // { p: { id, nick }, bv: … }
+function setReTo(k, x) {
+  reTo[k] = x;
+  const el = $(k + "ReTo");
+  el.hidden = !x;
+  el.innerHTML = x ? `<span>↳ <b>${esc(x.nick)}</b> 님에게 답글</span><button type="button" data-cancel>취소</button>` : "";
+  $(k + "CIn").placeholder = x ? "답글을 적어 주세요" : "댓글을 적어 주세요";
+  if (x) $(k + "CIn").focus();
+}
+for (const k of ["p", "bv"]) $(k + "ReTo").addEventListener("click", (e) => { if (e.target.closest("[data-cancel]")) setReTo(k, null); });
 $("pClose").addEventListener("click", () => $("postView").close());
 $("postView").addEventListener("close", () => { if (!boardLoaded) renderBoard(); }); // 댓글·좋아요 수 새로 고침
 $("pLike").addEventListener("click", async () => {
@@ -1916,6 +1940,7 @@ $("pActions").addEventListener("click", async (e) => {
   }
 });
 $("pComments").addEventListener("click", async (e) => {
+  const r = e.target.closest("[data-r]"); if (r) { setReTo("p", { id: r.dataset.r, nick: r.dataset.n }); return; }
   const b = e.target.closest("[data-c]"); if (!b || !postNow) return;
   if (!confirm("이 댓글을 지울까요?")) return;
   try { await sync.deleteComment(b.dataset.c); boardLoaded = ""; openPost(postNow.id); }
@@ -1925,7 +1950,7 @@ $("pCSend").addEventListener("click", async () => {
   const v = $("pCIn").value.trim(); if (!v || !postNow) return;
   if (!sync.myNick()) { openNick(false); return; }
   $("pCSend").disabled = true;
-  try { await sync.addComment(postNow.id, v); $("pCIn").value = ""; boardLoaded = ""; await openPost(postNow.id); }
+  try { await sync.addComment(postNow.id, v, reTo.p?.id || null); $("pCIn").value = ""; boardLoaded = ""; await openPost(postNow.id); }
   catch { toast("댓글을 올리지 못했어요. 인터넷 연결을 확인해 주세요"); }
   $("pCSend").disabled = false;
 });
@@ -2321,7 +2346,36 @@ function paintBlogPost() {
   fillPhotoRows($("bvBody"));
   $("bvTags").innerHTML = (b.tags || []).map((t) => `<button type="button" data-tag="${esc(t)}">#${esc(t)}</button>`).join("");
   $("bvActions").innerHTML = [mine ? `<button type="button" data-a="edit">고치기</button>` : "", mine || sync.amAdmin() ? `<button type="button" data-a="del">지우기</button>` : ""].join("");
+  // 댓글은 공개 글에만
+  $("bvCmtWrap").hidden = !b.is_public;
+  $("bvComments").innerHTML = ""; $("bvCnt").textContent = ""; setReTo("bv", null);
+  if (b.is_public) loadBlogCmts();
 }
+async function loadBlogCmts() {
+  const b = blogNow; if (!b) return;
+  try {
+    const list = await sync.blogComments(b.id);
+    if (blogNow?.id !== b.id) return;
+    const me = sync.myId(), owner = b.user_id === me, adm = sync.amAdmin();
+    $("bvCnt").textContent = list.length || "";
+    $("bvComments").innerHTML = cmtTree(list, (c) => c.user_id === me || owner || adm);
+  } catch { $("bvComments").innerHTML = `<li class="muted">댓글을 불러오지 못했어요</li>`; }
+}
+$("bvComments").addEventListener("click", async (e) => {
+  const r = e.target.closest("[data-r]"); if (r) { setReTo("bv", { id: r.dataset.r, nick: r.dataset.n }); return; }
+  const b = e.target.closest("[data-c]"); if (!b || !blogNow) return;
+  if (!confirm("이 댓글을 지울까요?")) return;
+  try { await sync.deleteBlogComment(b.dataset.c); loadBlogCmts(); }
+  catch { toast("지우지 못했어요"); }
+});
+$("bvCSend").addEventListener("click", async () => {
+  const v = $("bvCIn").value.trim(); if (!v || !blogNow) return;
+  if (!sync.myNick()) { openNick(false); return; }
+  $("bvCSend").disabled = true;
+  try { await sync.addBlogComment(blogNow.id, v, reTo.bv?.id || null); $("bvCIn").value = ""; setReTo("bv", null); await loadBlogCmts(); }
+  catch { toast("댓글을 올리지 못했어요. 인터넷 연결을 확인해 주세요"); }
+  $("bvCSend").disabled = false;
+});
 $("bvClose").addEventListener("click", () => $("blogView").close());
 $("bvMeta").addEventListener("click", (e) => {
   const b = e.target.closest("[data-u]"); if (!b) return;
@@ -2596,3 +2650,38 @@ $("wsCodeForm").addEventListener("submit", (e) => {
   wsLast = { id: c.id, mode: c.vertical ? "v" : "h", count: 1, ans: true };
   wsShow([code], true);
 });
+
+// ---------- 🔔 새 댓글 알림 (홈 위 종에 N만, 누르면 목록) ----------
+const seenKey = () => "kbc-alert-seen-" + sync.myId();
+let alerts = [];
+async function checkAlerts() {
+  $("bellBtn").hidden = !sync.myId();
+  if (!sync.myId()) return;
+  try {
+    alerts = await sync.myAlerts(Date.now() - 30 * 864e5);
+    const seen = Number(localStorage.getItem(seenKey()) || 0);
+    $("bellN").hidden = !alerts.some((a) => Date.parse(a.created_at) > seen);
+  } catch { /* 조용히 넘어가요 */ }
+}
+$("bellBtn").addEventListener("click", async () => {
+  const seen = Number(localStorage.getItem(seenKey()) || 0);
+  $("alList").innerHTML = `<li class="muted">불러오는 중…</li>`;
+  $("alertPage").showModal();
+  await checkAlerts();
+  $("alList").innerHTML = alerts.map((a) => `<li><button type="button" class="al-row${Date.parse(a.created_at) > seen ? " new" : ""}" data-src="${a.src}" data-ref="${esc(a.ref)}">
+      <span class="al-ic">${a.src === "blog" ? "📝" : "💬"}</span>
+      <span class="al-tx"><span><b>${esc(a.nick || "(알 수 없음)")}</b> 님이 ${a.reply ? "내 댓글에 답글을" : `내 ${a.src === "blog" ? "블로그 글" : "글"}에 댓글을`} 남겼어요</span>
+        <small>「${esc(a.title)}」 · ${ago(a.created_at)}</small><em>${esc(a.body.length > 60 ? a.body.slice(0, 60) + "…" : a.body)}</em></span></button></li>`).join("")
+    || `<li class="muted">최근 30일 동안 새 댓글이 없어요</li>`;
+  localStorage.setItem(seenKey(), String(Date.now()));
+  $("bellN").hidden = true;
+});
+$("alClose").addEventListener("click", () => $("alertPage").close());
+$("alList").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-ref]"); if (!b) return;
+  $("alertPage").close();
+  if (b.dataset.src === "blog") openBlogPost(b.dataset.ref); else openPost(b.dataset.ref);
+});
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") checkAlerts(); });
+setInterval(() => { if (document.visibilityState === "visible") checkAlerts(); }, 3 * 60 * 1000);
+checkAlerts();

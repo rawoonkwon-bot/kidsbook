@@ -22,7 +22,10 @@
       <img class="logo" src="/logo.svg" alt="" width="34" height="34" />
       <h1>바나나북코드</h1>
     </div>
-    <button type="button" class="gear" id="gearBtn" aria-label="설정"><span data-ico="settings"></span></button>
+    <div class="top-btns">
+      <button type="button" class="gear bell" id="bellBtn" aria-label="새 댓글 알림" hidden><span data-ico="bell"></span><i class="bell-n" id="bellN" hidden>N</i></button>
+      <button type="button" class="gear" id="gearBtn" aria-label="설정"><span data-ico="settings"></span></button>
+    </div>
     <nav class="kidbar" id="kidBar" aria-label="자녀 고르기" hidden></nav>
     <div class="peek-bar" id="peekBar" hidden><span>👀 다른 집 책장 구경 중 · 보기만 할 수 있어요</span><button type="button" id="peekBack">← 내 책장</button></div>
   </header>
@@ -34,8 +37,9 @@
 
       <div class="rings">
         <div class="ring-card"><div class="ring" id="ringMonth"></div><small>이번 달</small></div>
-        <button type="button" class="ring-card" id="ringStampBtn" aria-label="독서 스탬프 보기"><div class="ring" id="ringStamp"></div><small>스탬프</small></button>
         <div class="ring-card"><div class="ring" id="ringPoint"></div><small>독서 포인트</small></div>
+        <button type="button" class="ring-card" id="ringStampKoBtn" aria-label="한글책 스탬프 보기"><div class="ring ko" id="ringStampKo"></div><small>한글책 스탬프</small></button>
+        <button type="button" class="ring-card" id="ringStampEnBtn" aria-label="영어책 스탬프 보기"><div class="ring en" id="ringStampEn"></div><small>영어책 스탬프</small></button>
       </div>
 
       <div id="popWrap" hidden>
@@ -305,6 +309,7 @@
     <form method="dialog" class="page-in">
       <div class="page-top end"><button class="x-btn" value="close" aria-label="닫기">✕</button></div>
       <h2 class="stamp-h">책 한 권 다 읽을 때마다<br>독서 스탬프 하나씩!</h2>
+      <div class="seg small stamp-tabs" id="stampTabs" role="radiogroup" aria-label="스탬프판 고르기"><button type="button" role="radio" data-sh="ko">📕 한글책</button><button type="button" role="radio" data-sh="en">📘 영어책</button></div>
       <div class="stamp-card">
         <div class="stamp-top"><b>독서 스탬프</b><span id="stampCount"></span></div>
         <div class="stamp-bar"><i id="stampBar"></i></div>
@@ -320,6 +325,7 @@
         <h4>🏅 독서스탬프 안내</h4>
         <ul>
           <li>책 한 권을 끝까지 읽으면 스탬프를 하나씩 받아요</li>
+          <li>한글책과 영어책은 스탬프판이 따로 있어요</li>
           <li>50개를 다 채우면 졸업장을 받고 새 스탬프판이 시작돼요</li>
           <li>10개마다 금색 칸이 있어요. 중간 목표로 삼아 보세요</li>
         </ul>
@@ -584,6 +590,7 @@
       </article>
       <h4 class="r-sub">댓글 <span id="pCnt"></span></h4>
       <ul class="comments" id="pComments"></ul>
+      <div class="reply-to" id="pReTo" hidden></div>
       <div class="comment-new">
         <textarea id="pCIn" rows="2" maxlength="1000" placeholder="댓글을 적어 주세요"></textarea>
         <button type="button" class="btn dark" id="pCSend">등록</button>
@@ -662,6 +669,25 @@
         <div id="bvPhotos"></div>
         <div class="bl-tags" id="bvTags"></div>
       </article>
+      <div id="bvCmtWrap" hidden>
+        <h4 class="r-sub">댓글 <span id="bvCnt"></span></h4>
+        <ul class="comments" id="bvComments"></ul>
+        <div class="reply-to" id="bvReTo" hidden></div>
+        <div class="comment-new">
+          <textarea id="bvCIn" rows="2" maxlength="1000" placeholder="댓글을 적어 주세요"></textarea>
+          <button type="button" class="btn dark" id="bvCSend">등록</button>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- 새 댓글 알림 -->
+  <dialog id="alertPage" class="page">
+    <div class="page-in">
+      <div class="page-top"><button type="button" class="x-btn" id="alClose" aria-label="닫기">✕</button></div>
+      <h2 class="al-h">🔔 새 댓글</h2>
+      <p class="muted al-sub">내 글에 달린 댓글과 내 댓글에 달린 답글이에요 (최근 30일)</p>
+      <ul class="al-list" id="alList"></ul>
     </div>
   </dialog>
 

@@ -310,7 +310,7 @@ export async function getPost(id) {
   const c = await client();
   const [{ data: post, error }, { data: comments }, { data: mine }] = await Promise.all([
     c.from("posts").select("id, board, title, body, photos, pinned, views, topic, created_at, updated_at, user_id, profiles(nick, face), likes(count)").eq("id", id).maybeSingle(),
-    c.from("comments").select("id, body, created_at, user_id, profiles(nick)").eq("post_id", id).order("created_at"),
+    c.from("comments").select("id, parent_id, body, created_at, user_id, profiles(nick)").eq("post_id", id).order("created_at"),
     c.from("likes").select("post_id").eq("post_id", id).eq("user_id", user.id).maybeSingle(),
   ]);
   if (error) throw error;
@@ -346,9 +346,9 @@ export async function toggleLike(id, on) {
   const { error } = on ? await c.from("likes").insert({ post_id: id }) : await c.from("likes").delete().eq("post_id", id).eq("user_id", user.id);
   if (error && error.code !== "23505") throw error;
 }
-export async function addComment(postId, body) {
+export async function addComment(postId, body, parentId = null) {
   const c = await client();
-  const { error } = await c.from("comments").insert({ post_id: postId, body });
+  const { error } = await c.from("comments").insert({ post_id: postId, body, parent_id: parentId });
   if (error) throw error;
 }
 export async function deleteComment(id) {
@@ -477,4 +477,29 @@ export async function bumpBlogView(id) {
   const { data, error } = await c.rpc("bump_blog_view", { bid: id });
   if (error) throw error;
   return typeof data === "number" ? data : null;
+}
+
+// ---------- 블로그 댓글 · 알림 ----------
+export async function blogComments(blogId) {
+  const c = await client();
+  const { data, error } = await c.from("blog_comments").select("id, parent_id, body, created_at, user_id, profiles(nick)").eq("blog_id", blogId).order("created_at");
+  if (error) throw error;
+  return (data || []).map((x) => ({ ...x, nick: x.profiles?.nick || "(알 수 없음)" }));
+}
+export async function addBlogComment(blogId, body, parentId = null) {
+  const c = await client();
+  const { error } = await c.from("blog_comments").insert({ blog_id: blogId, body, parent_id: parentId });
+  if (error) throw error;
+}
+export async function deleteBlogComment(id) {
+  const c = await client();
+  const { error } = await c.from("blog_comments").delete().eq("id", id);
+  if (error) throw error;
+}
+// 내 글에 달린 새 댓글 · 내 댓글에 달린 답글
+export async function myAlerts(since) {
+  const c = await client();
+  const { data, error } = await c.rpc("my_alerts", { since: new Date(since).toISOString() });
+  if (error) throw error;
+  return data || [];
 }
