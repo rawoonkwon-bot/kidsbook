@@ -910,7 +910,7 @@ body.peek #wsOpen { display: none; }
   position: fixed; z-index: 9; right: calc(max(16px, calc(50vw - 344px)) + 24px);
   bottom: calc(env(safe-area-inset-bottom) + 10px + var(--nav-h) + 14px + 54px + 10px);
   width: 51px; height: 51px; border-radius: 50%; padding: 0; cursor: pointer;
-  background: #FFEBDD; border: 1px solid #F6CFB6; color: #B95A26;
+  background: #F9C9B4; border: 1px solid #EFA98A; color: #B95A26;
   display: flex; align-items: center; justify-content: center; box-shadow: var(--raise-s);
 }
 .ws-ops { display: grid; grid-template-columns: 1fr 1fr; gap: 1px 2px; font-size: 12px; line-height: 13px; }
