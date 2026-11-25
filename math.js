@@ -734,18 +734,17 @@ export function sheetHtml(sh, qr) {
     ? `<div class="ws-qv${isDiv ? " div" : ""}"><b>${i + 1}</b>${vHtml(p.v, sp.big)}</div>`
     : `<div class="ws-q"><b>${i + 1}</b><span>${p.q}</span></div>`).join("");
   return `<section class="ws-page">
-  <header class="ws-top"><div><div class="ws-kick">바나나북코드 연산 · ${esc(kickOf(st))}</div><div class="ws-tt">${st.no}) ${esc(st.title)}</div><div class="ws-sub">${esc(st.unit)} · ${st.total}단계 중 ${st.no}단계${sh.vertical ? " · 세로셈" : ""}</div></div>
+  <header class="ws-top"><div><div class="ws-kick">바나나북코드 연산 · ${esc(kickOf(st))}</div><div class="ws-tt">${st.no}) ${esc(st.title)}</div><div class="ws-sub">${esc(st.unit)} · ${st.total}단계 중 ${st.no}단계${sh.vertical ? " · 세로셈" : ""} · 문제지 번호 ${sh.code}</div></div>
   ${qr ? `<div class="ws-qr">${qr}<div>정답 보기</div></div>` : ""}</header>
   <div class="ws-meta"><span>이름</span><span>날짜</span><span>맞은 개수 &nbsp;&nbsp;&nbsp;&nbsp;/ ${n}</span></div>
   <p class="ws-inst">${inst}</p>
   <div class="${sh.vertical ? "ws-gv" : "ws-g"}" style="grid-template-columns:repeat(${cols},1fr);grid-template-rows:repeat(${rows},1fr)">${body}</div>
-  <footer class="ws-foot"><span>문제지 번호 ${sh.code}</span><span>banana bookcode</span></footer>
 </section>`;
 }
 const plainLen = (h) => String(h).replace(/<[^>]+>/g, "").length;
 export const answersBlock = (sh) => `<div class="ws-ak"><div class="ws-akh"><b>${sh.step.no}) ${esc(sh.step.title)}</b><span>${sh.code}</span></div>
   <ol class="ws-akl${sh.probs.some((p) => plainLen(p.a) > 22) ? " wide" : ""}">${sh.probs.map((p) => `<li><span>${p.a}</span></li>`).join("")}</ol></div>`;
-export const answerPageHtml = (sheets) => `<section class="ws-page ws-apage"><header class="ws-top"><div><div class="ws-kick">바나나북코드 연산</div><div class="ws-tt">정답</div></div></header>${sheets.map(answersBlock).join("")}<footer class="ws-foot"><span></span><span>banana bookcode</span></footer></section>`;
+export const answerPageHtml = (sheets) => `<section class="ws-page ws-apage"><header class="ws-top"><div><div class="ws-kick">바나나북코드 연산</div><div class="ws-tt">정답</div></div></header>${sheets.map(answersBlock).join("")}</section>`;
 
 // QR (정답 보기 주소) — 처음 쓸 때만 불러옴
 let qrMod = null;

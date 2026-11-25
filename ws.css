@@ -1,30 +1,30 @@
 /* 연산 프린트 — 문제지(A4)와 정답 */
 .ws-page {
-  width: 210mm; height: 296.5mm; padding: 14mm 15mm 12mm; box-sizing: border-box; background: #fff; color: #22252A;
+  width: 210mm; height: 296.5mm; padding: 9mm 9mm 8mm; box-sizing: border-box; background: #fff; color: #22252A;
   display: flex; flex-direction: column; overflow: hidden;
   font-family: "Pretendard", -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
   -webkit-print-color-adjust: exact; print-color-adjust: exact;
 }
 .ws-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 6mm; border-bottom: .6pt solid #22252A; padding-bottom: 3mm; }
-.ws-kick { font-size: 7.5pt; color: #7A807B; letter-spacing: .3pt; }
-.ws-tt { font-size: 13pt; font-weight: 700; margin: 1mm 0 .5mm; }
-.ws-sub { font-size: 8.5pt; color: #55595F; }
-.ws-qr { width: 18mm; text-align: center; font-size: 6.5pt; color: #9A9F9B; flex: none; }
+.ws-kick { font-size: 8.5pt; color: #7A807B; letter-spacing: .3pt; }
+.ws-tt { font-size: 15pt; font-weight: 700; margin: 1mm 0 .5mm; }
+.ws-sub { font-size: 9.5pt; color: #55595F; }
+.ws-qr { width: 18mm; text-align: center; font-size: 7pt; color: #9A9F9B; flex: none; }
 .ws-qr svg { width: 18mm; height: 18mm; display: block; }
-.ws-meta { display: flex; gap: 8mm; font-size: 8.5pt; color: #55595F; margin: 3mm 0 0; }
+.ws-meta { display: flex; gap: 8mm; font-size: 10pt; color: #55595F; margin: 3mm 0 0; }
 .ws-meta span { flex: 1; border-bottom: .4pt solid #B8BCB9; padding-bottom: .8mm; }
-.ws-inst { font-size: 9.5pt; margin: 4mm 0 1mm; }
+.ws-inst { font-size: 11pt; margin: 4mm 0 1mm; }
 .ws-g, .ws-gv { flex: 1; display: grid; column-gap: 8mm; min-height: 0; }
-.ws-q { display: flex; gap: 2.5mm; align-items: flex-start; padding-top: 2.6mm; border-top: .4pt dashed #DADDD9; font-size: 10pt; line-height: 1.9; min-width: 0; }
-.ws-q b, .ws-qv b { font-weight: 400; font-size: 8pt; color: #7A807B; min-width: 4mm; padding-top: .4mm; line-height: 1.6; }
+.ws-q { display: flex; gap: 2.5mm; align-items: flex-start; padding-top: 2.6mm; border-top: .4pt dashed #DADDD9; font-size: 12.5pt; line-height: 1.9; min-width: 0; }
+.ws-q b, .ws-qv b { font-weight: 400; font-size: 9pt; color: #7A807B; min-width: 4mm; padding-top: .4mm; line-height: 1.6; }
 .ws-q small { font-size: 8pt; color: #7A807B; margin-right: 1mm; }
 .ws-qv { display: flex; gap: 2.5mm; align-items: flex-start; padding-top: 3mm; border-top: .4pt dashed #DADDD9; }
-.ws-v { font-family: ui-monospace, "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace; font-size: 12.5pt; text-align: right; letter-spacing: 3.5pt; line-height: 1.55; min-width: 22mm; margin-left: 3mm; white-space: nowrap; }
+.ws-v { font-family: ui-monospace, "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace; font-size: 14pt; text-align: right; letter-spacing: 3.5pt; line-height: 1.55; min-width: 22mm; margin-left: 3mm; white-space: nowrap; }
 .ws-ln { border-bottom: .8pt solid #22252A; }
 .ws-ln span { float: left; letter-spacing: 0; margin-right: 2mm; }
 .ws-ans { height: 7mm; }
 .ws-v.big .ws-ans { height: 20mm; }
-.ws-ld { font-family: ui-monospace, "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace; font-size: 12.5pt; letter-spacing: 3.5pt; display: inline-flex; align-items: stretch; margin: 5mm 0 0 4mm; white-space: nowrap; }
+.ws-ld { font-family: ui-monospace, "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace; font-size: 14pt; letter-spacing: 3.5pt; display: inline-flex; align-items: stretch; margin: 5mm 0 0 4mm; white-space: nowrap; }
 .ws-dv { padding-right: 1.5mm; }
 .ws-dd { border-top: .8pt solid #22252A; border-left: .8pt solid #22252A; border-top-left-radius: 3mm 6mm; padding: .5mm 1mm 0 2.5mm; }
 .ws-foot { display: flex; justify-content: space-between; font-size: 7pt; color: #9A9F9B; margin-top: 2mm; }
@@ -44,7 +44,7 @@
 .ws-apage .ws-ak { margin-top: 5mm; break-inside: avoid; }
 .ws-akh { display: flex; justify-content: space-between; font-size: 9pt; border-bottom: .4pt solid #B8BCB9; padding-bottom: 1mm; }
 .ws-akh span { color: #7A807B; font-size: 8pt; }
-.ws-akl { list-style: none; margin: 2mm 0 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.2mm 4mm; font-size: 9pt; counter-reset: q; }
+.ws-akl { list-style: none; margin: 2mm 0 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.2mm 4mm; font-size: 10.5pt; counter-reset: q; }
 .ws-akl li { counter-increment: q; display: flex; gap: 1.5mm; align-items: baseline; line-height: 1.7; }
 .ws-akl li::before { content: counter(q); color: #9A9F9B; font-size: 7.5pt; min-width: 4mm; }
 .ws-akl.wide { grid-template-columns: repeat(2, 1fr); }
