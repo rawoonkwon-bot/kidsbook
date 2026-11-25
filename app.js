@@ -1191,6 +1191,9 @@ $("catFilter").addEventListener("click", (e) => {
 function renderStats() {
   const kidNow = kids.find((k) => k.id === activeKid);
   $("statsTitle").textContent = kidNow ? `${kidNow.nick} 독서 통계` : "독서 통계";
+  // 통계 볼 아이 고르기 (아이가 둘 이상일 때)
+  $("statKids").hidden = kids.length < 2;
+  $("statKids").innerHTML = kids.map((k) => `<button type="button" class="kid${k.id === activeKid ? " on" : ""}" data-kid="${k.id}">${esc(k.nick)}${gradeOf(k) ? ` <small class="grade">${gradeOf(k)}</small>` : ""}</button>`).join("");
   const pages = readRecs().reduce((a, r) => a + pagesOf(r), 0);
   const done = readRecs().reduce((a, r) => a + timesRead(r), 0);
   // 책 읽은 시간: 포트폴리오에 적은 한글책·영어책 시간 (+ 예전에 책 기록에 적은 시간)
@@ -1408,6 +1411,9 @@ function setKid(id) {
   $("monthFilter").value = "all";
   renderKids(); render();
 }
+$("statKids").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-kid]"); if (b && b.dataset.kid !== activeKid) setKid(b.dataset.kid);
+});
 $("kidBar").addEventListener("click", (e) => {
   const b = e.target.closest("[data-kid]"); if (!b) return;
   if (b.dataset.kid === "+") openKids(false);

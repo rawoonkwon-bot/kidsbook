@@ -678,6 +678,7 @@ body.peek .tabbar [data-go="board"] { display: none; }
 .v-home { font-size: 16px; margin: 4px 0 10px; }
 .v-home input { width: 22px; height: 22px; }
 .kidbar.off { display: none; }
+.stat-kids { margin: -4px 0 14px; }
 
 /* 인기글 · 엄마 페이지 · 글감 */
 .pop-head { display: flex; align-items: center; justify-content: space-between; }
