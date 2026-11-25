@@ -126,8 +126,9 @@ const lastDay = (r) => r.sessions.map((s) => s.day).sort().at(-1);
 function progressText(r) {
   const to = readTo(r);
   if (r.done) return `✅ 다 ${isFo(r) ? "들었어요" : "읽었어요"}!${r.totalPages ? ` (${r.totalPages}쪽)` : ""}${timesRead(r) > 1 ? ` · ${timesRead(r)}번 ${isFo(r) ? "들음" : "읽음"}` : ""}`;
-  const nth = roundOf(r) > 1 ? `${roundOf(r)}번째 읽는 중 · ` : "";
-  if (!to) return nth ? `${roundOf(r)}번째 읽기 시작` : "";
+  const v = isFo(r) ? "듣" : "읽";
+  const nth = roundOf(r) > 1 ? `${roundOf(r)}번째 ${v}는 중 · ` : "";
+  if (!to) return nth ? `${roundOf(r)}번째 ${v}기 시작` : "";
   return nth + (r.totalPages ? `진도율 ${pct(r)}% (${to} / ${r.totalPages}쪽)` : `${to}쪽까지 읽었어요`);
 }
 const hasHangul = (t) => /[가-힣]/.test(t || "");
@@ -276,17 +277,21 @@ $("ringStampKoBtn").addEventListener("click", () => openStamp(null, "ko"));
 $("ringStampEnBtn").addEventListener("click", () => openStamp(null, "en"));
 
 // ---------- 1) 스캔 후 책 정보 시트 ----------
-let sheet = null; // { isbn, book, existing }
+let sheet = null; // { isbn, book, existing, fo }
+// 같은 책이라도 "읽은 기록"과 "집중듣기 기록"은 따로 둬요 (영어책은 듣고 나서 또 읽기도 하니까)
+const recsOf = (isbn) => { const all = isbn ? records.filter((r) => r.isbn === isbn) : []; return { read: all.find((r) => !isFo(r)) || null, fo: all.find(isFo) || null }; };
+const bookOfRec = (r) => (r ? { title: r.title, authors: r.authors ? [r.authors] : [], publisher: r.publisher, category: r.category, pages: r.totalPages, cover: r.cover, description: r.description } : null);
 async function openSheet(isbn, scanInfo) {
-  const existing = records.find((r) => r.isbn === isbn) || null;
-  sheet = { isbn, book: null, existing };
+  const { read: existing, fo: foRec } = recsOf(isbn);
+  const ex0 = existing || foRec; // 화면에 보여 줄 내 기록
+  sheet = { isbn, book: null, existing, fo: foRec };
   $("sCat").textContent = "책 정보";
   $("sTitle").textContent = "책 정보를 찾는 중…";
   $("sAuthor").textContent = ""; $("sPages").textContent = "";
   $("sDesc").textContent = ""; $("sDesc").classList.remove("open");
   $("sTiming").textContent = "";
   $("sMine").hidden = true;
-  setImg($("sCover"), existing?.cover);
+  setImg($("sCover"), ex0?.cover);
   $("sOk").disabled = true; $("sOk").textContent = "확인";
   $("scanSheet").showModal();
 
@@ -301,25 +306,31 @@ async function openSheet(isbn, scanInfo) {
   $("sTiming").textContent = parts.join(" · ");
   $("sOk").disabled = false;
 
-  if (!book && !existing) {
+  if (!book && !ex0) {
     $("sTitle").textContent = "책 정보를 찾지 못했어요";
     $("sAuthor").textContent = "셀프등록에서 제목을 적으면 다른 판의 표지와 쪽수를 찾아 줘요. 한 번 등록하면 다음부터는 누구나 바로 찾아요.";
     $("sOk").textContent = "셀프등록";
     return;
   }
   const b = book || {};
-  $("sCat").textContent = b.category || existing?.category || (hasHangul(b.title || existing?.title) ? "한글책" : "영어책");
-  $("sTitle").textContent = existing?.title || b.title;
-  $("sAuthor").textContent = `〈작가〉 ${existing?.authors || (b.authors || []).join(", ") || "모름"}`;
-  const pages = existing?.totalPages || b.pages;
+  $("sCat").textContent = b.category || ex0?.category || (hasHangul(b.title || ex0?.title) ? "한글책" : "영어책");
+  $("sTitle").textContent = ex0?.title || b.title;
+  $("sAuthor").textContent = `〈작가〉 ${ex0?.authors || (b.authors || []).join(", ") || "모름"}`;
+  const pages = ex0?.totalPages || b.pages;
   $("sPages").textContent = `〈페이지〉 ${pages ? `${pages} pages` : "정보 없음"}`;
-  setImg($("sCover"), existing?.cover || b.cover);
-  $("sDesc").textContent = b.description || existing?.description || "";
+  setImg($("sCover"), ex0?.cover || b.cover);
+  $("sDesc").textContent = b.description || ex0?.description || "";
   if (existing) {
     $("sMine").hidden = false;
-    $("sMine").textContent = existing.done ? `📚 ${timesRead(existing)}번 다 읽은 책이에요 · 기록 보기 ›` : `📚 읽고 있는 책이에요 · ${progressText(existing) || "쪽수 기록 없음"}`;
+    const fo = isFo(existing); // 집중듣기 책은 "듣기"로
+    $("sMine").textContent = existing.done ? `${fo ? "🎧" : "📚"} ${timesRead(existing)}번 다 ${fo ? "들은" : "읽은"} 책이에요 · 기록 보기 ›` : `${fo ? "🎧 듣고" : "📚 읽고"} 있는 책이에요 · ${progressText(existing) || "쪽수 기록 없음"}`;
     $("sMine").classList.toggle("link", !!existing.done);
-    $("sOk").textContent = existing.done ? `🔁 다시 읽기 (${roundOf(existing) + 1}번째)` : "이어서 기록하기";
+    $("sOk").textContent = existing.done ? `🔁 다시 ${fo ? "듣기" : "읽기"} (${roundOf(existing) + 1}번째)` : "이어서 기록하기";
+  } else if (foRec) { // 집중듣기만 한 책: 들은 기록은 따로 두고, 읽은 책으로 새로 기록
+    $("sMine").hidden = false;
+    $("sMine").textContent = foRec.done ? `🎧 ${timesRead(foRec)}번 다 들은 책이에요 · 들은 기록 보기 ›` : `🎧 듣고 있는 책이에요 · 들은 기록 보기 ›`;
+    $("sMine").classList.add("link");
+    $("sOk").textContent = "📖 읽은 책으로 기록하기";
   }
 }
 $("sDesc").addEventListener("click", () => $("sDesc").classList.toggle("open"));
@@ -338,9 +349,10 @@ $("scanSheet").addEventListener("close", () => {
   const v = $("scanSheet").returnValue;
   const s = sheet; sheet = null;
   if (!s || (v !== "ok" && v !== "self" && v !== "view")) return; // ✕ = 검색만 하고 끝
-  if (v === "view" && s.existing) { openView(s.existing.id); return; }
+  if (v === "view" && (s.existing || s.fo)) { openView((s.existing || s.fo).id); return; }
   if (s.existing) { s.existing.done && v === "ok" ? startReread(s.existing, true) : openRecord({ existing: s.existing, pick: true }); return; }
-  openRecord({ isbn: s.isbn, book: s.book, self: v === "self" || !s.book, pick: true });
+  const bk = s.book || bookOfRec(s.fo); // 들은 기록이 있으면 그 책 정보로 읽은 기록을 새로 시작
+  openRecord({ isbn: s.isbn, book: bk, self: v === "self" || !bk, pick: true, notFocus: !!s.fo });
 });
 
 // ---------- 2) 책 기록 화면 ----------
@@ -384,7 +396,7 @@ function syncDone() {
 $("rDone").addEventListener("change", syncDone);
 $("rTotal").addEventListener("input", () => { if ($("rDone").checked) $("rTo").value = $("rTotal").value; });
 
-function openRecord({ existing = null, isbn = null, book = null, self = false, reread = false, pick = false }) {
+function openRecord({ existing = null, isbn = null, book = null, self = false, reread = false, pick = false, notFocus = false }) {
   rec = { existing, isbn: existing?.isbn || isbn, book, self, reread, pick };
   // 스캔해서 들어왔을 때: 누구 기록인지 고르기 (아이가 둘 이상일 때)
   $("rKidWrap").hidden = !(pick && kids.length > 1 && !PEEK);
@@ -408,13 +420,13 @@ function openRecord({ existing = null, isbn = null, book = null, self = false, r
   $("rDesc").textContent = desc; $("rDesc").classList.remove("open");
   $("rDescHead").hidden = !desc;
 
-  chosenShelf = existing ? shelfOf(existing) : preferShelf || (title ? (hasHangul(title) ? "ko" : "en") : (rec.isbn?.startsWith("97911") || rec.isbn?.startsWith("97889") ? "ko" : "en"));
+  chosenShelf = existing ? shelfOf(existing) : (notFocus && preferShelf === "focus" ? null : preferShelf) || (title ? (hasHangul(title) ? "ko" : "en") : (rec.isbn?.startsWith("97911") || rec.isbn?.startsWith("97889") ? "ko" : "en"));
   paintShelf();
   rDay = returnDay || localDay(); paintDate();
 
   const prev = existing && !reread ? readTo(existing) : 0;
   $("soFar").hidden = !prev && !reread;
-  $("soFar").textContent = reread ? `🔁 ${roundOf(existing) + 1}번째 읽기를 시작해요! 1쪽부터 다시 기록해요`
+  $("soFar").textContent = reread ? `🔁 ${roundOf(existing) + 1}번째 ${isFo(existing) ? "듣기" : "읽기"}를 시작해요! 1쪽부터 다시 기록해요`
     : prev ? `지난번까지 ${prev}쪽 읽었어요 → 오늘은 ${prev + 1}쪽부터` : "";
   $("rTotal").value = total || "";
   $("rTo").value = ""; $("rMin").value = ""; $("rHour").value = "";
@@ -477,6 +489,9 @@ function saveRecord() {
   if (chosenShelf === "focus" && !minutes) { toast("집중듣기 시간을 적어 주세요"); $("rMin").focus(); return; }
   if (rDay > localDay()) { rDay = localDay(); paintDate(); toast("오늘 이후 날짜는 고를 수 없어요"); return; }
 
+  // 같은 책은 읽은 기록 하나 · 들은 기록 하나만 (같은 종류가 이미 있으면 그 기록에 이어서)
+  const twin = rec.isbn ? records.find((x) => x.isbn === rec.isbn && x !== r0 && isFo(x) === (chosenShelf === "focus")) : null;
+  if (twin) { toast(`이미 ${chosenShelf === "focus" ? "집중듣기로" : "읽은 책으로"} 기록한 책이에요. 그 기록에서 이어서 적어 주세요`, 3500); return; }
   const session = { from: prev + 1, to, day: rDay, ...(minutes ? { minutes } : {}) };
   let r;
   if (r0) {
@@ -695,13 +710,14 @@ function fillView(r) {
   $("vSessions").innerHTML = Array.from({ length: rounds }, (_, i) => i + 1).map((n) => {
     const ss = roundSessions(r, n).sort((a, b) => a.day.localeCompare(b.day));
     const fin = (r.finishes || []).find((f) => f.round === n);
-    const head = rounds > 1 || fin ? `<li class="round-h"><b>${n}번째</b><span>${ss[0] ? shortDay(ss[0].day) : ""}${fin ? ` ~ ${shortDay(fin.day)} · 다 ${isFo(r) ? "들음" : "읽음"}` : " ~ 읽는 중"}</span></li>` : "";
+    const head = rounds > 1 || fin ? `<li class="round-h"><b>${n}번째</b><span>${ss[0] ? shortDay(ss[0].day) : ""}${fin ? ` ~ ${shortDay(fin.day)} · 다 ${isFo(r) ? "들음" : "읽음"}` : ` ~ ${isFo(r) ? "듣는" : "읽는"} 중`}</span></li>` : "";
     return head + ss.map((s) => `<li><span>${prettyDay(s.day)}</span><b>${sessionText(s)}</b></li>`).join("");
   }).join("");
   $("vHome").checked = !!r.home; $("vHome").disabled = !!PEEK;
   $("vTimes").innerHTML = timesRead(r) ? `${tallySvg(timesRead(r))}<span>${timesRead(r)}번 ${isFo(r) ? "들었어요" : "읽었어요"}</span>` : "";
   $("vMore").hidden = false;
-  $("vMore").textContent = r.done ? `🔁 다시 읽기 (${rounds + 1}번째)` : "➕ 이어서 기록하기";
+  $("vMore").textContent = r.done ? `🔁 다시 ${isFo(r) ? "듣기" : "읽기"} (${rounds + 1}번째)` : "➕ 이어서 기록하기";
+  $("vSessH").textContent = isFo(r) ? "🎧 들은 기록" : "📖 읽은 기록";
   $("vActivity").hidden = isFo(r) || !(r.done && !(r.bonusRounds || []).includes(rounds));
   $("vScore").textContent = r.score ? `${"★".repeat(r.score)}${"☆".repeat(5 - r.score)}  ${r.score}점` : "주지 않았어요";
   $("vNote").textContent = r.note || "적지 않았어요";
@@ -1784,7 +1800,7 @@ function mergeBackup(d) {
     if (!r0?.title) continue;
     const r = migrate({ ...r0, sessions: (r0.sessions || []).map((s) => ({ ...s })) });
     r.kid = kidOf(r0.kid); r.id = r.id || uid();
-    const same = allRecords.find((x) => x.id === r.id) || (r.isbn && allRecords.find((x) => x.kid === r.kid && x.isbn === r.isbn));
+    const same = allRecords.find((x) => x.id === r.id) || (r.isbn && allRecords.find((x) => x.kid === r.kid && x.isbn === r.isbn && isFo(x) === isFo(r)));
     if (!same) { allRecords.push(r); n.r++; n.s += r.sessions.length; continue; }
     const key = (s) => `${s.day}|${s.from}|${s.to}|${s.round || 1}`;
     const have = new Set(same.sessions.map(key));
@@ -2853,7 +2869,7 @@ $("rKids").addEventListener("click", (e) => {
   const b = e.target.closest("[data-kid]"); if (!b || !rec || b.dataset.kid === activeKid) return;
   const { isbn, book, self } = rec, bk = book || (rec.existing ? { title: rec.existing.title, authors: rec.existing.authors ? [rec.existing.authors] : [], publisher: rec.existing.publisher, category: rec.existing.category, pages: rec.existing.totalPages, cover: rec.existing.cover, description: rec.existing.description } : null);
   setKid(b.dataset.kid);
-  const ex = isbn ? records.find((r) => r.isbn === isbn) : null;
+  const pair = recsOf(isbn), ex = chosenShelf === "focus" ? pair.fo : pair.read;
   if (ex && ex.done) { if (!startReread(ex, true)) { $("recordPage").close(); return; } }
   else if (ex) openRecord({ existing: ex, pick: true });
   else openRecord({ isbn, book: bk, self: self && !bk, pick: true });
