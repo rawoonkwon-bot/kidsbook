@@ -401,6 +401,25 @@ textarea { resize: vertical; line-height: 1.6; }
 .vbar b { font-size: 12px; }
 .vbar small { position: absolute; bottom: -22px; font-size: 12px; color: var(--muted); }
 .vbars + * { margin-top: 30px; }
+/* 읽은 시간 그래프 */
+.tchips3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 12px 0 14px; }
+.tchips3 div { background: var(--card); box-shadow: var(--raise-s); border-radius: 14px; padding: 10px 12px; }
+.tchips3 small { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); }
+.tchips3 small i { width: 9px; height: 9px; border-radius: 2px; flex: none; }
+.tchips3 b { display: block; font-size: 16px; margin-top: 2px; white-space: nowrap; }
+.tchart { display: grid; grid-template-columns: auto 1fr; gap: 8px; height: 200px; margin-bottom: 30px; }
+.tc-y { display: flex; flex-direction: column; justify-content: space-between; font-size: 11px; color: var(--muted); text-align: right; transform: translateY(6px); }
+.tc-plot { position: relative; border-bottom: 1px solid var(--line); }
+.tc-g { position: absolute; left: 0; right: 0; height: 1px; background: var(--line); opacity: .7; }
+.tc-cols { position: absolute; inset: 0; display: grid; gap: 6px; }
+.tc-col { position: relative; border: 0; background: none; padding: 0; cursor: pointer; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; }
+.tc-stack { width: 62%; max-width: 26px; display: flex; flex-direction: column-reverse; gap: 2px; border-radius: 4px 4px 0 0; overflow: hidden; min-height: 0; }
+.tc-stack em { display: block; min-height: 2px; }
+.tc-col small { position: absolute; bottom: -22px; font-size: 12px; color: var(--muted); }
+.tc-col.fut small { opacity: .45; }
+.tc-col.on small { color: var(--forest); font-weight: 800; }
+.tc-col.on .tc-stack { outline: 2px solid var(--forest); outline-offset: 2px; }
+.tinfo { font-size: 13px; color: var(--muted); text-align: center; margin: 0 0 8px; }
 
 .toast {
   position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + var(--nav-h) + 90px); transform: translateX(-50%);

@@ -1206,7 +1206,7 @@ function renderStats() {
   // 한글책 / 영어책 / 집중듣기
   const groups = Object.keys(SHELVES).map((k) => {
     const list = records.filter((r) => shelfOf(r) === k);
-    const jm = k === "focus" ? 0 : journal.filter((j) => j.cat === k && j.minutes).reduce((a, j) => a + j.minutes, 0); // 포트폴리오에 적은 읽은 시간
+    const jm = journal.filter((j) => j.cat === k && j.minutes).reduce((a, j) => a + j.minutes, 0); // 포트폴리오에 따로 적은 시간 (그래프와 같은 기준)
     return { k, n: list.length, p: list.reduce((a, r) => a + pagesOf(r), 0), m: list.reduce((a, r) => a + minsOf(r), 0) + jm, color: `var(--${k === "focus" ? "fo" : k})` };
   });
   const sum = groups.reduce((a, g) => a + g.n, 0);
@@ -1237,9 +1237,61 @@ function renderStats() {
   const mp = Object.fromEntries(months.map((m) => [m, 0]));
   for (const r of readRecs()) for (const s of r.sessions) { const m = s.day.slice(0, 7); if (m in mp) mp[m] += sessionPages(s); }
   const mmax = Math.max(1, ...Object.values(mp));
+  renderTimeChart();
   $("statMonths").innerHTML = months.map((m) => `
     <div class="vbar" title="${m} ${mp[m]}쪽">${mp[m] ? `<b>${mp[m]}</b>` : ""}<i style="height:${(mp[m] / mmax) * 82}%"></i><small>${Number(m.slice(5))}월</small></div>`).join("");
 }
+
+// ---------- 소식: 읽은 시간 그래프 (이번 주 = 요일별 / 한 달 = 주별, 세로는 시간) ----------
+let timeRange = "w";
+const TKIND = [["ko", "한글책", "#2F5D3A"], ["en", "영어책", "#6F9F97"], ["fo", "집중듣기", "#C89B3C"]];
+function minutesByDay() { // { "2026-11-25": { ko, en, fo } }
+  const m = {};
+  const add = (day, k, v) => { if (!v) return; (m[day] ||= { ko: 0, en: 0, fo: 0 })[k] += v; };
+  for (const r of records) { const k = isFo(r) ? "fo" : shelfOf(r) === "en" ? "en" : "ko"; for (const s of r.sessions) add(s.day, k, s.minutes || 0); }
+  for (const j of journal) { const k = j.cat === "focus" ? "fo" : j.cat === "ko" || j.cat === "en" ? j.cat : null; if (k) add(j.day, k, j.minutes || 0); }
+  return m;
+}
+function renderTimeChart() {
+  const md = minutesByDay(), now = new Date(), today = localDay();
+  let cols = [];
+  if (timeRange === "w") { // 월요일부터 일요일까지
+    const mon = new Date(now); mon.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+    cols = Array.from({ length: 7 }, (_, i) => { const d = new Date(mon); d.setDate(mon.getDate() + i); const day = localDay(d); return { label: "월화수목금토일"[i], days: [day], title: prettyDay(day), future: day > today }; });
+  } else { // 이번 달을 7일씩
+    const y = now.getFullYear(), mo = now.getMonth(), last = new Date(y, mo + 1, 0).getDate();
+    for (let s = 1, w = 1; s <= last; s += 7, w++) {
+      const days = []; for (let d = s; d <= Math.min(last, s + 6); d++) days.push(localDay(new Date(y, mo, d)));
+      cols.push({ label: `${w}주`, days, title: `${mo + 1}월 ${s}~${Math.min(last, s + 6)}일`, future: days[0] > today });
+    }
+  }
+  for (const c of cols) { c.v = { ko: 0, en: 0, fo: 0 }; for (const d of c.days) if (md[d]) for (const k of ["ko", "en", "fo"]) c.v[k] += md[d][k]; c.t = c.v.ko + c.v.en + c.v.fo; }
+  const tot = { ko: 0, en: 0, fo: 0 }; for (const c of cols) for (const k in tot) tot[k] += c.v[k];
+  $("timeTotals").innerHTML = TKIND.map(([k, n, col]) => `<div><small><i style="background:${col}"></i>${n}</small><b>${tot[k] ? fmtMin(tot[k]) : "-"}</b></div>`).join("");
+  // 세로축: 시간 단위 (가장 긴 막대를 넉넉히 담는 정수 시간)
+  const maxH = Math.max(1, Math.ceil(Math.max(0, ...cols.map((c) => c.t)) / 60));
+  const step = maxH <= 4 ? 1 : maxH <= 8 ? 2 : Math.ceil(maxH / 4);
+  const top = Math.ceil(maxH / step) * step;
+  const ticks = Array.from({ length: top / step + 1 }, (_, i) => i * step);
+  $("timeChart").innerHTML = `<div class="tc-y">${ticks.slice().reverse().map((h) => `<span>${h ? `${h}시간` : "0"}</span>`).join("")}</div>
+    <div class="tc-plot">${ticks.map((h) => `<i class="tc-g" style="bottom:${(h / top) * 100}%"></i>`).join("")}
+    <div class="tc-cols" style="grid-template-columns:repeat(${cols.length},1fr)">${cols.map((c, i) => `<button type="button" class="tc-col${c.future ? " fut" : ""}" data-i="${i}" aria-label="${c.title} ${fmtMin(c.t)}">
+      <span class="tc-stack" style="height:${(c.t / 60 / top) * 100}%">${TKIND.map(([k, , col]) => (c.v[k] ? `<em style="flex:${c.v[k]};background:${col}"></em>` : "")).join("")}</span><small>${c.label}</small></button>`).join("")}</div></div>`;
+  const all = tot.ko + tot.en + tot.fo;
+  $("timeInfo").textContent = all ? `${timeRange === "w" ? "이번 주" : `${now.getMonth() + 1}월`} 모두 ${fmtMin(all)} · 막대를 누르면 자세히 보여요` : "아직 적은 시간이 없어요. 포트폴리오나 책 기록 보기에서 읽은 시간을 적어 보세요.";
+  $("timeChart").onclick = (e) => {
+    const b = e.target.closest(".tc-col"); if (!b) return;
+    const c = cols[Number(b.dataset.i)];
+    [...$("timeChart").querySelectorAll(".tc-col")].forEach((x) => x.classList.toggle("on", x === b));
+    $("timeInfo").textContent = c.t ? `${c.title} · ${TKIND.filter(([k]) => c.v[k]).map(([k, n]) => `${n} ${fmtMin(c.v[k])}`).join(" · ")}` : `${c.title} · 기록 없음`;
+  };
+}
+$("timeRange").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-r]"); if (!b) return;
+  timeRange = b.dataset.r;
+  [...$("timeRange").children].forEach((x) => x.setAttribute("aria-checked", String(x === b)));
+  renderTimeChart();
+});
 
 // ---------- 스캐너 ----------
 const scanner = new Scanner({
