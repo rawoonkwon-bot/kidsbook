@@ -1015,3 +1015,7 @@ body.peek #wsOpen { display: none; }
 /* 우리 집 책장 글자 옆 집 표시 (표지 위 표시와 같은 모양) */
 .home-mark { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: #FFEBDD; color: #B95A26; vertical-align: 2px; margin-left: 4px; font-style: normal; box-shadow: 0 1px 3px rgba(0,0,0,.18); }
 .home-mark svg { width: 12px; height: 12px; }
+
+/* 교과서 수록도서 학년 동그라미 */
+.tb-gs { display: inline-flex; gap: 3px; margin-left: 6px; vertical-align: 3px; }
+.tb-g { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: #2F7A45; color: #fff; font-size: 12px; font-weight: 800; font-style: normal; line-height: 1; letter-spacing: 0; }

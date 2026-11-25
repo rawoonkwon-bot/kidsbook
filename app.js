@@ -5,6 +5,7 @@ import * as sync from "./sync.js";
 import { ico, toIcon, ICON_EMOJI, PICK } from "./icons.js";
 import { faceSvg, validFace, FACE_COLORS, FACE_COUNT } from "./faces.js";
 import { makeRich, makeRichCE, richHtml, plainText, MARK } from "./rich.js";
+import { TEXTBOOK } from "./textbook.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -397,7 +398,7 @@ function openRecord({ existing = null, isbn = null, book = null, self = false, r
   const desc = existing?.description || b.description || "";
 
   setImg($("rCover"), existing?.cover || b.cover);
-  $("rTitleText").textContent = title;
+  $("rTitleText").innerHTML = esc(title) + tbHtml(tbGrades(rec.isbn, title, authors));
   $("rTitleText").hidden = self;
   $("rTitle").hidden = !self; $("rAuthor").hidden = !self;
   $("rTitle").value = title; $("rAuthor").value = authors;
@@ -685,7 +686,7 @@ function openView(id) {
 }
 function fillView(r) {
   setImg($("vCover"), r.cover);
-  $("vTitle").textContent = r.title;
+  $("vTitle").innerHTML = esc(r.title) + tbHtml(tbGrades(r.isbn, r.title, r.authors));
   $("vAuthor").textContent = r.authors || "";
   $("vMeta").textContent = [SHELVES[shelfOf(r)], r.totalPages && `${r.totalPages}쪽`, minsOf(r) && `${fmtMin(minsOf(r))} 들음`, !isFo(r) && `${pointsOf(r)}점`].filter(Boolean).join(" · ");
   $("vProgress").innerHTML = progressText(r)
@@ -2770,3 +2771,22 @@ $("rKids").addEventListener("click", (e) => {
   else openRecord({ isbn, book: bk, self: self && !bk, pick: true });
   toast(`${kidNow()?.nick || ""} 책장에 기록해요`);
 });
+
+// ---------- 교과서 수록도서: 제목 옆 학년 동그라미 ----------
+// 바코드(ISBN)가 같으면 바로, 아니면 제목+지은이로 맞춰 봐요 (짧은 제목은 지은이까지 같아야 해요)
+const nT = (s) => String(s || "").toLowerCase().replace(/\[[^\]]*\]|\([^)]*\)/g, "").replace(/[^0-9a-z가-힣]/g, "");
+const TB_I = new Map(), TB_T = [];
+for (const [t, a, g, is] of TEXTBOOK) {
+  for (const i of is.split(" ").filter(Boolean)) TB_I.set(i, (TB_I.get(i) || "") + g);
+  TB_T.push([nT(t), a.replace(/\s/g, ""), g]);
+}
+function tbGrades(isbn, title, authors) {
+  const gs = new Set([...(TB_I.get(isbn || "") || "")]);
+  const nt = nT(title), au = String(authors || "").replace(/\s/g, "");
+  if (nt) for (const [t, a, g] of TB_T) {
+    const auOk = a && au.includes(a);
+    if ((nt === t && (t.length >= 4 || auOk)) || (t.length >= 3 && nt.startsWith(t) && auOk)) for (const c of g) gs.add(c);
+  }
+  return [...gs].sort();
+}
+const tbHtml = (gs) => gs.length ? `<span class="tb-gs">${gs.map((g) => `<i class="tb-g" title="${g}학년 국어 교과서 수록도서" aria-label="${g}학년 교과서 수록">${g}</i>`).join("")}</span>` : "";
