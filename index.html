@@ -504,6 +504,7 @@
       <button type="button" class="set-row" id="setImport"><span class="si">📤</span><span class="st"><b>기록 파일 다시 올리기</b><small>내려받은 파일(.zip 또는 .json)로 복원해요</small></span><span>›</span></button>
       <p class="set-note" id="acctEmail"></p>
       <label class="set-row set-check"><span class="si">🔒</span><span class="st"><b>나만 보기</b><small>체크하면 다른 사람이 우리 아이 책장을 볼 수 없어요</small></span><input type="checkbox" id="setPrivate" /></label>
+      <button type="button" class="set-row" id="setAdmin" hidden><span class="si">👑</span><span class="st"><b>회원 관리</b><small>관리자에게만 보여요 · 회원 · 신고된 글</small></span><span>›</span></button>
       <button type="button" class="set-row" id="setLogout"><span class="si">🚪</span><span class="st"><b>로그아웃</b><small>기록은 계정에 남아 있어요</small></span><span>›</span></button>
     </form>
   </dialog>
@@ -766,5 +767,36 @@
   </div>
 
   <script type="module" src="/app.js"></script>
+
+  <!-- 👑 회원 관리 (관리자만) -->
+  <dialog id="adminPage" class="page">
+    <div class="page-in">
+      <div class="page-top"><button type="button" class="x-btn" id="admClose" aria-label="닫기">✕</button></div>
+      <h2 class="page-title">👑 회원 관리</h2>
+      <p class="muted adm-sub">관리자에게만 보이는 화면이에요</p>
+      <div class="adm-tiles" id="admTiles"></div>
+      <button type="button" class="adm-rep" id="admRep" hidden></button>
+      <input id="admQ" class="sub-input" type="search" placeholder="별명이나 이메일로 찾기" autocomplete="off" />
+      <div class="adm-sort" id="admSort"><button type="button" data-s="recent" aria-pressed="true">최근 기록순</button><button type="button" data-s="joined" aria-pressed="false">가입순</button><button type="button" data-s="books" aria-pressed="false">책 많은 순</button></div>
+      <ul class="adm-list" id="admList"></ul>
+    </div>
+  </dialog>
+  <dialog id="admRepPage" class="page">
+    <div class="page-in">
+      <div class="page-top"><button type="button" class="x-btn" id="arClose" aria-label="닫기">✕</button></div>
+      <h2 class="page-title">🚨 신고된 글</h2>
+      <p class="muted adm-sub">"괜찮음"을 누르면 신고만 정리되고 글은 그대로 남아요</p>
+      <ul class="w-list" id="arList"></ul>
+    </div>
+  </dialog>
+  <dialog id="admUserPage" class="page">
+    <div class="page-in">
+      <div class="page-top"><button type="button" class="x-btn" id="auClose" aria-label="닫기">✕</button></div>
+      <div class="au-head" id="auHead"></div>
+      <div class="au-acts" id="auActs"></div>
+      <h4 class="r-sub">쓴 글 · 댓글 <span id="auCnt"></span></h4>
+      <ul class="w-list" id="auList"></ul>
+    </div>
+  </dialog>
 </body>
 </html>

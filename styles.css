@@ -1021,3 +1021,42 @@ body.peek #wsOpen { display: none; }
 .tb-g { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: #2F7A45; color: #fff; font-size: 12px; font-weight: 800; font-style: normal; line-height: 1; letter-spacing: 0; }
 .tb-g.m { background: #2E6FB0; }
 .tb-g.h { background: #7F4DB0; }
+
+/* 👑 회원 관리 */
+.adm-sub { font-size: 13px; margin: -4px 0 12px; }
+.adm-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; }
+.adm-tiles div { background: var(--card); box-shadow: var(--raise-s); border-radius: 14px; padding: 10px; text-align: center; }
+.adm-tiles b { display: block; font-size: 22px; color: var(--forest); }
+.adm-tiles small { font-size: 12px; color: var(--muted); }
+.adm-rep { width: 100%; border: 0; border-radius: 14px; padding: 12px; margin-bottom: 10px; background: #FDECEC; color: #A32D2D; font: inherit; font-size: 14px; font-weight: 700; text-align: left; cursor: pointer; }
+.adm-sort { display: flex; gap: 6px; margin: 8px 0 10px; }
+.adm-sort button { border: 0; border-radius: 99px; padding: 7px 12px; font: inherit; font-size: 13px; font-weight: 700; background: var(--card); box-shadow: var(--raise-s); color: var(--ink); cursor: pointer; }
+.adm-sort button[aria-pressed="true"] { background: var(--forest); color: #F3EFE6; box-shadow: none; }
+.adm-list, .w-list { list-style: none; padding: 0; margin: 0 0 20px; display: flex; flex-direction: column; gap: 6px; }
+.adm-list .muted, .w-list .muted { text-align: center; padding: 24px 0; font-size: 14px; }
+.adm-row { width: 100%; display: flex; align-items: center; gap: 10px; border: 0; border-radius: 14px; padding: 10px 12px; background: var(--card); box-shadow: var(--raise-s); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.adm-row .av, .au-head .av { width: 36px; height: 36px; flex: none; }
+.adm-row .am { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.adm-row .am small { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adm-row .ar { text-align: right; font-size: 13px; font-weight: 700; flex: none; }
+.adm-row .ar em { display: block; font-style: normal; font-weight: 400; font-size: 11px; color: var(--muted); }
+.tag { font-style: normal; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 6px; margin-left: 4px; vertical-align: 1px; }
+.tag.adm { background: #FFCC00; color: #1E2420; } .tag.new { background: #E1F5EE; color: #085041; } .tag.idle { background: #FAEEDA; color: #854F0B; } .tag.ban { background: #FDECEC; color: #A32D2D; }
+.w-row { display: flex; gap: 10px; align-items: flex-start; background: var(--card); box-shadow: var(--raise-s); border-radius: 14px; padding: 10px 12px; }
+.w-row > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.w-row small { color: var(--muted); font-size: 12px; }
+.w-row small .rp { color: #A32D2D; }
+.w-row > div > b { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.w-row p { margin: 0; font-size: 13px; color: var(--ink); opacity: .8; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.w-acts { display: flex; flex-direction: column; gap: 4px; flex: none; }
+.w-acts button, .au-acts button { border: 0; border-radius: 10px; padding: 6px 10px; font: inherit; font-size: 12px; font-weight: 700; background: var(--soft); color: var(--ink); cursor: pointer; }
+.w-acts button.del, .au-acts button.del { background: #FDECEC; color: #A32D2D; }
+.au-head { display: flex; gap: 12px; align-items: flex-start; margin: 4px 0 12px; }
+.au-head .av { width: 48px; height: 48px; }
+.au-head div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.au-head b { font-size: 18px; }
+.au-head small { color: var(--muted); font-size: 12px; word-break: break-all; }
+.au-acts { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.au-acts button { padding: 9px 12px; font-size: 13px; background: var(--card); box-shadow: var(--raise-s); }
+.au-acts button.on { background: #FDECEC; color: #A32D2D; box-shadow: none; }
+.comments li .rp-btn { margin-left: 0; border: 0; background: none; color: var(--muted); font-size: 11px; cursor: pointer; padding: 2px 4px; opacity: .7; }

@@ -1466,6 +1466,7 @@ function openSettings() {
   $("acctEmail").textContent = sync.currentEmail() ? `${sync.currentEmail()} 로 로그인했어요${AUTH.offline ? " (지금은 인터넷 없음)" : ""}` : "";
   $("setPrivate").checked = !sync.getPublic();
   $("setNickTxt").textContent = sync.myNick() ? `${sync.myNick()} · 게시판에 이 이름으로 보여요` : "게시판에서 쓸 이름을 정해 주세요";
+  $("setAdmin").hidden = !sync.amAdmin();
   $("settingsDialog").showModal();
 }
 $("setPrivate").addEventListener("change", async (e) => {
@@ -1945,17 +1946,18 @@ function paintPost() {
     adm ? `<button type="button" data-a="pin">${p.pinned ? "공지 풀기" : "공지로 고정"}</button>` : "",
     mine ? `<button type="button" data-a="edit">고치기</button>` : "",
     mine || adm ? `<button type="button" data-a="del">지우기</button>` : "",
+    !mine && !adm && sync.myId() ? `<button type="button" data-a="report">신고</button>` : "",
   ].join("");
   $("pCnt").textContent = p.comments.length || "";
-  $("pComments").innerHTML = cmtTree(p.comments, (c) => c.user_id === sync.myId() || adm);
+  $("pComments").innerHTML = cmtTree(p.comments, (c) => c.user_id === sync.myId() || adm, !adm);
   setReTo("p", null);
 }
 // 댓글 + 답글 (한 단계) — 답글의 답글도 같은 댓글 아래에 붙어요
-function cmtTree(list, canDel) {
+function cmtTree(list, canDel, canReport = true) {
   const ids = new Set(list.map((c) => c.id));
   const top = list.filter((c) => !c.parent_id || !ids.has(c.parent_id));
   const row = (c, root) => `<li${root !== c.id ? ` class="re"` : ""}><div>${root !== c.id ? `<span class="re-mark">↳</span>` : ""}<b>${esc(c.nick)}</b><small>${ago(c.created_at)}</small>
-      ${sync.myId() ? `<button type="button" class="re-btn" data-r="${root}" data-n="${esc(c.nick)}">답글</button>` : ""}${canDel(c) ? `<button type="button" class="x" data-c="${c.id}" aria-label="댓글 지우기">✕</button>` : ""}</div><p>${esc(c.body)}</p></li>`;
+      ${sync.myId() ? `<button type="button" class="re-btn" data-r="${root}" data-n="${esc(c.nick)}">답글</button>` : ""}${canDel(c) ? `<button type="button" class="x" data-c="${c.id}" aria-label="댓글 지우기">✕</button>` : canReport && sync.myId() ? `<button type="button" class="rp-btn" data-rp="${c.id}">신고</button>` : ""}</div><p>${esc(c.body)}</p></li>`;
   return top.map((c) => row(c, c.id) + list.filter((r) => r.parent_id === c.id).map((r) => row(r, c.id)).join("")).join("")
     || `<li class="muted">첫 댓글을 남겨 보세요</li>`;
 }
@@ -1980,6 +1982,7 @@ $("pLike").addEventListener("click", async () => {
 });
 $("pActions").addEventListener("click", async (e) => {
   const b = e.target.closest("[data-a]"); const p = postNow; if (!b || !p) return;
+  if (b.dataset.a === "report") { reportIt("post", p.id); return; }
   if (b.dataset.a === "edit") { $("postView").close(); openWrite(p); return; }
   if (b.dataset.a === "del") {
     if (!confirm("이 글을 지울까요? 댓글도 함께 지워져요. 되돌릴 수 없어요.")) return;
@@ -1993,6 +1996,7 @@ $("pActions").addEventListener("click", async (e) => {
   }
 });
 $("pComments").addEventListener("click", async (e) => {
+  const rp = e.target.closest("[data-rp]"); if (rp) { reportIt("comment", rp.dataset.rp); return; }
   const r = e.target.closest("[data-r]"); if (r) { setReTo("p", { id: r.dataset.r, nick: r.dataset.n }); return; }
   const b = e.target.closest("[data-c]"); if (!b || !postNow) return;
   if (!confirm("이 댓글을 지울까요?")) return;
@@ -2004,7 +2008,7 @@ $("pCSend").addEventListener("click", async () => {
   if (!sync.myNick()) { openNick(false); return; }
   $("pCSend").disabled = true;
   try { await sync.addComment(postNow.id, v, reTo.p?.id || null); $("pCIn").value = ""; boardLoaded = ""; await openPost(postNow.id); }
-  catch { toast("댓글을 올리지 못했어요. 인터넷 연결을 확인해 주세요"); }
+  catch (e) { toast(sync.isBanErr(e) ? BAN_MSG : "댓글을 올리지 못했어요. 인터넷 연결을 확인해 주세요", 3500); }
   $("pCSend").disabled = false;
 });
 
@@ -2082,7 +2086,7 @@ $("peSave").addEventListener("click", async () => {
     toast(writing ? "글을 고쳤어요" : "글을 올렸어요");
     board = bd; boardLoaded = ""; renderBoard(true);
     openPost(id);
-  } catch { toast("올리지 못했어요. 인터넷 연결을 확인해 주세요", 3500); }
+  } catch (e) { toast(sync.isBanErr(e) ? BAN_MSG : "올리지 못했어요. 인터넷 연결을 확인해 주세요", 3500); }
   $("peSave").disabled = false;
 });
 
@@ -2398,7 +2402,7 @@ function paintBlogPost() {
   $("bvPhotos").innerHTML = "";
   fillPhotoRows($("bvBody"));
   $("bvTags").innerHTML = (b.tags || []).map((t) => `<button type="button" data-tag="${esc(t)}">#${esc(t)}</button>`).join("");
-  $("bvActions").innerHTML = [mine ? `<button type="button" data-a="edit">고치기</button>` : "", mine || sync.amAdmin() ? `<button type="button" data-a="del">지우기</button>` : ""].join("");
+  $("bvActions").innerHTML = [mine ? `<button type="button" data-a="edit">고치기</button>` : "", mine || sync.amAdmin() ? `<button type="button" data-a="del">지우기</button>` : "", !mine && !sync.amAdmin() && sync.myId() ? `<button type="button" data-a="report">신고</button>` : ""].join("");
   // 댓글은 공개 글에만
   $("bvCmtWrap").hidden = !b.is_public;
   $("bvComments").innerHTML = ""; $("bvCnt").textContent = ""; setReTo("bv", null);
@@ -2411,10 +2415,11 @@ async function loadBlogCmts() {
     if (blogNow?.id !== b.id) return;
     const me = sync.myId(), owner = b.user_id === me, adm = sync.amAdmin();
     $("bvCnt").textContent = list.length || "";
-    $("bvComments").innerHTML = cmtTree(list, (c) => c.user_id === me || owner || adm);
+    $("bvComments").innerHTML = cmtTree(list, (c) => c.user_id === me || owner || adm, !adm);
   } catch { $("bvComments").innerHTML = `<li class="muted">댓글을 불러오지 못했어요</li>`; }
 }
 $("bvComments").addEventListener("click", async (e) => {
+  const rp = e.target.closest("[data-rp]"); if (rp) { reportIt("blog_comment", rp.dataset.rp); return; }
   const r = e.target.closest("[data-r]"); if (r) { setReTo("bv", { id: r.dataset.r, nick: r.dataset.n }); return; }
   const b = e.target.closest("[data-c]"); if (!b || !blogNow) return;
   if (!confirm("이 댓글을 지울까요?")) return;
@@ -2426,7 +2431,7 @@ $("bvCSend").addEventListener("click", async () => {
   if (!sync.myNick()) { openNick(false); return; }
   $("bvCSend").disabled = true;
   try { await sync.addBlogComment(blogNow.id, v, reTo.bv?.id || null); $("bvCIn").value = ""; setReTo("bv", null); await loadBlogCmts(); }
-  catch { toast("댓글을 올리지 못했어요. 인터넷 연결을 확인해 주세요"); }
+  catch (e) { toast(sync.isBanErr(e) ? BAN_MSG : "댓글을 올리지 못했어요. 인터넷 연결을 확인해 주세요", 3500); }
   $("bvCSend").disabled = false;
 });
 $("bvClose").addEventListener("click", () => $("blogView").close());
@@ -2444,6 +2449,7 @@ $("bvTags").addEventListener("click", async (e) => {
 });
 $("bvActions").addEventListener("click", async (e) => {
   const b = e.target.closest("[data-a]"); const p = blogNow; if (!b || !p) return;
+  if (b.dataset.a === "report") { reportIt("blog", p.id); return; }
   if (b.dataset.a === "edit") { $("blogView").close(); openBlogEdit(p); return; }
   if (!confirm("이 글을 지울까요? 사진도 함께 지워지고 되돌릴 수 없어요.")) return;
   try {
@@ -2555,7 +2561,7 @@ $("beSave").addEventListener("click", async () => {
     toast(bEditing ? "글을 고쳤어요" : "블로그에 올렸어요");
     await renderMyBlog(true);
     openBlogPost(id, myBlog);
-  } catch { toast("올리지 못했어요. 인터넷 연결을 확인해 주세요", 3500); }
+  } catch (e) { toast(sync.isBanErr(e) ? BAN_MSG : "올리지 못했어요. 인터넷 연결을 확인해 주세요", 3500); }
   $("beSave").disabled = false;
 });
 
@@ -2791,3 +2797,115 @@ function tbGrades(isbn, title, authors) {
 }
 const TB_ORDER = "123456중고";
 const tbHtml = (gs) => gs.length ? `<span class="tb-gs">${gs.map((g) => { const nm = g === "중" ? "중학교" : g === "고" ? "고등학교" : `초등 ${g}학년`; return `<i class="tb-g${g === "중" ? " m" : g === "고" ? " h" : ""}" title="${nm} 교과서 수록도서" aria-label="${nm} 교과서 수록">${g}</i>`; }).join("")}</span>` : "";
+
+// ---------- 신고 ----------
+const BAN_MSG = "글쓰기가 잠시 막혀 있어요. 관리자에게 문의해 주세요";
+async function reportIt(kind, id) {
+  if (!confirm("이 글을 신고할까요?\n관리자가 확인해서 부적절하면 지워요.")) return;
+  try { await sync.report(kind, id); toast("신고했어요. 알려 주셔서 고마워요"); }
+  catch { toast("신고하지 못했어요. 인터넷 연결을 확인해 주세요"); }
+}
+
+// ---------- 👑 회원 관리 (관리자만) ----------
+const KIND_KO = { post: "게시판 글", comment: "게시판 댓글", blog: "블로그 글", blog_comment: "블로그 댓글" };
+const DAY = 864e5;
+let admMembers = [], admSort = "recent", admUser = null;
+const maskEmail = (e) => String(e || "").replace(/^(.{1,3})[^@]*@.*$/, "$1…@…");
+const admDay = (t) => { if (!t) return "-"; const d = new Date(t); return `${d.getMonth() + 1}/${String(d.getDate()).padStart(2, "0")}`; };
+const agoText = (t) => { if (!t) return "기록 없음"; const n = Math.floor((Date.now() - Date.parse(t)) / DAY); return n <= 0 ? "오늘 기록" : n === 1 ? "어제 기록" : `${n}일 전`; };
+$("setAdmin").addEventListener("click", () => { $("settingsDialog").close(); openAdmin(); });
+async function openAdmin() {
+  $("admList").innerHTML = `<li class="muted">불러오는 중…</li>`; $("admTiles").innerHTML = ""; $("admRep").hidden = true;
+  if (!$("adminPage").open) $("adminPage").showModal();
+  try {
+    const [ms, reps] = await Promise.all([sync.adminMembers(), sync.adminReports()]);
+    admMembers = ms;
+    const now = Date.now();
+    const tiles = [[ms.length, "전체 회원"], [ms.filter((m) => now - Date.parse(m.joined) < 7 * DAY).length, "이번 주 가입"], [ms.filter((m) => m.last_record && now - Date.parse(m.last_record) < 7 * DAY).length, "이번 주 기록"]];
+    $("admTiles").innerHTML = tiles.map(([n, t]) => `<div><b>${n}</b><small>${t}</small></div>`).join("");
+    $("admRep").hidden = !reps.length;
+    $("admRep").innerHTML = `🚨 신고된 글 <b>${reps.length}개</b> 확인하기 ›`;
+    paintAdmList();
+  } catch { $("admList").innerHTML = `<li class="muted">불러오지 못했어요. 관리자만 볼 수 있어요.</li>`; }
+}
+function paintAdmList() {
+  const q = $("admQ").value.trim().toLowerCase(), now = Date.now();
+  let list = admMembers.filter((m) => !q || (m.nick || "").toLowerCase().includes(q) || (m.email || "").toLowerCase().includes(q));
+  const tm = (t) => (t ? Date.parse(t) : 0);
+  list = [...list].sort(admSort === "joined" ? (a, b) => tm(b.joined) - tm(a.joined) : admSort === "books" ? (a, b) => b.books - a.books : (a, b) => tm(b.last_record) - tm(a.last_record));
+  $("admList").innerHTML = list.map((m) => {
+    const tags = [m.user_id === sync.myId() ? `<i class="tag adm">관리자</i>` : "", now - Date.parse(m.joined) < 7 * DAY ? `<i class="tag new">새 회원</i>` : "",
+      now - (tm(m.last_record) || tm(m.joined)) > 14 * DAY ? `<i class="tag idle">2주 넘게 쉼</i>` : "", m.banned ? `<i class="tag ban">글쓰기 막힘</i>` : ""].join("");
+    return `<li><button type="button" class="adm-row" data-u="${esc(m.user_id)}">${avatar(m.nick || "?", null, "av")}
+      <span class="am"><span><b>${esc(m.nick || "(별명 없음)")}</b>${tags}</span><small>${esc(maskEmail(m.email))} · 가입 ${admDay(m.joined)} · 아이 ${m.kids}명${m.writings ? ` · 글 ${m.writings}` : ""}</small></span>
+      <span class="ar">${m.books}권<em>${agoText(m.last_record)}</em></span></button></li>`;
+  }).join("") || `<li class="muted">찾는 회원이 없어요</li>`;
+}
+$("admQ").addEventListener("input", paintAdmList);
+$("admSort").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-s]"); if (!b) return;
+  admSort = b.dataset.s; [...$("admSort").children].forEach((x) => x.setAttribute("aria-pressed", String(x === b))); paintAdmList();
+});
+$("admClose").addEventListener("click", () => $("adminPage").close());
+$("admList").addEventListener("click", (e) => { const b = e.target.closest("[data-u]"); if (b) openAdmUser(b.dataset.u); });
+
+// 신고된 글
+$("admRep").addEventListener("click", openAdmReports);
+async function openAdmReports() {
+  $("arList").innerHTML = `<li class="muted">불러오는 중…</li>`;
+  if (!$("admRepPage").open) $("admRepPage").showModal();
+  try {
+    const reps = await sync.adminReports();
+    $("arList").innerHTML = reps.map((r) => wRow(r, `신고 ${r.reports}번 · ${r.author ? esc(r.nick || "(별명 없음)") : "(이미 지워진 글)"}`, true)).join("") || `<li class="muted">신고된 글이 없어요 👍</li>`;
+  } catch { $("arList").innerHTML = `<li class="muted">불러오지 못했어요</li>`; }
+}
+$("arClose").addEventListener("click", () => { $("admRepPage").close(); openAdmin(); });
+// 글 한 줄 (신고 목록 · 회원 글 목록 같이 씀)
+const wRow = (w, who, dismiss) => `<li class="w-row"><div><small>${KIND_KO[w.kind] || ""} · ${admDay(w.created_at)}${who ? ` · ${who}` : ""}${!dismiss && w.reports ? ` · <b class="rp">신고 ${w.reports}</b>` : ""}</small>
+  ${w.title ? `<b>${w.kind.endsWith("comment") ? "↳ " : ""}${esc(w.title)}</b>` : ""}<p>${esc(plainText(w.body || ""))}</p></div>
+  <span class="w-acts">${w.ref && w.author !== null ? `<button type="button" data-view="${w.kind}" data-ref="${esc(w.ref)}">보기</button>` : ""}<button type="button" class="del" data-del="${w.kind}" data-id="${esc(w.id)}">지우기</button>${dismiss ? `<button type="button" data-dis="${w.kind}" data-id="${esc(w.id)}">괜찮음</button>` : ""}</span></li>`;
+async function wAction(e, after) {
+  const v = e.target.closest("[data-view]"), d = e.target.closest("[data-del]"), s = e.target.closest("[data-dis]");
+  if (v) { v.dataset.view.startsWith("blog") ? openBlogPost(v.dataset.ref) : openPost(v.dataset.ref); return; }
+  if (d) {
+    if (!confirm(`이 ${KIND_KO[d.dataset.del]}을(를) 지울까요?\n되돌릴 수 없어요.`)) return;
+    try { await sync.adminDelete(d.dataset.del, d.dataset.id); toast("지웠어요"); boardLoaded = ""; after(); } catch { toast("지우지 못했어요"); }
+  }
+  if (s) { try { await sync.adminDismiss(s.dataset.dis, s.dataset.id); toast("신고를 정리했어요"); after(); } catch { toast("정리하지 못했어요"); } }
+}
+$("arList").addEventListener("click", (e) => wAction(e, openAdmReports));
+
+// 회원 한 명: 쓴 글 · 전부 지우기 · 글쓰기 막기 · 책장 보기
+async function openAdmUser(uid) {
+  admUser = admMembers.find((m) => m.user_id === uid); if (!admUser) return;
+  const m = admUser, me = uid === sync.myId();
+  $("auHead").innerHTML = `${avatar(m.nick || "?", null, "av")}<div><b>${esc(m.nick || "(별명 없음)")}</b><small>${esc(m.email || "")}</small>
+    <small>가입 ${admDay(m.joined)} · 마지막 로그인 ${admDay(m.last_sign_in)} · 아이 ${m.kids}명 · 책 ${m.books}권 · ${m.is_public ? "책장 공개" : "🔒 나만 보기"}</small></div>`;
+  $("auActs").innerHTML = [m.is_public ? `<button type="button" data-act="shelf">📚 책장 보기</button>` : "",
+    me ? "" : `<button type="button" data-act="ban" class="${m.banned ? "on" : ""}">${m.banned ? "✋ 글쓰기 막힘 · 풀기" : "✋ 글쓰기 막기"}</button>`,
+    me ? "" : `<button type="button" data-act="wipe" class="del">🗑 쓴 글 전부 지우기</button>`].join("");
+  $("auList").innerHTML = `<li class="muted">불러오는 중…</li>`;
+  if (!$("admUserPage").open) $("admUserPage").showModal();
+  try {
+    const ws = await sync.adminWritings(uid);
+    $("auCnt").textContent = ws.length ? `${ws.length}개` : "";
+    $("auList").innerHTML = ws.map((w) => wRow({ ...w, author: uid }, "", false)).join("") || `<li class="muted">쓴 글이 없어요</li>`;
+  } catch { $("auList").innerHTML = `<li class="muted">불러오지 못했어요</li>`; }
+}
+$("auClose").addEventListener("click", () => { $("admUserPage").close(); openAdmin(); });
+$("auList").addEventListener("click", (e) => wAction(e, () => openAdmUser(admUser.user_id)));
+$("auActs").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-act]"); const m = admUser; if (!b || !m) return;
+  if (b.dataset.act === "shelf") { for (const id of ["admUserPage", "adminPage"]) $(id).close(); openMom(m.user_id); return; }
+  if (b.dataset.act === "ban") {
+    const on = !m.banned;
+    if (on && !confirm(`${m.nick || "이 회원"}님이 게시판·블로그에 글과 댓글을 못 쓰게 할까요?\n(독서 기록과 책장은 그대로 쓸 수 있어요. 언제든 다시 풀 수 있어요)`)) return;
+    try { await sync.adminSetBan(m.user_id, on); m.banned = on; toast(on ? "글쓰기를 막았어요" : "글쓰기를 다시 풀었어요"); openAdmUser(m.user_id); } catch { toast("바꾸지 못했어요"); }
+    return;
+  }
+  if (b.dataset.act === "wipe") {
+    if (!confirm(`${m.nick || "이 회원"}님이 쓴 게시판 글·블로그 글·댓글을 전부 지울까요?\n되돌릴 수 없어요.`)) return;
+    if (!confirm("정말 전부 지울까요? 한 번 더 확인해요.")) return;
+    try { const n = await sync.adminDeleteAll(m.user_id); toast(`${n || 0}개를 지웠어요`); boardLoaded = ""; openAdmUser(m.user_id); } catch { toast("지우지 못했어요"); }
+  }
+});

@@ -520,3 +520,24 @@ export async function momsSameBooks(isbns) {
   const n = new Map((data || []).map((r) => [r.user_id, Number(r.n)]));
   return (await withProfiles(data || [])).map((m) => ({ ...m, n: n.get(m.user_id) || 0 }));
 }
+
+// ---------- 신고 · 관리자 ----------
+export async function report(kind, target) {
+  const c = await client();
+  const { error } = await c.from("reports").insert({ kind, target });
+  if (error && error.code !== "23505") throw error; // 이미 신고한 글이면 그냥 넘어가요
+}
+async function rpc(name, args = {}) {
+  const c = await client();
+  const { data, error } = await c.rpc(name, args);
+  if (error) throw error;
+  return data;
+}
+export const adminMembers = () => rpc("admin_members").then((d) => d || []);
+export const adminWritings = (uid) => rpc("admin_writings", { uid }).then((d) => d || []);
+export const adminReports = () => rpc("admin_reports").then((d) => d || []);
+export const adminDelete = (k, tid) => rpc("admin_delete", { k, tid });
+export const adminDismiss = (k, tid) => rpc("admin_dismiss", { k, tid });
+export const adminDeleteAll = (uid) => rpc("admin_delete_all", { uid });
+export const adminSetBan = (uid, on_) => rpc("admin_set_ban", { uid, on_ });
+export const isBanErr = (e) => /banned/.test(e?.message || "");
