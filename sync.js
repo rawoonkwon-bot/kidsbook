@@ -233,6 +233,13 @@ export async function sharedBook(isbn) {
   return { title: data.title, authors: data.authors ? data.authors.split(", ").filter(Boolean) : [], publisher: data.publisher || "",
     cover: data.cover || "", pages: data.pages || null, description: "", category: "", source: "회원이 등록한 책" };
 }
+// 쪽수 정보가 없던 책에 회원이 적은 전체 쪽수를 함께 쓰는 책 목록에 남김 (이미 쪽수가 있으면 그대로)
+export async function sharePages(b) {
+  if (!user || !/^\d{13}$/.test(b.isbn || "") || !b.title || !(b.pages > 0 && b.pages < 5000)) return;
+  const c = await client();
+  await c.rpc("share_book_pages", { p_isbn: b.isbn, p_title: b.title.slice(0, 200), p_authors: (b.authors || "").slice(0, 200),
+    p_publisher: (b.publisher || "").slice(0, 100), p_cover: /^https:\/\//.test(b.cover || "") ? b.cover.slice(0, 500) : "", p_pages: b.pages });
+}
 export async function shareBook(b) {
   if (!user || !/^\d{13}$/.test(b.isbn || "") || !b.title) return;
   const c = await client();

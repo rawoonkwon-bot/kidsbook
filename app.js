@@ -298,6 +298,8 @@ async function openSheet(isbn, scanInfo) {
   let { book, ms, cached } = await lookupBook(isbn, { needDescription: true });
   // 어디에도 없으면, 다른 회원이 직접 등록해 둔 책인지 확인
   if (!book && !PEEK) book = await sync.sharedBook(isbn).catch(() => null);
+  // 쪽수만 없으면, 다른 회원이 적어 둔 쪽수로 채움
+  else if (book && !book.pages && !PEEK) { const sb = await sync.sharedBook(isbn).catch(() => null); if (sb?.pages) book = { ...book, pages: sb.pages, pagesBy: "member" }; }
   if (!sheet || sheet.isbn !== isbn) return;
   sheet.book = book;
   const parts = [];
@@ -317,7 +319,7 @@ async function openSheet(isbn, scanInfo) {
   $("sTitle").textContent = ex0?.title || b.title;
   $("sAuthor").textContent = `〈작가〉 ${ex0?.authors || (b.authors || []).join(", ") || "모름"}`;
   const pages = ex0?.totalPages || b.pages;
-  $("sPages").textContent = `〈페이지〉 ${pages ? `${pages} pages` : "정보 없음"}`;
+  $("sPages").textContent = `〈페이지〉 ${pages ? `${pages} pages${!ex0?.totalPages && b.pagesBy ? " (회원이 적은 쪽수)" : ""}` : "정보 없음"}`;
   setImg($("sCover"), ex0?.cover || b.cover);
   $("sDesc").textContent = b.description || ex0?.description || "";
   if (existing) {
@@ -429,11 +431,15 @@ function openRecord({ existing = null, isbn = null, book = null, self = false, r
   $("soFar").textContent = reread ? `🔁 ${roundOf(existing) + 1}번째 ${isFo(existing) ? "듣기" : "읽기"}를 시작해요! 1쪽부터 다시 기록해요`
     : prev ? `지난번까지 ${prev}쪽 읽었어요 → 오늘은 ${prev + 1}쪽부터` : "";
   $("rTotal").value = total || "";
+  $("rFrom").value = prev + 1; // 다음 기록은 지난번 다음 쪽부터 (고칠 수 있어요)
   $("rTo").value = ""; $("rMin").value = ""; $("rHour").value = "";
-  $("rTo").placeholder = prev ? `${prev + 1}쪽부터 몇 쪽까지?` : "몇 쪽까지";
+  $("rTo").placeholder = "몇 쪽까지";
+  // 쪽수 정보가 없는 책: 적어 주면 다른 회원과 함께 써요
+  rec.noPages = !total && !!rec.isbn && !self;
+  $("pagesShare").hidden = !rec.noPages;
   $("rDone").checked = false; // 완독은 직접 체크할 때만
   $("rHome").checked = !!existing?.home;
-  $("pagesLabel").textContent = prev ? "오늘 몇 쪽까지 읽었나요? / (전체 페이지)" : "읽은 페이지 / (전체 페이지)";
+  $("pagesLabel").textContent = prev ? "오늘 읽은 쪽 (몇 쪽부터 ~ 몇 쪽까지) / 전체" : "읽은 쪽 (몇 쪽부터 ~ 몇 쪽까지) / 전체";
   syncDone();
   $("rTiming").textContent = rec.isbn ? `ISBN ${rec.isbn}` : "";
   $("recordPage").showModal();
@@ -478,12 +484,14 @@ function saveRecord() {
   const done = $("rDone").checked;
   if (rec.reread && readsThisYear(r0) >= MAX_READS_PER_YEAR) { toast(`같은 책은 한 해에 ${MAX_READS_PER_YEAR}번까지 기록할 수 있어요`); return; }
   const to = done ? total : parseInt($("rTo").value, 10) || null;
+  const from = parseInt($("rFrom").value, 10) || prev + 1;
   const title = rec.self ? $("rTitle").value.trim() : (r0?.title || rec.book?.title || "");
   if (!title) { toast("책 제목을 적어 주세요"); $("rTitle").focus(); return; }
   if (done && !total) { toast("전체 쪽수를 적어 주세요"); $("rTotal").focus(); return; }
   if (!to) { toast("몇 쪽까지 읽었는지 적어 주세요"); $("rTo").focus(); return; }
   if (total && to > total) { toast(`전체 쪽수(${total}쪽)보다 클 수 없어요`); return; }
   if (to <= prev) { toast(`지난번(${prev}쪽)보다 뒤의 쪽을 적어 주세요`); return; }
+  if (from < 1 || from > to) { toast(`시작 쪽(${from}쪽)이 끝 쪽(${to}쪽)보다 클 수 없어요`); $("rFrom").focus(); return; }
 
   const minutes = chosenShelf === "focus" ? ((parseInt($("rHour").value, 10) || 0) * 60 + (parseInt($("rMin").value, 10) || 0)) || null : null;
   if (chosenShelf === "focus" && !minutes) { toast("집중듣기 시간을 적어 주세요"); $("rMin").focus(); return; }
@@ -492,7 +500,8 @@ function saveRecord() {
   // 같은 책은 읽은 기록 하나 · 들은 기록 하나만 (같은 종류가 이미 있으면 그 기록에 이어서)
   const twin = rec.isbn ? records.find((x) => x.isbn === rec.isbn && x !== r0 && isFo(x) === (chosenShelf === "focus")) : null;
   if (twin) { toast(`이미 ${chosenShelf === "focus" ? "집중듣기로" : "읽은 책으로"} 기록한 책이에요. 그 기록에서 이어서 적어 주세요`, 3500); return; }
-  const session = { from: prev + 1, to, day: rDay, ...(minutes ? { minutes } : {}) };
+  const session = { from, to, day: rDay, ...(minutes ? { minutes } : {}) };
+  if (rec.noPages && total && !PEEK) sync.sharePages({ isbn: rec.isbn, title, authors: r0?.authors || (rec.book?.authors || []).join(", "), publisher: r0?.publisher || rec.book?.publisher, cover: r0?.cover || rec.book?.cover, pages: total }).catch(() => {});
   let r;
   if (r0) {
     r = r0;
@@ -548,7 +557,7 @@ function saveRecord() {
 }
 $("rSave").type = "button";
 $("rSave").addEventListener("click", saveRecord);
-["rTo", "rTotal", "rHour", "rMin"].forEach((id) => $(id).addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); saveRecord(); } }));
+["rFrom", "rTo", "rTotal", "rHour", "rMin"].forEach((id) => $(id).addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); saveRecord(); } }));
 $("recordPage").addEventListener("close", () => { rec = null; });
 
 // ---------- 3) 다 읽었을 때 마무리 ----------
