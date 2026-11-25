@@ -364,6 +364,7 @@ let chosenShelf = "ko";
 const paintShelf = () => {
   [...$("shelfPick").children].forEach((x) => x.setAttribute("aria-checked", String(x.dataset.shelf === chosenShelf)));
   $("focusRow").hidden = chosenShelf !== "focus"; // 책 기록에서 시간은 집중듣기만 (한글책·영어책 읽은 시간은 포트폴리오에서)
+  if ($("rState")) paintState();
   $("rDone").nextElementSibling.textContent = chosenShelf === "focus" ? "다 들음" : "완독";
 };
 let preferShelf = null; // 포트폴리오 날짜 시트에서 스캔하면 그 책장을 먼저 골라 둠
@@ -397,6 +398,21 @@ function syncDone() {
 }
 $("rDone").addEventListener("change", syncDone);
 $("rTotal").addEventListener("input", () => { if ($("rDone").checked) $("rTo").value = $("rTotal").value; });
+// 책 상태 카드: 다 읽은 책 / 읽고 있는 책 (둘 중 하나) + 우리 집 책장 (따로 켜고 끄기)
+function paintState() {
+  const fo = chosenShelf === "focus";
+  $("stDoneB").textContent = fo ? "다 들은 책" : "다 읽은 책"; $("stDoneS").textContent = fo ? "끝까지 들었어요" : "끝까지 읽었어요";
+  $("stReadB").textContent = fo ? "듣고 있는 책" : "읽고 있는 책"; $("stReadS").textContent = fo ? "지금 듣는 중" : "지금 읽는 중";
+  const on = { done: $("rDone").checked, reading: !$("rDone").checked, home: $("rHome").checked };
+  [...$("rState").children].forEach((b) => b.setAttribute("aria-pressed", String(!!on[b.dataset.s])));
+}
+$("rState").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-s]"); if (!b) return;
+  const s = b.dataset.s;
+  if (s === "home") $("rHome").checked = !$("rHome").checked;
+  else { $("rDone").checked = s === "done"; $("rDone").dispatchEvent(new Event("change")); }
+  paintState();
+});
 
 function openRecord({ existing = null, isbn = null, book = null, self = false, reread = false, pick = false, notFocus = false }) {
   rec = { existing, isbn: existing?.isbn || isbn, book, self, reread, pick };
@@ -437,8 +453,10 @@ function openRecord({ existing = null, isbn = null, book = null, self = false, r
   // 쪽수 정보가 없는 책: 적어 주면 다른 회원과 함께 써요
   rec.noPages = !total && !!rec.isbn && !self;
   $("pagesShare").hidden = !rec.noPages;
-  $("rDone").checked = false; // 완독은 직접 체크할 때만
+  $("rDone").checked = false; // 완독은 직접 고를 때만 (기본: 읽고 있는 책)
   $("rHome").checked = !!existing?.home;
+  rStars.set(existing?.score || 0);
+  paintState();
   $("pagesLabel").textContent = prev ? "오늘 읽은 쪽 (몇 쪽부터 ~ 몇 쪽까지) / 전체" : "읽은 쪽 (몇 쪽부터 ~ 몇 쪽까지) / 전체";
   syncDone();
   $("rTiming").textContent = rec.isbn ? `ISBN ${rec.isbn}` : "";
@@ -511,6 +529,7 @@ function saveRecord() {
     r.shelf = chosenShelf;
     if (total) r.totalPages = total;
     if ($("rHome").checked) r.home = true; else delete r.home;
+    if (rStars.get()) r.score = rStars.get(); else delete r.score;
     records = [r, ...records.filter((x) => x.id !== r.id)]; // 최근 읽은 책이 앞으로
   } else {
     const b = rec.book || {};
@@ -527,7 +546,7 @@ function saveRecord() {
       totalPages: total,
       sessions: [session],
       ...($("rHome").checked ? { home: true } : {}),
-      done: false, score: null, note: "", bonus: false, finishes: [], bonusRounds: [],
+      done: false, score: rStars.get() || null, note: "", bonus: false, finishes: [], bonusRounds: [],
       date: new Date().toISOString(),
     };
     records.unshift(r);
@@ -572,12 +591,27 @@ $("finishSheet").addEventListener("close", () => {
 let act = null; // { r, pages, fromFlow }
 let stars = 0;
 const STAR = `<svg viewBox="0 0 24 24"><path d="M12 2.2l2.9 6.6 7.1.6-5.4 4.7 1.6 7-6.2-3.7-6.2 3.7 1.6-7L2 9.4l7.1-.6z"/></svg>`;
-$("stars").innerHTML = [1, 2, 3, 4, 5].map((n) => `<button type="button" role="radio" aria-label="${n}점" data-n="${n}">${STAR}</button>`).join("");
-const paintStars = () => [...$("stars").children].forEach((b) => {
-  const n = Number(b.dataset.n);
-  b.classList.toggle("lit", n <= stars); b.setAttribute("aria-checked", String(n === stars));
-});
-$("stars").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; const n = Number(b.dataset.n); stars = stars === n ? n - 1 : n; paintStars(); });
+// 별점 (반쪽 가능): 별의 왼쪽 절반을 누르면 0.5, 오른쪽을 누르면 1개. 같은 점수를 다시 누르면 지워요
+function starWidget(el, onChange) {
+  let v = 0;
+  el.innerHTML = [1, 2, 3, 4, 5].map((n) => `<button type="button" role="radio" aria-label="${n}점" data-n="${n}"><span class="sb">${STAR}</span><span class="sf">${STAR}</span></button>`).join("");
+  const paint = () => [...el.children].forEach((b) => {
+    const n = Number(b.dataset.n), f = Math.max(0, Math.min(1, v - (n - 1)));
+    b.querySelector(".sf").style.width = `${f * 100}%`;
+    b.setAttribute("aria-checked", String(Math.ceil(v) === n));
+  });
+  el.addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    const rc = b.getBoundingClientRect(), n = Number(b.dataset.n);
+    const nv = e.clientX && e.clientX < rc.left + rc.width / 2 ? n - 0.5 : n;
+    v = v === nv ? 0 : nv; paint(); onChange?.(v);
+  });
+  return { get: () => v, set: (x) => { v = Number(x) || 0; paint(); } };
+}
+const starsHtml = (v) => `<span class="stars mini">${[1, 2, 3, 4, 5].map((n) => `<span><span class="sb">${STAR}</span><span class="sf" style="width:${Math.max(0, Math.min(1, v - (n - 1))) * 100}%">${STAR}</span></span>`).join("")}</span>`;
+const aStars = starWidget($("stars"), (x) => { stars = x; });
+const paintStars = () => aStars.set(stars);
+const rStars = starWidget($("rStars"));
 $("aText").addEventListener("input", () => ($("aCount").textContent = $("aText").value.length));
 
 function openActivity(r, ctx) {
@@ -735,7 +769,7 @@ function fillView(r) {
   $("vMore").textContent = r.done ? `🔁 다시 ${isFo(r) ? "듣기" : "읽기"} (${rounds + 1}번째)` : "➕ 이어서 기록하기";
   $("vSessH").textContent = isFo(r) ? "🎧 들은 기록" : "📖 읽은 기록";
   $("vActivity").hidden = isFo(r) || !(r.done && !(r.bonusRounds || []).includes(rounds));
-  $("vScore").textContent = r.score ? `${"★".repeat(r.score)}${"☆".repeat(5 - r.score)}  ${r.score}점` : "주지 않았어요";
+  $("vScore").innerHTML = r.score ? `${starsHtml(r.score)} ${r.score}점` : "주지 않았어요";
   $("vNote").textContent = r.note || "적지 않았어요";
   $("vCat").value = BOOK_CATS.includes(r.category) ? r.category : "";
   $("vTotalRow").hidden = !!r.totalPages;
@@ -943,7 +977,7 @@ function dayGroupsHtml(day) {
         const note = c.kind === "note" && !j.what;
         const main = j.what || mins || c.name;
         const sub = j.what ? [mins, j.text || ""].filter(Boolean).join(" · ") : mins ? j.text || "" : "";
-        rows += `<div class="day-item link" data-edit="${j.id}">
+        rows += `<div class="day-item link" data-edit="${j.id}">${j.cover ? `<img src="${esc(j.cover)}" alt="">` : ""}
           <div class="grow">${note ? richHtml(j.text, j.photos || [], "ph-row", "dn-text") : `<b>${esc(main)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}${j.photos?.length ? `<div class="ph-row" data-paths="${esc(j.photos.join("|"))}"></div>` : ""}`}</div>
           <button type="button" class="x" data-del="${j.id}" aria-label="지우기">✕</button></div>`;
       }
@@ -975,9 +1009,8 @@ function fillDay(day) {
     const ongoing = records.filter((r) => shelfOf(r) === dayPanel && !r.done);
     html += `<div class="day-actions">
         <button type="button" class="btn lime" data-act="scan">📷 책 스캔</button>
-        <button type="button" class="btn ghost" data-act="isbn" style="background:var(--soft)">ISBN 입력</button>
-        <button type="button" class="btn ghost" data-act="title" style="background:var(--soft)">바코드 없는 책</button>
-        ${c.hybrid ? `<button type="button" class="btn ghost" data-act="entry" style="background:var(--soft)">✏️ 직접 적기</button>` : c.book ? `<button type="button" class="btn ghost" data-act="entry" style="background:var(--soft)">⏱ 읽은 시간 적기</button>` : ""}
+        <button type="button" class="btn ghost ic-btn" data-act="title" style="background:var(--soft)">${ico("search")} 책 검색</button>
+        ${c.hybrid ? `<button type="button" class="btn ghost" data-act="entry" style="background:var(--soft)">✏️ 직접 적기</button>` : c.book ? `<button type="button" class="btn ghost ic-btn" data-act="entry" style="background:var(--soft)">⏱ 읽은 시간 적기</button>` : ""}
       </div>`;
     html += ongoing.length ? `<small>읽고 있는 ${c.name} (누르면 이 날 읽은 쪽수를 기록해요)</small>` +
       ongoing.map((r) => `<div class="day-item link" data-more="${r.id}">
@@ -1069,6 +1102,10 @@ let editEntry = null;
 function openEntry(cat, entry = null) {
   const c = CAT[cat]; entryCat = cat; editEntry = entry;
   $("eTitle").textContent = `${c.name}${c.book ? " 읽은 시간" : ""}${entry ? " 고치기" : ""} · ${prettyDay(entry?.day || openDayKey)}`;
+  // 수학: 문제집을 검색해서 고르면 표지가 함께 남아요
+  eCover = entry?.cover || "";
+  $("eBook").hidden = !(cat === "math" || /수학/.test(c.name));
+  paintECover();
   $("eWhatWrap").hidden = !c.what; $("eWhatLabel").textContent = c.what || ""; $("eWhat").placeholder = c.whatPh || ""; $("eWhat").value = "";
   $("eAmountWrap").hidden = !c.amount; $("eAmountLabel").textContent = (c.amount || "").replace("몇 분", "얼마나"); $("eUnit").textContent = c.unit || ""; $("eAmount").value = ""; $("eHour").value = "";
   $("eTextWrap").hidden = false; $("eTextLabel").textContent = c.text || "한 줄 메모 (선택)"; $("eText").placeholder = c.textPh || ""; $("eText").value = "";
@@ -1141,6 +1178,10 @@ async function shrinkPhoto(file) {
   bmp.close?.();
   return new Promise((res, rej) => cv.toBlob((b) => (b ? res(b) : rej(new Error("toBlob"))), "image/jpeg", 0.82));
 }
+let eCover = "";
+function paintECover() { $("eBookImg").hidden = !eCover; if (eCover) $("eBookImg").src = eCover; }
+$("eFind").addEventListener("click", () => openTitle("workbook", (b) => { $("eWhat").value = b.title; eCover = b.cover || ""; paintECover(); }));
+$("eWhat").addEventListener("input", () => { if (eCover) { eCover = ""; paintECover(); } }); // 이름을 고치면 표지는 뺌
 $("entryDialog").addEventListener("close", () => { // 책 기록 보기에서 왔으면 그 책으로 돌아가기
   const id = entryBook; if (!id) return;
   setTimeout(() => { entryBook = null; if (!document.querySelector("dialog[open]")) openView(id); }, 120);
@@ -1162,6 +1203,7 @@ $("entryDialog").addEventListener("close", async () => {
     if (removed.length) sync.deletePhotos(removed);
   }
   Object.assign(entry, { what, minutes, text });
+  if (eCover && what) entry.cover = eCover; else delete entry.cover;
   if (kept.length) entry.photos = kept; else delete entry.photos;
   if (picked.length) {
     if (!sync.canUpload()) {
@@ -1338,30 +1380,59 @@ $("scanManual").addEventListener("click", () => { closeScanner(); openManual(); 
 $("scanTitle").addEventListener("click", () => { closeScanner(); openTitle(); });
 // ---------- 바코드(ISBN) 없는 책: 제목으로 등록 ----------
 const normTitle = (t) => (t || "").toLowerCase().replace(/[^a-z0-9가-힣]/g, "");
-function openTitle() {
-  $("tIn").value = ""; $("tMine").innerHTML = "";
+// 책 검색: mode "book" = 책 기록하기 / "workbook" = 수학 문제집 고르기 (onPick 으로 돌려줌)
+let tMode = "book", tPick = null, tFoundList = [], tTimer = null, tSeq = 0;
+function openTitle(mode = "book", onPick = null) {
+  tMode = mode; tPick = onPick;
+  $("tHead").textContent = mode === "workbook" ? "문제집 검색" : "책 검색";
+  $("tIn").placeholder = mode === "workbook" ? "문제집 이름 (예: 디딤돌 초등수학)" : "책 제목을 입력해 주세요";
+  $("tNew").textContent = mode === "workbook" ? "이 이름으로 적기" : "제목으로 직접 기록";
+  $("tIn").value = ""; $("tMine").innerHTML = ""; $("tFound").innerHTML = ""; tFoundList = [];
   $("titleDialog").showModal();
   setTimeout(() => $("tIn").focus(), 50);
 }
+async function tSearch() {
+  const q = $("tIn").value.trim(), my = ++tSeq;
+  if (q.length < 2) { $("tFound").innerHTML = ""; return; }
+  $("tFound").innerHTML = `<small>찾는 중…</small>`;
+  try {
+    const r = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+    const list = r.ok ? (await r.json()).results || [] : [];
+    if (my !== tSeq) return; // 그 사이 다시 친 글자가 있으면 버림
+    tFoundList = list;
+    $("tFound").innerHTML = list.length ? `<small>찾은 책 · 눌러서 골라요</small>` + list.map((b, i) => `<button type="button" class="find-item" data-f="${i}">
+        ${b.cover ? `<img src="${esc(b.cover)}" alt="" loading="lazy">` : `<span class="noimg"></span>`}
+        <span><b>${esc(b.title)}</b><small>${esc([(b.authors || []).join(", "), b.publisher, b.pages && `${b.pages}쪽`].filter(Boolean).join(" · "))}</small></span></button>`).join("")
+      : `<small>찾지 못했어요. 아래 버튼으로 ${tMode === "workbook" ? "이름을 그대로 적을" : "제목만 적어 기록할"} 수 있어요.</small>`;
+  } catch { if (my === tSeq) $("tFound").innerHTML = `<small>찾지 못했어요. 인터넷 연결을 확인해 주세요.</small>`; }
+}
 $("tIn").addEventListener("input", () => {
   const q = normTitle($("tIn").value);
-  const hits = q.length < 2 ? [] : records.filter((r) => normTitle(r.title).includes(q)).slice(0, 5);
+  const hits = tMode !== "book" || q.length < 2 ? [] : records.filter((r) => normTitle(r.title).includes(q)).slice(0, 5);
   $("tMine").innerHTML = hits.length ? `<small>내 책장에 있는 책이면 눌러 주세요</small>` + hits.map((r) => `<button type="button" class="find-item" data-id="${r.id}">
       ${r.cover ? `<img src="${esc(r.cover)}" alt="">` : `<span class="noimg"></span>`}
       <span><b>${esc(r.title)}</b><small>${esc(progressText(r) || "")}</small></span></button>`).join("") : "";
+  clearTimeout(tTimer); tTimer = setTimeout(tSearch, 500); // 치는 대로 찾기
 });
-$("tIn").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $("titleDialog").close("new"); } });
+$("tIn").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); clearTimeout(tTimer); tSearch(); } });
 $("tMine").addEventListener("click", (e) => {
   const b = e.target.closest("[data-id]"); if (!b) return;
   const r = records.find((x) => x.id === b.dataset.id); if (!r) return;
   $("titleDialog").close("pick");
   r.done ? startReread(r) : openRecord({ existing: r });
 });
+$("tFound").addEventListener("click", (e) => {
+  const t = e.target.closest("[data-f]"); if (!t) return;
+  const b = tFoundList[Number(t.dataset.f)]; if (!b) return;
+  if (tMode === "workbook") { $("titleDialog").close("pick"); tPick?.(b); return; }
+  $("titleDialog").close("pick");
+  openRecord({ self: true, book: { title: b.title, authors: b.authors || [], publisher: b.publisher || "", cover: b.cover || "", pages: b.pages || null } });
+});
 $("titleDialog").addEventListener("close", () => {
-  const v = $("titleDialog").returnValue;
+  const v = $("titleDialog").returnValue, t = $("tIn").value.trim();
+  if (tMode === "workbook") { if (v === "new" && t) tPick?.({ title: t }); return; }
   if (v === "pick") return;
   if (v !== "new") { maybeReturn(); return; }
-  const t = $("tIn").value.trim();
   openRecord({ self: true, book: { title: t } });
   if (t.length >= 2) $("rFind").click();
 });

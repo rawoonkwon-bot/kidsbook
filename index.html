@@ -189,7 +189,7 @@
       </label>
       <div class="scan-alt">
         <button class="btn glass" id="scanManual" type="button">ISBN 직접 입력</button>
-        <button class="btn glass" id="scanTitle" type="button">바코드 없는 책</button>
+        <button class="btn glass ic-btn" id="scanTitle" type="button"><span data-ico="search"></span> 책 검색</button>
       </div>
       <div class="engine" id="engine"></div>
     </div>
@@ -282,9 +282,20 @@
           <input id="rTotal" type="number" inputmode="numeric" min="1" placeholder="전체" aria-label="전체 페이지" />
         </div>
         <p class="pages-share" id="pagesShare" hidden>📖 이 책은 쪽수 정보가 없어요. 전체 쪽수를 적어 주시면 다른 회원이 이 책을 스캔할 때도 바로 채워져요.</p>
-        <label class="check"><input type="checkbox" id="rDone" /><span>완독</span></label>
-        <label class="check"><input type="checkbox" id="rHome" /><span>우리 집 책장 <i class="home-mark" aria-hidden="true"><svg viewBox="0 0 12 12" width="11" height="11"><path d="M6 1.2 1 5.6h1.6V11h2.9V7.6h1V11h2.9V5.6H11z" fill="currentColor"/></svg></i></span></label>
-        <p class="check-help">집에 있는 책이면 체크해요. 도서관에서 빌린 책은 그대로 두세요.</p>
+        <input type="checkbox" id="rDone" hidden /><input type="checkbox" id="rHome" hidden />
+      </div>
+      <div class="field">
+        <span>책 상태</span>
+        <div class="st-cards" id="rState">
+          <button type="button" data-s="done"><span data-ico="flag"></span><b id="stDoneB">다 읽은 책</b><small id="stDoneS">끝까지 읽었어요</small></button>
+          <button type="button" data-s="reading"><span data-ico="bookmark"></span><b id="stReadB">읽고 있는 책</b><small id="stReadS">지금 읽는 중</small></button>
+          <button type="button" data-s="home" class="home"><span data-ico="home"></span><b>우리 집 책장</b><small>집에 있는 책</small></button>
+        </div>
+        <p class="check-help">'우리 집 책장'은 따로 켜고 끌 수 있어요. 도서관에서 빌린 책은 꺼 두세요.</p>
+      </div>
+      <div class="field">
+        <span>평점 <small>별 반쪽도 돼요</small></span>
+        <div class="stars half" id="rStars" role="radiogroup" aria-label="평점"></div>
       </div>
       <div class="field" id="focusRow" hidden>
         <span><span id="timeIco" data-ico="ear"></span><span id="timeLabel">집중듣기 시간</span> <small id="timeOpt" hidden>(적고 싶을 때만)</small></span>
@@ -470,6 +481,7 @@
         <span id="eWhatLabel"></span>
         <input id="eWhat" class="sub-input" />
       </label>
+      <div class="e-book" id="eBook" hidden><img id="eBookImg" alt=""><button type="button" class="btn ghost ic-btn" id="eFind"><span data-ico="search"></span> 문제집 검색</button></div>
       <label class="field" id="eAmountWrap">
         <span id="eAmountLabel"></span>
         <div class="pages-row"><input id="eHour" type="number" inputmode="numeric" min="0" placeholder="0" aria-label="시간" /><span>시간</span><input id="eAmount" type="number" inputmode="numeric" min="0" max="59" placeholder="0" aria-label="분" /><span id="eUnit"></span></div>
@@ -570,16 +582,16 @@
     </form>
   </dialog>
 
-  <!-- 바코드 없는 책: 제목으로 등록 -->
+  <!-- 책 검색 (바코드 없는 책 · 문제집 검색): 제목으로 찾아서 고르기 -->
   <dialog id="titleDialog">
     <form method="dialog" class="sheet">
-      <h3>바코드 없는 책</h3>
-      <p class="k-help">ORT 리더스북처럼 바코드가 없는 책은 제목으로 기록해요.</p>
-      <input id="tIn" class="sub-input" placeholder="책 제목 (예: Fire in the Dark)" autocomplete="off" />
+      <h3 id="tHead">책 검색</h3>
+      <label class="search-box"><span data-ico="search"></span><input id="tIn" placeholder="책 제목을 입력해 주세요" autocomplete="off" enterkeyhint="search" /></label>
       <div class="find-list" id="tMine"></div>
+      <div class="find-list" id="tFound"></div>
       <div class="row">
         <button class="btn ghost" value="cancel" formnovalidate>취소</button>
-        <button class="btn dark" value="new">책 찾기</button>
+        <button class="btn dark" value="new" id="tNew">제목으로 직접 기록</button>
       </div>
     </form>
   </dialog>

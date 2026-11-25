@@ -279,10 +279,41 @@ textarea { resize: vertical; line-height: 1.6; }
 .act-title { text-align: center; font-size: 21px; margin: 4px 0 6px; }
 .act-q { margin: 10px 0 0; font-size: 19px; }
 .stars { display: flex; gap: 8px; }
+.stars.half button, .stars.mini > span { position: relative; }
+.stars .sb, .stars .sf { position: absolute; inset: 0; display: block; }
+.stars .sf { overflow: hidden; width: 0; }
+.stars .sf svg { width: 54px; height: 54px; }
+.stars.half { gap: 6px; }
+.stars.half button { width: 44px; height: 44px; }
+.stars.half .sf svg { width: 44px; height: 44px; }
+.stars .sb path, .stars.half button path { fill: #E7E2D6; stroke: none; }
+.stars .sf path, .stars.half .sf path { fill: #FFC21A; stroke: #E7A600; stroke-width: .6; }
+.stars.mini { display: inline-flex; gap: 2px; vertical-align: -3px; }
+.stars.mini > span { width: 17px; height: 17px; display: inline-block; }
+.stars.mini .sf svg { width: 17px; height: 17px; }
+.st-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.st-cards button { border: 0; border-radius: 16px; background: var(--card); box-shadow: var(--raise-s); padding: 14px 6px 12px; display: flex; flex-direction: column; align-items: center; gap: 3px; font: inherit; color: var(--ink); cursor: pointer; }
+.st-cards button .ico { width: 24px; height: 24px; color: var(--muted); margin-bottom: 4px; }
+.st-cards b { font-size: 15px; }
+.st-cards small { font-size: 12px; color: var(--muted); }
+.st-cards button[aria-pressed="true"] { background: var(--forest); color: #F3EFE6; box-shadow: none; }
+.st-cards button[aria-pressed="true"] .ico, .st-cards button[aria-pressed="true"] small { color: #F3EFE6; opacity: .9; }
+.st-cards button.home[aria-pressed="true"] { background: #FFEBDD; color: #8A3F14; }
+.st-cards button.home[aria-pressed="true"] .ico, .st-cards button.home[aria-pressed="true"] small { color: #B95A26; }
+.search-box { display: flex; align-items: center; gap: 8px; background: var(--card); box-shadow: var(--inset); border-radius: 14px; padding: 0 14px; margin: 6px 0 10px; }
+.search-box .ico { width: 20px; height: 20px; color: var(--muted); flex: none; }
+.search-box input { flex: 1; min-width: 0; border: 0; background: transparent; font: inherit; font-size: 16px; padding: 13px 0; outline: none; }
+.ic-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.ic-btn .ico { width: 18px; height: 18px; }
+.e-book { display: flex; align-items: center; gap: 10px; margin: -4px 0 10px; }
+.e-book img { width: 40px; height: 54px; object-fit: cover; border-radius: 6px; }
+.e-book .btn { background: var(--soft); padding: 9px 14px; font-size: 14px; flex: none; width: auto; white-space: nowrap; }
+.e-book img[hidden] { display: none; }
+#tMine:empty, #tFound:empty { display: none; }
+.ic-btn { white-space: nowrap; }
 .stars button { border: 0; background: none; padding: 0; cursor: pointer; width: 54px; height: 54px; }
 .stars svg { width: 100%; height: 100%; }
-.stars path { fill: #fff; stroke: #36D17C; stroke-width: 1; }
-.stars button[aria-checked="true"] path, .stars button.lit path { fill: #C6FF00; stroke: #3BA300; }
+
 .count { margin: -6px 0 0; text-align: right; font-size: 13px; color: var(--muted); }
 
 /* 5) 스탬프 */
@@ -488,8 +519,7 @@ dialog { background: var(--bg); }
 .mark { background: linear-gradient(transparent 58%, #DDE5D3 58%); color: var(--forest-d); }
 .choice { background: var(--card); border-color: transparent; box-shadow: var(--raise); }
 .choice.dark { background: var(--forest); border-color: var(--forest); }
-.stars path { stroke: #8EB69B; }
-.stars button[aria-checked="true"] path, .stars button.lit path { fill: #8EB69B; stroke: var(--forest); }
+#rState + .check-help { padding-left: 2px; margin-top: 8px; }
 .stamp { border-color: #B9B2A3; }
 .stamp.on { border-color: var(--forest); }
 .stamp.on::after { color: var(--forest); }
@@ -619,7 +649,7 @@ body.peek #dayCats, body.peek .day-sub, body.peek .day-actions, body.peek .day-i
 #titleDialog .sub-input { margin: 4px 0 6px; font-size: 16px; }
 .browse .kid.loading { opacity: .55; }
 .day-actions { flex-wrap: wrap; }
-.day-actions .btn { min-width: 30%; }
+.day-actions .btn { min-width: 30%; flex: 1 1 auto; padding: 11px 10px; white-space: nowrap; }
 
 /* 포트폴리오 날짜: 카테고리별 블록 */
 .day-group { background: var(--card); border-radius: 14px; padding: 8px 8px 4px; box-shadow: var(--raise-s); }
