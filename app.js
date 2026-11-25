@@ -212,7 +212,7 @@ function tallySvg(n) {
 const cardHtml = (r) => `
     <li data-id="${r.id}" tabindex="0" role="button" aria-label="${esc(r.title)} 기록 보기${timesRead(r) ? ` · ${timesRead(r)}번 읽음` : ""}" title="${esc(r.title)}">
       ${imgOr(r.cover, r.title, "cover")}
-      ${r.done ? `<span class="done-badge" aria-label="다 읽음">✓</span>` : r.totalPages ? `<div class="pbar"><i style="width:${pct(r)}%"></i></div>` : ""}
+      ${r.done ? `<span class="done-badge" aria-label="완독">✓</span>` : r.totalPages ? `<div class="pbar"><i style="width:${pct(r)}%"></i></div>` : ""}
       ${timesRead(r) ? `<span class="tally-wrap">${tallySvg(timesRead(r))}</span>` : ""}
       ${r.home ? `<span class="home-badge" aria-label="우리 집 책장에 있는 책"><svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M6 1.2 1 5.6h1.6V11h2.9V7.6h1V11h2.9V5.6H11z" fill="currentColor"/></svg></span>` : ""}
     </li>`;
@@ -325,20 +325,21 @@ $("sDesc").addEventListener("click", () => $("sDesc").classList.toggle("open"));
 $("sSelf").addEventListener("click", () => $("scanSheet").close("self"));
 $("sMine").addEventListener("click", () => { if ($("sMine").classList.contains("link")) $("scanSheet").close("view"); });
 // 다 읽은 책 다시 읽기 (같은 해에 20번까지)
-function startReread(r) {
+function startReread(r, pick = false) {
   if (readsThisYear(r) >= MAX_READS_PER_YEAR) {
     toast(`같은 책은 한 해에 ${MAX_READS_PER_YEAR}번까지 기록할 수 있어요. 내년에 다시 기록해 주세요`, 3800);
-    return;
+    return false;
   }
-  openRecord({ existing: r, reread: true });
+  openRecord({ existing: r, reread: true, pick });
+  return true;
 }
 $("scanSheet").addEventListener("close", () => {
   const v = $("scanSheet").returnValue;
   const s = sheet; sheet = null;
   if (!s || (v !== "ok" && v !== "self" && v !== "view")) return; // ✕ = 검색만 하고 끝
   if (v === "view" && s.existing) { openView(s.existing.id); return; }
-  if (s.existing) { s.existing.done && v === "ok" ? startReread(s.existing) : openRecord({ existing: s.existing }); return; }
-  openRecord({ isbn: s.isbn, book: s.book, self: v === "self" || !s.book });
+  if (s.existing) { s.existing.done && v === "ok" ? startReread(s.existing, true) : openRecord({ existing: s.existing, pick: true }); return; }
+  openRecord({ isbn: s.isbn, book: s.book, self: v === "self" || !s.book, pick: true });
 });
 
 // ---------- 2) 책 기록 화면 ----------
@@ -348,7 +349,7 @@ let chosenShelf = "ko";
 const paintShelf = () => {
   [...$("shelfPick").children].forEach((x) => x.setAttribute("aria-checked", String(x.dataset.shelf === chosenShelf)));
   $("focusRow").hidden = chosenShelf !== "focus";
-  $("rDone").nextElementSibling.textContent = chosenShelf === "focus" ? "다 들음" : "다 읽음";
+  $("rDone").nextElementSibling.textContent = chosenShelf === "focus" ? "다 들음" : "완독";
 };
 let preferShelf = null; // 포트폴리오 날짜 시트에서 스캔하면 그 책장을 먼저 골라 둠
 $("shelfPick").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) { chosenShelf = b.dataset.shelf; paintShelf(); } });
@@ -382,8 +383,11 @@ function syncDone() {
 $("rDone").addEventListener("change", syncDone);
 $("rTotal").addEventListener("input", () => { if ($("rDone").checked) $("rTo").value = $("rTotal").value; });
 
-function openRecord({ existing = null, isbn = null, book = null, self = false, reread = false }) {
-  rec = { existing, isbn: existing?.isbn || isbn, book, self, reread };
+function openRecord({ existing = null, isbn = null, book = null, self = false, reread = false, pick = false }) {
+  rec = { existing, isbn: existing?.isbn || isbn, book, self, reread, pick };
+  // 스캔해서 들어왔을 때: 누구 기록인지 고르기 (아이가 둘 이상일 때)
+  $("rKidWrap").hidden = !(pick && kids.length > 1 && !PEEK);
+  $("rKids").innerHTML = kids.map((k) => `<button type="button" role="radio" data-kid="${k.id}" aria-checked="${k.id === activeKid}">${esc(k.nick)}${gradeOf(k) ? ` <small>${gradeOf(k)}</small>` : ""}</button>`).join("");
   const b = book || {};
   const title = existing?.title || b.title || "";
   const authors = existing?.authors || (b.authors || []).join(", ");
@@ -414,8 +418,7 @@ function openRecord({ existing = null, isbn = null, book = null, self = false, r
   $("rTotal").value = total || "";
   $("rTo").value = ""; $("rMin").value = ""; $("rHour").value = "";
   $("rTo").placeholder = prev ? `${prev + 1}쪽부터 몇 쪽까지?` : "몇 쪽까지";
-  // 새 책이고 전체 쪽수를 알면 '다 읽은 책'을 기본으로 (한 번에 다 읽는 그림책이 많아서)
-  $("rDone").checked = (!existing || reread) && !!total;
+  $("rDone").checked = false; // 완독은 직접 체크할 때만
   $("rHome").checked = !!existing?.home;
   $("pagesLabel").textContent = prev ? "오늘 몇 쪽까지 읽었나요? / (전체 페이지)" : "읽은 페이지 / (전체 페이지)";
   syncDone();
@@ -1366,12 +1369,13 @@ $("kSave").addEventListener("click", () => {
 });
 
 // ---------- 카테고리 편집 ----------
-const PICK_ALL = [["book", "책"], ["abc", "영어"], ["headphones", "듣기"], ["ear", "귀"], ["pencil", "메모"], ["math-symbols", "수학"], ["star", "별"], ...PICK];
+// 새 카테고리 아이콘: 책·영어·듣기는 이미 있으니 자주 쓰는 것만
+const PICK_ALL = [["pencil", "메모"], ["math-symbols", "수학"], ["star", "별"], ["music", "음악"], ["ball-football", "축구"], ["heart", "좋은 일"], ["plant", "식물"]];
 let catDraft = [], newKind = "time", newIcon = "star", pickFor = "new"; // pickFor: "new" 또는 목록 번호
 const catColor = (c) => CAT_COLOR[c.key] || "#2F5D3A";
 const LOCKED = (c) => c.kind === "book" || c.kind === "focus" || c.key === "secret";
 const KIND_NAME = { book: "책장", focus: "책장+시간", time: "한 것+시간", note: "메모" };
-$("cEmoji").innerHTML = PICK_ALL.map(([n, label]) => `<button type="button" data-e="${n}" aria-label="${label} 아이콘 고르기">${ico(n)}<small>${label}</small></button>`).join("");
+$("cEmoji").innerHTML = PICK_ALL.map(([n, label]) => `<button type="button" data-e="${n}" aria-label="${label} 아이콘 고르기">${ico(n)}</button>`).join("");
 function paintPick() {
   const cur = pickFor === "new" ? newIcon : catDraft[pickFor]?.icon;
   $("cPickFor").textContent = pickFor === "new" ? "새 카테고리 아이콘 고르기" : `‘${catDraft[pickFor]?.name || ""}’ 아이콘 고르기`;
@@ -1409,8 +1413,8 @@ function paintCats() {
     <input class="nm-in" value="${esc(c.name)}" maxlength="8" aria-label="카테고리 이름" />
     <button type="button" data-mv="-1" aria-label="위로" ${i ? "" : "disabled"}>▲</button>
     <button type="button" data-mv="1" aria-label="아래로" ${i < last ? "" : "disabled"}>▼</button>
-    <button type="button" data-hide aria-label="${c.hidden ? "보이기" : "숨기기"}">${c.hidden ? "🙈" : "👁"}</button>
-    ${LOCKED(c) ? `<span class="lock" title="${c.key === "secret" ? "비밀 메모는 지울 수 없고 숨기기만 돼요" : "책장과 연결돼 있어서 숨기기만 돼요"}">🔒</span>` : `<button type="button" data-rm aria-label="${esc(c.name)} 삭제">🗑</button>`}
+    <button type="button" data-hide aria-label="${c.hidden ? "보이기" : "숨기기"}">${ico(c.hidden ? "eye-off" : "eye")}</button>
+    ${LOCKED(c) ? `<span class="lock" title="${c.key === "secret" ? "비밀 메모는 지울 수 없고 숨기기만 돼요" : "책장과 연결돼 있어서 숨기기만 돼요"}">${ico("lock")}</span>` : `<button type="button" data-rm aria-label="${esc(c.name)} 삭제">${ico("trash")}</button>`}
   </li>`).join("");
 }
 $("cList").addEventListener("click", (e) => {
@@ -2754,3 +2758,15 @@ $("alList").addEventListener("click", (e) => {
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") checkAlerts(); });
 setInterval(() => { if (document.visibilityState === "visible") checkAlerts(); }, 3 * 60 * 1000);
 checkAlerts();
+
+// 기록 화면에서 아이 바꾸기: 그 아이 책장 기준으로 다시 열어요 (이미 읽던 책이면 이어서)
+$("rKids").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-kid]"); if (!b || !rec || b.dataset.kid === activeKid) return;
+  const { isbn, book, self } = rec, bk = book || (rec.existing ? { title: rec.existing.title, authors: rec.existing.authors ? [rec.existing.authors] : [], publisher: rec.existing.publisher, category: rec.existing.category, pages: rec.existing.totalPages, cover: rec.existing.cover, description: rec.existing.description } : null);
+  setKid(b.dataset.kid);
+  const ex = isbn ? records.find((r) => r.isbn === isbn) : null;
+  if (ex && ex.done) { if (!startReread(ex, true)) { $("recordPage").close(); return; } }
+  else if (ex) openRecord({ existing: ex, pick: true });
+  else openRecord({ isbn, book: bk, self: self && !bk, pick: true });
+  toast(`${kidNow()?.nick || ""} 책장에 기록해요`);
+});

@@ -214,7 +214,7 @@
     <form method="dialog" class="page-in" id="recordForm">
       <div class="page-top">
         <button class="x-btn" value="cancel" aria-label="닫기">✕</button>
-        <button class="pill-btn" value="save" id="rSave">책 등록</button>
+        <button class="pill-btn" value="save" id="rSave">기록</button>
       </div>
       <div class="r-card">
         <div class="r-book">
@@ -233,6 +233,11 @@
       </div>
 
       <h3 class="mark">시작 전 확인</h3>
+
+      <div class="field" id="rKidWrap" hidden>
+        <span>누구 기록인가요?</span>
+        <div class="seg r-kids" id="rKids" role="radiogroup" aria-label="자녀 고르기"></div>
+      </div>
 
       <div class="field">
         <span>어느 책장에 꽂을까요?</span>
@@ -264,8 +269,8 @@
           <span>/</span>
           <input id="rTotal" type="number" inputmode="numeric" min="1" placeholder="전체" aria-label="전체 페이지" />
         </div>
-        <label class="check"><input type="checkbox" id="rDone" /><span>다 읽음</span></label>
-        <label class="check"><input type="checkbox" id="rHome" /><span>우리 집 책장</span></label>
+        <label class="check"><input type="checkbox" id="rDone" /><span>완독</span></label>
+        <label class="check"><input type="checkbox" id="rHome" /><span>우리 집 책장 <i class="home-mark" aria-hidden="true"><svg viewBox="0 0 12 12" width="11" height="11"><path d="M6 1.2 1 5.6h1.6V11h2.9V7.6h1V11h2.9V5.6H11z" fill="currentColor"/></svg></i></span></label>
         <p class="check-help">집에 있는 책이면 체크해요. 도서관에서 빌린 책은 그대로 두세요.</p>
       </div>
       <div class="field" id="focusRow" hidden>
@@ -407,7 +412,7 @@
       </div>
       <div class="progress" id="vProgress"></div>
       <div class="v-times" id="vTimes"></div>
-      <label class="check v-home"><input type="checkbox" id="vHome" /><span>우리 집 책장에 있는 책</span></label>
+      <label class="check v-home"><input type="checkbox" id="vHome" /><span>우리 집 책장에 있는 책 <i class="home-mark" aria-hidden="true"><svg viewBox="0 0 12 12" width="11" height="11"><path d="M6 1.2 1 5.6h1.6V11h2.9V7.6h1V11h2.9V5.6H11z" fill="currentColor"/></svg></i></span></label>
       <div class="total-row" id="vTotalRow" hidden>
         <span>책 전체</span>
         <input id="vTotal" type="number" inputmode="numeric" min="1" placeholder="?" aria-label="책 전체 쪽수" />
@@ -526,7 +531,7 @@
         <b>카테고리 편집</b>
         <span></span>
       </div>
-      <p class="k-help">아이콘을 누르고 아래에서 새 아이콘을 골라요. 이름을 고치고, ▲▼로 순서를 바꿔요. 👁를 누르면 숨겨져요. 🔒는 책장과 연결돼 있어서 숨기기만 돼요.</p>
+      <p class="k-help">아이콘을 누르고 아래에서 새 아이콘을 골라요. 이름을 고치고, ▲▼로 순서를 바꿔요. 눈 모양을 누르면 숨겨져요. 자물쇠가 있는 칸은 책장과 연결돼 있어서 숨기기만 돼요.</p>
       <ul class="cat-list" id="cList"></ul>
       <div class="cat-add">
         <b>＋ 새 카테고리</b>

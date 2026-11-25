@@ -539,7 +539,7 @@ body.peek #dayCats, body.peek .day-sub, body.peek .day-actions, body.peek .day-i
 .ic-btn .ico { width: 24px; height: 24px; }
 .ic-btn.on { box-shadow: 0 0 0 2px var(--forest); }
 .pick-for { display: block; font-size: 12px; color: var(--muted); margin: 2px 0 -2px; }
-.icon-pick { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.icon-pick { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
 .icon-pick button { width: auto; height: auto; padding: 6px 0 4px; display: flex; flex-direction: column; align-items: center; gap: 2px; color: var(--forest); font-size: 0; }
 .icon-pick button .ico { width: 22px; height: 22px; }
 .icon-pick button small { font-size: 10px; color: var(--muted); }
@@ -1000,3 +1000,18 @@ body.peek #wsOpen { display: none; }
 .ws-cnt input { width: 64px; height: 44px; text-align: center; font: inherit; font-size: 18px; font-weight: 800; border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--ink); margin: 0; }
 .ws-cnt span { font-weight: 700; }
 .ws-cnt small { margin-left: auto; color: var(--muted); font-size: 12px; }
+
+/* 기록 화면: 누구 기록인지 */
+.r-kids button small { font-size: 12px; opacity: .7; margin-left: 2px; }
+.icon-pick button { padding: 9px 0; }
+
+/* 카테고리 편집: 눈·자물쇠·휴지통 선 아이콘 */
+.cat-list button .ico, .cat-list .lock .ico { width: 18px; height: 18px; }
+.cat-list button[data-hide], .cat-list button[data-rm] { display: flex; align-items: center; justify-content: center; color: var(--forest); }
+.cat-list li.off button[data-hide] { color: var(--muted); }
+.cat-list button[data-rm] { color: #C23B3B; }
+.cat-list .lock { display: flex; align-items: center; justify-content: center; color: var(--muted); }
+
+/* 우리 집 책장 글자 옆 집 표시 (표지 위 표시와 같은 모양) */
+.home-mark { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: #FFEBDD; color: #B95A26; vertical-align: 2px; margin-left: 4px; font-style: normal; box-shadow: 0 1px 3px rgba(0,0,0,.18); }
+.home-mark svg { width: 12px; height: 12px; }
