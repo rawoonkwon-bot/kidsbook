@@ -214,6 +214,7 @@ const cardHtml = (r) => `
       ${imgOr(r.cover, r.title, "cover")}
       ${r.done ? `<span class="done-badge" aria-label="다 읽음">✓</span>` : r.totalPages ? `<div class="pbar"><i style="width:${pct(r)}%"></i></div>` : ""}
       ${timesRead(r) ? `<span class="tally-wrap">${tallySvg(timesRead(r))}</span>` : ""}
+      ${r.home ? `<span class="home-badge" aria-label="우리 집 책장에 있는 책"><svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M6 1.2 1 5.6h1.6V11h2.9V7.6h1V11h2.9V5.6H11z" fill="currentColor"/></svg></span>` : ""}
     </li>`;
 
 function render() {
@@ -2621,13 +2622,15 @@ function wsDefaultGrade() {
 let wsGrade = null;
 function paintWs() {
   const M = WSM;
-  $("wsGrades").innerHTML = M.CURRICULUM.map((g) => `<button type="button" role="radio" data-g="${g.g}" aria-checked="${g.g === wsGrade}">${g.label}</button>`).join("");
+  // 초등 / 중등을 먼저 고르고, 그 안에서 학년
+  const lv = (wsGrade || "E1")[0];
+  $("wsGrades").innerHTML = `<div class="ws-lv">${[["E", "초등"], ["M", "중등"]].map(([k, t]) => `<button type="button" data-lv="${k}" aria-pressed="${k === lv}">${t}</button>`).join("")}</div>
+    <div class="ws-gr" role="radiogroup" aria-label="학년">${M.CURRICULUM.filter((g) => g.g[0] === lv).map((g) => `<button type="button" role="radio" data-g="${g.g}" aria-checked="${g.g === wsGrade}">${g.g.slice(1)}학년</button>`).join("")}</div>`;
   const gr = M.CURRICULUM.find((g) => g.g === wsGrade) || M.CURRICULUM[0];
   $("wsUnits").innerHTML = gr.units.map((u) => `
     <section class="ws-unit"><h4>${esc(u.name)}${u.sem ? `<small>${u.sem}학기</small>` : ""}</h4>
       <ul class="ws-steps">${u.steps.map((st) => `<li><button type="button" data-id="${st.id}"><span class="no">${M.circ(st.no)}</span><span class="t">${esc(st.title)}</span><small>${st.n}문제${st.v ? " · 세로셈" : ""}</small></button></li>`).join("")}</ul>
     </section>`).join("");
-  $("wsGrades").querySelector('[aria-checked="true"]')?.scrollIntoView({ block: "nearest", inline: "center" });
 }
 async function openWs() {
   try { await wsLoad(); } catch { toast("연산 프린트를 불러오지 못했어요. 인터넷을 확인해 주세요."); return; }
@@ -2638,6 +2641,8 @@ async function openWs() {
 $("wsOpen").addEventListener("click", openWs);
 $("wsClose").addEventListener("click", () => $("wsPage").close());
 $("wsGrades").addEventListener("click", (e) => {
+  const l = e.target.closest("[data-lv]");
+  if (l) { if (wsGrade[0] !== l.dataset.lv) { wsGrade = l.dataset.lv + "1"; localStore.setItem(WS_GRADE_KEY, wsGrade); paintWs(); } return; }
   const b = e.target.closest("[data-g]"); if (!b) return;
   wsGrade = b.dataset.g; localStore.setItem(WS_GRADE_KEY, wsGrade); paintWs();
 });
