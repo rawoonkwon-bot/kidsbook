@@ -2256,11 +2256,22 @@ function blogTags(st) {
 async function loadBlog(uid) {
   const me = uid === sync.myId(), known = momCache.get(uid);
   const [prof, data, list] = await Promise.all([
-    me ? { nick: sync.myNick(), face: sync.myFace() } : known?.nick ? known : sync.profileOf(uid).catch(() => null),
+    me ? { nick: sync.myNick(), face: sync.myFace(), blog_cats: sync.myBlogCats() } : sync.profileOf(uid).catch(() => known?.nick ? known : null),
     me ? null : prefetchPeek(uid),
     sync.blogList(uid),
   ]);
-  return { uid, me, nick: prof?.nick || "(알 수 없음)", face: prof?.face || null, data, list, view: "list" };
+  return { uid, me, nick: prof?.nick || "(알 수 없음)", face: prof?.face || null, cats: Array.isArray(prof?.blog_cats) ? prof.blog_cats : [], data, list, view: "list", cat: "" };
+}
+// 블로그 카테고리: 글의 cat 이 목록에 없으면(지운 카테고리) 미분류
+const NOCAT = "_none";
+const catOf = (st, b) => (b.cat && st.cats.some((c) => c.id === b.cat) ? b.cat : NOCAT);
+function catChips(st) {
+  const cnt = new Map();
+  for (const b of st.list) { const k = catOf(st, b); cnt.set(k, (cnt.get(k) || 0) + 1); }
+  const chip = (id, name, n) => `<button type="button" data-act="cat" data-c="${esc(id)}" class="${st.cat === id ? "on" : ""}">${esc(name)} <small>${n}</small></button>`;
+  const rows = [chip("", "전체", st.list.length), ...st.cats.map((c) => chip(c.id, c.name, cnt.get(c.id) || 0))];
+  if (cnt.get(NOCAT) && st.cats.length) rows.push(chip(NOCAT, "미분류", cnt.get(NOCAT)));
+  return rows.join("");
 }
 function paintBlog(root, st) {
   if (!st) { root.innerHTML = `<p class="muted bl-msg">불러오는 중…</p>`; return; }
@@ -2269,22 +2280,26 @@ function paintBlog(root, st) {
   const pop = [...st.list].filter((b) => b.views > 0).sort((a, b) => b.views - a.views).slice(0, 6);
   const kl = st.me ? [] : st.data?.kids || [];
   const nb = follows.has(st.uid);
+  if (st.cat && st.cat !== NOCAT && !st.cats.some((c) => c.id === st.cat)) st.cat = "";
+  const shown = st.cat ? st.list.filter((b) => catOf(st, b) === st.cat) : st.list;
   root.innerHTML = `
     <div class="bl-head">${avatar(st.nick, st.face, "av big")}<div class="grow"><h2>${esc(st.nick)}님의 블로그</h2><p>글 ${st.list.length}</p></div>
       ${st.me ? `<button type="button" class="follow-btn" data-act="write">✏️ 글쓰기</button>` : `<button type="button" class="follow-btn${nb ? " on" : ""}" data-act="follow">${nb ? "이웃 ✓" : "＋ 이웃 추가"}</button>`}</div>
     ${st.me ? "" : `<section><h3 class="sec-title">아이 책장</h3><div class="browse">${kl.length
       ? kl.map((k) => `<button type="button" class="kid" data-act="kid" data-k="${esc(k.id)}">${esc(k.nick)}${gradeOf(k) ? ` <small class="grade">${gradeOf(k)}</small>` : ""}</button>`).join("")
       : `<small class="muted">${st.data ? "아직 등록한 아이가 없어요." : "책장을 나만 보기로 해 둔 집이에요."}</small>`}</div></section>`}
-    ${tops.length ? `<section><div class="pop-head"><h3 class="sec-title">글감</h3><button type="button" class="link-btn" data-act="topics" data-t="all">전체보기 ›</button></div>
+    ${st.cats.length || st.me ? `<section><div class="pop-head"><h3 class="sec-title">카테고리</h3>${st.me ? `<button type="button" class="link-btn" data-act="cats">${ico("pencil")} 편집</button>` : ""}</div>
+      ${st.cats.length ? `<div class="bl-cats">${catChips(st)}</div>` : `<p class="muted bl-msg sm">카테고리를 만들어 글을 나눠 보세요. 예: 그림책 · 영어 원서 · 도서관 나들이</p>`}</section>` : ""}
+    ${tops.length && !st.cat ? `<section><div class="pop-head"><h3 class="sec-title">글감</h3><button type="button" class="link-btn" data-act="topics" data-t="all">전체보기 ›</button></div>
       <div class="tchips">${Object.keys(TOPIC).filter(n).map((t) => `<button type="button" class="tchip" data-act="topics" data-t="${t}">${ico(TOPIC[t][1])}${TOPIC[t][0]} <span>${n(t)}</span></button>`).join("")}</div></section>` : ""}
-    ${tags.length ? `<section><h3 class="sec-title">태그</h3><div class="bl-tags">${tags.slice(0, 20).map((x) => `<button type="button" data-act="tag" data-tag="${esc(x.t)}">#${esc(x.t)} <small>${x.n}</small></button>`).join("")}</div></section>` : ""}
-    ${pop.length ? `<section><h3 class="sec-title">인기글</h3><div class="pop-row">${pop.map((b) => `<button type="button" class="pop-card" data-act="post" data-id="${b.id}">
+    ${tags.length && !st.cat ? `<section><h3 class="sec-title">태그</h3><div class="bl-tags">${tags.slice(0, 20).map((x) => `<button type="button" data-act="tag" data-tag="${esc(x.t)}">#${esc(x.t)} <small>${x.n}</small></button>`).join("")}</div></section>` : ""}
+    ${pop.length && !st.cat ? `<section><h3 class="sec-title">인기글</h3><div class="pop-row">${pop.map((b) => `<button type="button" class="pop-card" data-act="post" data-id="${b.id}">
         <span class="pop-im">${blogThumb(b, "pop-img")}</span><b>${esc(b.title)}</b><small>조회 ${b.views}</small></button>`).join("")}</div></section>` : ""}
-    <section><div class="pop-head"><h3 class="sec-title">전체글</h3>${st.list.length ? `<span class="bl-view"><button type="button" data-act="view" data-v="list" class="${st.view === "list" ? "on" : ""}">목록</button><button type="button" data-act="view" data-v="grid" class="${st.view === "grid" ? "on" : ""}">사진</button></span>` : ""}</div>
-      ${!st.list.length ? `<p class="muted bl-msg">${st.me ? "아직 쓴 글이 없어요. 위의 글쓰기를 눌러 첫 글을 남겨 보세요!" : "아직 공개한 글이 없어요."}</p>`
-      : st.view === "grid" ? `<div class="tp-grid">${st.list.map((b) => `<button type="button" class="tp-item" data-act="post" data-id="${b.id}">${blogThumb(b, "tp-cover")}<span>${b.is_public ? "" : "🔒 "}${esc(b.title)}</span></button>`).join("")}</div>`
-      : `<ul class="bl-list">${st.list.map((b) => `<li><button type="button" class="bl-row" data-act="post" data-id="${b.id}">${blogThumb(b, "bl-th")}<span class="grow"><b>${esc(b.title)}</b>
-          <small>${ago(b.created_at)}${b.tags?.length ? ` · #${esc(b.tags[0])}` : ""} · ${b.is_public ? `조회 ${b.views || 0}` : "🔒 나만 보기"}</small></span></button></li>`).join("")}</ul>`}
+    <section><div class="pop-head"><h3 class="sec-title">${st.cat ? esc(st.cat === NOCAT ? "미분류" : st.cats.find((c) => c.id === st.cat)?.name || "전체글") : "전체글"}${st.cat ? ` <small class="muted">${shown.length}</small>` : ""}</h3>${st.list.length ? `<span class="bl-view"><button type="button" data-act="view" data-v="list" class="${st.view === "list" ? "on" : ""}">목록</button><button type="button" data-act="view" data-v="grid" class="${st.view === "grid" ? "on" : ""}">사진</button></span>` : ""}</div>
+      ${!shown.length ? `<p class="muted bl-msg">${st.me ? (st.cat ? "이 카테고리에는 아직 글이 없어요." : "아직 쓴 글이 없어요. 위의 글쓰기를 눌러 첫 글을 남겨 보세요!") : "아직 공개한 글이 없어요."}</p>`
+      : st.view === "grid" ? `<div class="tp-grid">${shown.map((b) => `<button type="button" class="tp-item" data-act="post" data-id="${b.id}">${blogThumb(b, "tp-cover")}<span>${b.is_public ? "" : "🔒 "}${esc(b.title)}</span></button>`).join("")}</div>`
+      : `<ul class="bl-list">${shown.map((b) => `<li><button type="button" class="bl-row" data-act="post" data-id="${b.id}">${blogThumb(b, "bl-th")}<span class="grow"><b>${esc(b.title)}</b>
+          <small>${!st.cat && catOf(st, b) !== NOCAT ? `${esc(st.cats.find((c) => c.id === b.cat).name)} · ` : ""}${ago(b.created_at)}${b.tags?.length ? ` · #${esc(b.tags[0])}` : ""} · ${b.is_public ? `조회 ${b.views || 0}` : "🔒 나만 보기"}</small></span></button></li>`).join("")}</ul>`}
     </section>`;
   fillTopicImgs(root);
 }
@@ -2320,6 +2335,8 @@ async function blogAct(e, st, root) {
   if (a === "write") openBlogEdit(null);
   else if (a === "post") openBlogPost(b.dataset.id, st);
   else if (a === "view") { st.view = b.dataset.v; paintBlog(root, st); }
+  else if (a === "cat") { st.cat = st.cat === b.dataset.c ? "" : b.dataset.c; paintBlog(root, st); }
+  else if (a === "cats") openBcEdit();
   else if (a === "topics") openGrid(st, { mode: "topic", type: b.dataset.t });
   else if (a === "tag") openGrid(st, { mode: "tag", tag: b.dataset.tag });
   else if (a === "kid") {
@@ -2342,6 +2359,58 @@ async function blogAct(e, st, root) {
   }
 }
 $("myBlog").addEventListener("click", (e) => blogAct(e, myBlog, $("myBlog")));
+
+// ---------- 블로그 카테고리 편집 (추가 · 이름 바꾸기 · 순서 · 지우기) ----------
+const MAX_BCATS = 20;
+let bcDraft = [];
+function paintBcEdit() {
+  $("bcList").innerHTML = bcDraft.map((c, i) => `<li data-i="${i}"><input class="bc-name" maxlength="20" value="${esc(c.name)}" aria-label="카테고리 이름" />
+    <button type="button" class="ic-sm" data-mv="-1" title="위로" aria-label="위로"${i ? "" : " disabled"}>${ico("chevron-up")}</button><button type="button" class="ic-sm" data-mv="1" title="아래로" aria-label="아래로"${i < bcDraft.length - 1 ? "" : " disabled"}>${ico("chevron-down")}</button><button type="button" class="ic-sm del" data-rm title="지우기" aria-label="지우기">${ico("trash")}</button></li>`).join("")
+    || `<li class="muted bc-empty">아직 카테고리가 없어요</li>`;
+  $("bcCnt").textContent = `${bcDraft.length}/${MAX_BCATS}`;
+  $("bcAddRow").hidden = bcDraft.length >= MAX_BCATS;
+}
+function openBcEdit() {
+  bcDraft = sync.myBlogCats().map((c) => ({ ...c }));
+  $("bcNew").value = "";
+  paintBcEdit();
+  $("bcEdit").showModal();
+}
+const bcSync = () => [...$("bcList").querySelectorAll("li[data-i]")].forEach((li) => { bcDraft[Number(li.dataset.i)].name = li.querySelector("input").value; });
+function bcAdd() {
+  const name = $("bcNew").value.trim().slice(0, 20); if (!name) { $("bcNew").focus(); return; }
+  bcSync();
+  if (bcDraft.some((c) => c.name.trim() === name)) { toast("같은 이름의 카테고리가 있어요"); return; }
+  bcDraft.push({ id: Math.random().toString(36).slice(2, 10), name });
+  $("bcNew").value = ""; paintBcEdit(); $("bcNew").focus();
+}
+$("bcAdd").addEventListener("click", bcAdd);
+$("bcNew").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); bcAdd(); } });
+$("bcList").addEventListener("click", (e) => {
+  const li = e.target.closest("li[data-i]"), b = e.target.closest("button"); if (!li || !b) return;
+  bcSync();
+  const i = Number(li.dataset.i);
+  if (b.dataset.mv) { const j = i + Number(b.dataset.mv); [bcDraft[i], bcDraft[j]] = [bcDraft[j], bcDraft[i]]; }
+  else if (b.hasAttribute("data-rm")) {
+    const n = (myBlog?.list || []).filter((x) => x.cat === bcDraft[i].id).length;
+    if (n && !confirm(`"${bcDraft[i].name}" 카테고리를 지울까요?\n안에 있는 글 ${n}개는 지워지지 않고 미분류로 옮겨져요.`)) return;
+    bcDraft.splice(i, 1);
+  }
+  paintBcEdit();
+});
+$("bcClose").addEventListener("click", () => $("bcEdit").close());
+$("bcSave").addEventListener("click", async () => {
+  bcSync();
+  const list = bcDraft.map((c) => ({ id: c.id, name: c.name.trim().slice(0, 20) })).filter((c) => c.name);
+  if (new Set(list.map((c) => c.name)).size !== list.length) { toast("같은 이름의 카테고리가 있어요"); return; }
+  $("bcSave").disabled = true;
+  try {
+    await sync.setBlogCats(list);
+    if (myBlog) { myBlog.cats = list; paintBlog($("myBlog"), myBlog); }
+    $("bcEdit").close(); toast("카테고리를 저장했어요");
+  } catch { toast("저장하지 못했어요. 인터넷 연결을 확인해 주세요"); }
+  $("bcSave").disabled = false;
+});
 $("momBlog").addEventListener("click", (e) => blogAct(e, momNow, $("momBlog")));
 $("pMeta").addEventListener("click", (e) => { const b = e.target.closest("[data-u]"); if (b) openMom(b.dataset.u); });
 
@@ -2500,6 +2569,10 @@ function openBlogEdit(b = null) {
   bRich.set(b?.body || "", items);
   if (b?.photos?.length) sync.photoUrls(b.photos).then((urls) => { const m = new Map(b.photos.map((pa, i) => [pa, urls[i]])); items.forEach((x) => { if (x.path) x.url = m.get(x.path) || ""; }); bRich.refresh(); });
   bTags = [...(b?.tags || [])];
+  const cats = sync.myBlogCats();
+  $("beCatRow").hidden = !cats.length;
+  $("beCat").innerHTML = `<option value="">미분류</option>` + cats.map((c) => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join("");
+  $("beCat").value = b?.cat && cats.some((c) => c.id === b.cat) ? b.cat : (!b && myBlog?.cat && myBlog.cat !== NOCAT ? myBlog.cat : "");
   $("beTitle").value = b?.title || ""; $("beTagIn").value = "";
   $("bePublic").checked = b ? !!b.is_public : true;
   $("beSave").textContent = b ? "고치기" : "올리기";
@@ -2560,7 +2633,7 @@ $("beSave").addEventListener("click", async () => {
     }
     const oldTp = bEditing?.topic?.photo;
     if (oldTp && oldTp !== topic?.photo) removed.push(oldTp);
-    const id = await sync.saveBlog({ id: bEditing?.id, title, body, photos: paths, topic, tags: bTags, is_public: $("bePublic").checked });
+    const id = await sync.saveBlog({ id: bEditing?.id, title, body, photos: paths, topic, tags: bTags, cat: $("beCat").value || null, is_public: $("bePublic").checked });
     if (removed.length) sync.deletePhotos(removed);
     fresh.forEach((x) => URL.revokeObjectURL(x.url)); bRich.clear();
     if (wTopic?.url) URL.revokeObjectURL(wTopic.url);

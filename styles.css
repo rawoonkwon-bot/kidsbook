@@ -840,6 +840,26 @@ body.peek .tabbar [data-go="blog"] { display: none; }
 .blog .browse { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; }
 .blog .browse .kid { background: var(--card); box-shadow: var(--raise-s); color: var(--ink); }
 .bl-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.bl-cats { display: flex; flex-wrap: wrap; gap: 6px; }
+.bl-cats button { border: 0; border-radius: 10px; padding: 8px 12px; background: var(--card); box-shadow: var(--raise-s); color: var(--ink); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.bl-cats button small { color: var(--muted); font-weight: 600; margin-left: 2px; }
+.bl-cats button.on { background: var(--forest); color: #F3EFE6; box-shadow: none; }
+.bl-cats button.on small { color: var(--sage-l); }
+.pop-head .link-btn .ico { width: 15px; height: 15px; vertical-align: -2px; }
+.bl-msg.sm { font-size: 13px; margin: 0; }
+.bc-list { list-style: none; padding: 0; margin: 10px 0; display: flex; flex-direction: column; gap: 8px; }
+.bc-list li { display: flex; gap: 6px; align-items: center; background: var(--card); box-shadow: var(--raise-s); border-radius: 14px; padding: 6px 8px 6px 12px; }
+.bc-list li.bc-empty { box-shadow: none; background: none; justify-content: center; padding: 18px; }
+.bc-name { flex: 1; min-width: 0; border: 0 !important; background: transparent !important; box-shadow: none !important; font: inherit; font-size: 15px; font-weight: 700; padding: 8px 0 !important; }
+.ic-sm { width: 34px; height: 34px; border: 0; border-radius: 10px; background: var(--soft); color: var(--muted); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; flex: none; }
+.ic-sm .ico { width: 18px; height: 18px; }
+.ic-sm:disabled { opacity: .35; cursor: default; }
+.ic-sm.del { background: #FDECEC; color: #A32D2D; }
+.bc-add { display: flex; gap: 8px; }
+.bc-add input { flex: 1; min-width: 0; font: inherit; font-size: 15px; padding: 11px 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--card); box-shadow: var(--inset); outline: none; }
+.bc-add input:focus { border-color: var(--sage); }
+.be-cat { display: flex; align-items: center; gap: 10px; margin: 4px 0 8px; font-size: 14px; font-weight: 700; color: var(--forest); }
+.be-cat select { flex: 1; font: inherit; font-size: 15px; padding: 9px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); color: var(--ink); }
 .bl-tags button { border: 0; border-radius: 999px; padding: 5px 11px; background: var(--sage-l); color: var(--forest-d); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
 .bl-tags button small { color: var(--muted); font-weight: 600; }
 #bvTags { margin-top: 14px; }

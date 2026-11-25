@@ -703,10 +703,22 @@
     </div>
   </dialog>
 
+  <!-- 블로그 카테고리 편집 -->
+  <dialog id="bcEdit" class="page">
+    <div class="page-in">
+      <div class="page-top"><button type="button" class="x-btn" id="bcClose" aria-label="닫기">✕</button><button type="button" class="pill-btn" id="bcSave">저장</button></div>
+      <h2 class="page-title">카테고리 편집 <small class="muted" id="bcCnt"></small></h2>
+      <p class="muted adm-sub">이름을 눌러 바꾸고, 화살표로 순서를 바꿔요. 지운 카테고리의 글은 미분류로 옮겨져요.</p>
+      <ul class="bc-list" id="bcList"></ul>
+      <div class="bc-add" id="bcAddRow"><input id="bcNew" maxlength="20" placeholder="새 카테고리 이름 (예: 그림책)" /><button type="button" class="btn dark" id="bcAdd">추가</button></div>
+    </div>
+  </dialog>
+
   <!-- 블로그 글쓰기 -->
   <dialog id="blogEdit" class="page">
     <div class="page-in">
       <div class="page-top"><button type="button" class="x-btn" id="beClose" aria-label="닫기">✕</button><button type="button" class="pill-btn" id="beSave">올리기</button></div>
+      <label class="be-cat" id="beCatRow" hidden><span>카테고리</span><select id="beCat"></select></label>
       <input id="beTitle" class="title-input" maxlength="100" placeholder="제목" />
       <div class="rt-box">
         <div class="rt-bar"><button type="button" class="rt-btn" id="bePhotoAdd">📷 사진</button><button type="button" class="rt-btn" id="beTopicBtn">📚 글감</button><small id="bePhotoCount">사진 0/10</small>

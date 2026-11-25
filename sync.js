@@ -277,6 +277,7 @@ export async function deletePhotos(paths) {
 let profile = null, admin = false;
 export const myNick = () => profile?.nick || "";
 export const myFace = () => profile?.face || null;
+export const myBlogCats = () => (Array.isArray(profile?.blog_cats) ? profile.blog_cats : []);
 export const amAdmin = () => admin;
 export const myId = () => user?.id || "";
 // 별명이 없으면 null, 인터넷 문제로 모르면 예외
@@ -284,7 +285,7 @@ export async function loadProfile() {
   if (!user) return null;
   const c = await client();
   const [{ data: p, error }, { data: a }] = await Promise.all([
-    c.from("profiles").select("nick, face, tu_seen").eq("user_id", user.id).maybeSingle(),
+    c.from("profiles").select("nick, face, tu_seen, blog_cats").eq("user_id", user.id).maybeSingle(),
     c.from("admins").select("user_id").eq("user_id", user.id).maybeSingle(),
   ]);
   if (error) throw error;
@@ -417,8 +418,15 @@ export async function searchMoms(q) {
 }
 export async function profileOf(uid) {
   const c = await client();
-  const { data } = await c.from("profiles").select("nick, face").eq("user_id", uid).maybeSingle();
+  const { data } = await c.from("profiles").select("nick, face, blog_cats").eq("user_id", uid).maybeSingle();
   return data || null;
+}
+// 내 블로그 카테고리 목록 저장: [{ id, name }] (순서 = 보이는 순서)
+export async function setBlogCats(list) {
+  const c = await client();
+  const { error } = await c.from("profiles").update({ blog_cats: list }).eq("user_id", user.id);
+  if (error) throw error;
+  if (profile) profile.blog_cats = list;
 }
 // 이웃: 내가 추가한 엄마들 (상대 허락 없이, 나만 보는 목록)
 export async function myFollows() {
@@ -446,7 +454,7 @@ export async function postsBy(uid) {
 }
 
 // ---------- 엄마 블로그 ----------
-const BLOG_COLS = "id, title, body, photos, topic, tags, is_public, views, created_at, updated_at, user_id";
+const BLOG_COLS = "id, title, body, photos, topic, tags, cat, is_public, views, created_at, updated_at, user_id";
 // 한 엄마의 블로그 글 (남의 블로그는 공개 글만 — 서버가 걸러 줌)
 export async function blogList(uid) {
   const c = await client();
@@ -460,9 +468,9 @@ export async function getBlog(id) {
   if (error) throw error;
   return data ? { ...data, nick: data.profiles?.nick || "(알 수 없음)", face: data.profiles?.face || null } : null;
 }
-export async function saveBlog({ id, title, body, photos, topic = null, tags = [], is_public = true }) {
+export async function saveBlog({ id, title, body, photos, topic = null, tags = [], cat = null, is_public = true }) {
   const c = await client();
-  const row = { title, body, photos, topic, tags, is_public };
+  const row = { title, body, photos, topic, tags, cat, is_public };
   if (id) {
     const { error } = await c.from("blogs").update(row).eq("id", id);
     if (error) throw error;
