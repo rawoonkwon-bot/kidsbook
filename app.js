@@ -1113,13 +1113,42 @@ function openPhoto(list, i) {
   if (!$("photoView").open) $("photoView").showModal();
 }
 function showPhoto() {
+  pz.reset();
   $("pvImg").src = photoList[photoAt];
   $("pvCount").textContent = photoList.length > 1 ? `${photoAt + 1} / ${photoList.length}` : "";
   $("pvPrev").hidden = $("pvNext").hidden = photoList.length < 2;
 }
 $("pvPrev").addEventListener("click", () => { photoAt = (photoAt + photoList.length - 1) % photoList.length; showPhoto(); });
 $("pvNext").addEventListener("click", () => { photoAt = (photoAt + 1) % photoList.length; showPhoto(); });
-$("pvImg").addEventListener("click", () => $("photoView").close());
+// 한 번 누르면 닫기 (두 번 눌러 확대할 수 있게 잠깐 기다렸다가)
+$("pvImg").addEventListener("click", () => { if (pz.used()) return; setTimeout(() => { if (!pz.used() && $("photoView").open) $("photoView").close(); }, 320); });
+// 사진 크게 보기에서만 두 손가락으로 벌려 확대 · 한 손가락으로 옮기기 · 두 번 눌러 2배
+const pz = (() => {
+  const img = $("pvImg");
+  let s = 1, x = 0, y = 0, d0 = 0, s0 = 1, px = 0, py = 0, moved = false, lastTap = 0;
+  const apply = () => { img.style.transform = s === 1 ? "" : `translate(${x}px, ${y}px) scale(${s})`; };
+  const dist = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+  img.addEventListener("touchstart", (e) => {
+    moved = false;
+    if (e.touches.length === 2) { d0 = dist(e.touches); s0 = s; }
+    else if (e.touches.length === 1) {
+      px = e.touches[0].clientX; py = e.touches[0].clientY;
+      const now = Date.now();
+      if (now - lastTap < 300) { s = s > 1 ? 1 : 2; x = y = 0; apply(); moved = true; lastTap = 0; e.preventDefault(); return; }
+      lastTap = now;
+    }
+  }, { passive: false });
+  img.addEventListener("touchmove", (e) => {
+    e.preventDefault(); moved = true;
+    if (e.touches.length === 2 && d0) { s = Math.min(4, Math.max(1, s0 * dist(e.touches) / d0)); if (s === 1) x = y = 0; apply(); }
+    else if (e.touches.length === 1 && s > 1) { x += e.touches[0].clientX - px; y += e.touches[0].clientY - py; px = e.touches[0].clientX; py = e.touches[0].clientY; apply(); }
+  }, { passive: false });
+  img.addEventListener("touchend", (e) => { if (e.touches.length < 2) d0 = 0; if (e.touches.length === 1) { px = e.touches[0].clientX; py = e.touches[0].clientY; } });
+  return { reset() { s = 1; x = y = 0; moved = false; apply(); }, used: () => moved || s > 1 };
+})();
+// 앱 화면은 두 손가락 확대 · 두 번 눌러 확대를 막음 (아이폰은 viewport 설정을 무시해서 따로 막음)
+document.addEventListener("gesturestart", (e) => e.preventDefault());
+document.addEventListener("touchmove", (e) => { if (e.touches.length > 1 && e.target !== $("pvImg")) e.preventDefault(); }, { passive: false });
 $("dayCats").addEventListener("click", (e) => {
   const b = e.target.closest("button[data-cat]"); if (!b) return;
   const c = CAT[b.dataset.cat];

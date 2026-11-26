@@ -1401,3 +1401,6 @@ body.peek #wsOpen { display: none; }
 .rx.rx-day .rx-ic { width: 25px; height: 25px; }
 .rx.rx-day button { font-size: 15px; }
 .peek-bar #peekWho span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 앱 화면 확대 막기 (두 번 눌러 확대 포함), 사진 크게 보기는 직접 확대 */
+html { touch-action: manipulation; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+.photo-view img { touch-action: none; transition: transform .05s linear; will-change: transform; }
