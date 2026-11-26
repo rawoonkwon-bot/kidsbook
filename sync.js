@@ -529,7 +529,7 @@ export async function deleteBlogComment(id) {
 // ---------- 방명록 (블로그마다 · 비밀글은 주인과 쓴 사람만) ----------
 export async function guestbook(owner) {
   const c = await client();
-  const { data, error } = await c.from("guestbook").select("id, owner, parent_id, body, secret, created_at, user_id, profiles(nick, face)").eq("owner", owner).order("created_at", { ascending: false }).limit(200);
+  const { data, error } = await c.from("guestbook").select("id, owner, parent_id, body, secret, created_at, user_id, profiles!guestbook_user_id_fkey(nick, face)").eq("owner", owner).order("created_at", { ascending: false }).limit(200);
   if (error) throw error;
   return (data || []).map((x) => ({ ...x, nick: x.profiles?.nick || "(알 수 없음)", face: x.profiles?.face || null }));
 }
@@ -546,7 +546,7 @@ export async function deleteGuest(id) {
 // ---------- 책 응원 (다른 집 아이 책 기록에 👏 + 짧은 한 줄) ----------
 export async function cheers(owner, recId) {
   const c = await client();
-  const { data, error } = await c.from("book_cheers").select("id, body, created_at, user_id, profiles(nick, face)").eq("owner", owner).eq("rec_id", recId).order("created_at", { ascending: false });
+  const { data, error } = await c.from("book_cheers").select("id, body, created_at, user_id, profiles!book_cheers_user_id_fkey(nick, face)").eq("owner", owner).eq("rec_id", recId).order("created_at", { ascending: false });
   if (error) throw error;
   return (data || []).map((x) => ({ ...x, nick: x.profiles?.nick || "(알 수 없음)" }));
 }
