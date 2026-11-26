@@ -1271,15 +1271,14 @@ function renderStats() {
   $("statKids").hidden = kids.length < 2;
   $("statKids").innerHTML = kids.map((k) => `<button type="button" class="kid${k.id === activeKid ? " on" : ""}" data-kid="${k.id}">${esc(k.nick)}${gradeOf(k) ? ` <small class="grade">${gradeOf(k)}</small>` : ""}</button>`).join("");
   const pages = readRecs().reduce((a, r) => a + pagesOf(r), 0);
-  const done = readRecs().reduce((a, r) => a + timesRead(r), 0);
   // 책 읽은 시간: 포트폴리오에 적은 한글책·영어책 시간 (+ 예전에 책 기록에 적은 시간)
   const readMins = readRecs().reduce((a, r) => a + minsOf(r), 0) + journal.filter((j) => (j.cat === "ko" || j.cat === "en") && j.minutes).reduce((a, j) => a + j.minutes, 0);
   const focusMins = records.filter(isFo).reduce((a, r) => a + minsOf(r), 0) + journal.filter((j) => j.cat === "focus").reduce((a, j) => a + (j.minutes || 0), 0);
   const recDays = new Set([...records.flatMap((r) => r.sessions.map((s) => s.day)), ...journal.map((j) => j.day)]).size;
   $("statTiles").innerHTML = [
-    ["읽은 책", readRecs().length, "권"], ["끝까지 읽은 횟수", done, "번"],
+    ["읽은 책", readRecs().length, "권"], ["기록한 날", recDays, "일"],
     ["읽은 쪽수", pages.toLocaleString(), "쪽"], ["독서 포인트", totalPoints().toLocaleString(), "점"],
-    ["책 읽은 시간", readMins ? fmtMin(readMins) : "-", ""], ["집중듣기 시간", fmtMin(focusMins), ""], ["기록한 날", recDays, "일"],
+    ["책 읽은 시간", readMins ? fmtMin(readMins) : "-", ""], ["집중듣기 시간", fmtMin(focusMins), ""],
   ].map(([k, v, u]) => `<div class="tile"><small>${k}</small><b>${v}<em>${u}</em></b></div>`).join("");
 
   // 한글책 / 영어책 / 집중듣기
