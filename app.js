@@ -963,7 +963,9 @@ function renderDayInline() {
   if (selDay > localDay()) selDay = localDay();
   const html = dayGroupsHtml(selDay);
   $("diTitle").textContent = prettyDay(selDay);
-  $("diList").innerHTML = html || `<p class="di-empty">이 날은 아직 기록이 없어요</p>`;
+  // 하트 · 댓글은 기록마다가 아니라 그날 하루 전체에 하나
+  const kn = kids.find((k) => k.id === activeKid)?.nick || "";
+  $("diList").innerHTML = html ? html + rxSlot(`day:${activeKid || "-"}:${selDay}`, `${kn ? kn + " " : ""}${prettyDay(selDay).replace(/ \(.*\)$/, "")} 기록`, "rx-day") : `<p class="di-empty">이 날은 아직 기록이 없어요</p>`;
   fillPhotoRows($("diList"));
   fillReacts($("diList"));
 }
@@ -1025,7 +1027,7 @@ function dayGroupsHtml(day, sheet = false) { // sheet: "이 날 기록 더하기
         const chips = tj.map((j) => `<button type="button" class="t-chip" data-edit="${j.id}" aria-label="읽은 시간 고치기">⏱ ${fmtMin(j.minutes)}</button>`).join("");
         rows += `<div class="day-item link" data-view="${r.id}">
           ${r.cover ? `<img src="${esc(r.cover)}" alt="">` : `<span class="noc"></span>`}
-          <div class="grow"><b>${esc(r.title)}</b><small>${sessionText(s)}${chips}</small>${sheet ? "" : rxSlot(r.id, r.title)}</div></div>`;
+          <div class="grow"><b>${esc(r.title)}</b><small>${sessionText(s)}${chips}</small></div></div>`;
       }
     }
     {
@@ -1039,7 +1041,7 @@ function dayGroupsHtml(day, sheet = false) { // sheet: "이 날 기록 더하기
         const main = j.total ? `⏱ 전체 읽은 시간 ${mins}` : j.what || mins || c.name;
         const sub = j.total ? j.text || "" : j.what ? [mins, j.text || ""].filter(Boolean).join(" · ") : mins ? j.text || "" : "";
         rows += `<div class="day-item link" data-edit="${j.id}">${j.cover ? `<img src="${esc(j.cover)}" alt="">` : ""}
-          <div class="grow">${note ? richHtml(j.text, j.photos || [], "ph-row", "dn-text") : `<b>${esc(main)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}${j.photos?.length ? `<div class="ph-row" data-paths="${esc(j.photos.join("|"))}"></div>` : ""}`}${sheet || c.key === "secret" ? "" : rxSlot(j.id, j.what || c.name)}</div>
+          <div class="grow">${note ? richHtml(j.text, j.photos || [], "ph-row", "dn-text") : `<b>${esc(main)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}${j.photos?.length ? `<div class="ph-row" data-paths="${esc(j.photos.join("|"))}"></div>` : ""}`}</div>
           <button type="button" class="x" data-del="${j.id}" aria-label="지우기">✕</button></div>`;
       }
     }
@@ -1907,7 +1909,7 @@ for (const id of ["momResList", "momFound", "nbList"]) {
 // 앱을 다시 열지 않고 화면만 친구 책장으로 바꾸기 (구경하는 동안은 휴대폰에 아무것도 저장하지 않음)
 function enterPeek(data, kid, uid = null, who = null) {
   PEEK_UID = uid;
-  $("peekWho").innerHTML = who?.nick ? `${avatar(who.nick, who.face, "av xs")}<b>${esc(who.nick)}</b>님 책장 구경 중 · 보기만 할 수 있어요` : "👀 다른 집 책장 구경 중 · 보기만 할 수 있어요";
+  $("peekWho").innerHTML = who?.nick ? `${avatar(who.nick, who.face, "av xs")}<span><b>${esc(who.nick)}</b>님 책장 구경 중</span>` : "👀 다른 집 책장 구경 중 · 보기만 할 수 있어요";
   fillMem(data, kid);
   PEEK = data; store = memStore;
   loadState();
@@ -3467,7 +3469,7 @@ function paintRx(likeBtn, cmtBtn, n, liked, c) {
 }
 // 포트폴리오 기록 하나하나: 구경 중이면 그 집, 아니면 내 것 (로그인했을 때만)
 function rxOwner() { return !sync.myId() || AUTH.offline ? null : PEEK ? PEEK_UID || null : sync.myId(); }
-function rxSlot(id, title) { return rxOwner() ? `<div class="rx" data-rx="${esc(id)}" data-t="${esc(String(title || "").slice(0, 200))}"><button type="button" class="rx-like">${HEART_()}</button><button type="button" class="rx-cmt">${BUBBLE_()}</button></div>` : ""; }
+function rxSlot(id, title, cls = "") { return rxOwner() ? `<div class="rx ${cls}" data-rx="${esc(id)}" data-t="${esc(String(title || "").slice(0, 200))}"><button type="button" class="rx-like">${HEART_()}</button><button type="button" class="rx-cmt">${BUBBLE_()}</button></div>` : ""; }
 var rxState = new Map(); // id → { n, mine, c }
 async function fillReacts(root) {
   const owner = rxOwner(); if (!owner) return;

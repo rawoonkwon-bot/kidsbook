@@ -1396,3 +1396,8 @@ body.peek #wsOpen { display: none; }
 .tb-row .ws-card { grid-column: 1 / -1; }
 .tb-row .ws-ic { background: #F9DCCF; color: #B95A26; }
 .tb-row .ws-ic svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; }
+/* 그날 하루 전체 하트 · 댓글 */
+.rx.rx-day { margin: 4px 6px 4px; gap: 18px; }
+.rx.rx-day .rx-ic { width: 25px; height: 25px; }
+.rx.rx-day button { font-size: 15px; }
+.peek-bar #peekWho span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
