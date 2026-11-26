@@ -1391,3 +1391,8 @@ body.peek #wsOpen { display: none; }
 #rcTitle { display: flex; align-items: center; gap: 8px; }
 #rcTitle .rx-ic { width: 22px; height: 22px; }
 .rc-list { max-height: 50vh; overflow: auto; }
+
+/* 연산 학습지 뽑기: 홈 버튼 줄 아래 한 줄 */
+.tb-row .ws-card { grid-column: 1 / -1; }
+.tb-row .ws-ic { background: #F9DCCF; color: #B95A26; }
+.tb-row .ws-ic svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; }
