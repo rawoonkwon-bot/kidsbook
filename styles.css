@@ -1326,3 +1326,27 @@ body.peek #wsOpen { display: none; }
 /* 별점: 버튼 안에서만 겹치게 (독후활동 화면 별이 커지던 오류) */
 .stars button { position: relative; }
 .stars .sb svg { width: 100%; height: 100%; display: block; }
+
+/* 홈 위쪽 네 칸: 한 줄에 4개로 작게 */
+.rings { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; margin-bottom: 12px; }
+.ring-card { padding: 10px 2px 8px; border-radius: 16px; gap: 4px; min-width: 0; }
+.ring { width: 58px; height: 58px; }
+.ring b { font-size: 15px; }
+.ring b small { font-size: 10px; }
+.ring-card small { font-size: 11px; letter-spacing: -.4px; white-space: nowrap; }
+/* 교과서 수록도서 · 서울대 추천도서: 작은 버튼 두 개 나란히 */
+.tb-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 0 14px; }
+.tb-row .tb-card { display: flex; align-items: center; gap: 10px; margin: 0; padding: 8px 10px; border-radius: 14px; background: transparent; box-shadow: none; border: 1px solid rgba(0, 0, 0, .08); min-width: 0; }
+.tb-row .tb-ic { width: 30px; height: 30px; border-radius: 9px; flex: none; }
+.tb-row .tb-ic .ico { width: 17px; height: 17px; }
+.tb-row .snu-ic { background: #E3E9F4; font-size: 16px; }
+.tb-row .tb-txt b { font-size: 13.5px; font-weight: 500; white-space: nowrap; letter-spacing: -.3px; }
+/* 서울대 추천도서 */
+.snu-tabs { grid-template-columns: repeat(5, 1fr); }
+.s-snu { margin: 12px 0 6px; padding: 12px 14px; border-radius: 16px; background: #EEF2F8; }
+.s-snu h4 { margin: 0; font-size: 14px; color: #2E4A7A; }
+.s-snu .sn-g { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; text-align: center; }
+.s-snu .sn-g div { background: #fff; border-radius: 12px; padding: 8px 4px; }
+.s-snu .sn-g b { display: block; font-size: 17px; }
+.s-snu .sn-g small { font-size: 11.5px; color: var(--muted); }
+.s-snu p { font-size: 13px; color: var(--muted); margin: 10px 0 0; line-height: 1.5; }

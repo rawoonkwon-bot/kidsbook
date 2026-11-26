@@ -285,6 +285,7 @@ const recsOf = (isbn) => { const all = isbn ? records.filter((r) => r.isbn === i
 const bookOfRec = (r) => (r ? { title: r.title, authors: r.authors ? [r.authors] : [], publisher: r.publisher, category: r.category, pages: r.totalPages, cover: r.cover, description: r.description } : null);
 // 교과서 수록도서에서 열 때(info): 기록하기 없이 책 소개 + 읽은 친구들 별점만
 function sheetMode(info) {
+  $("sSnu").hidden = true;
   $("sSelf").hidden = $("sNote").hidden = $("sOk").hidden = $("sTiming").hidden = info;
   $("sRates").hidden = !info; if (info) $("sRates").innerHTML = `<small>읽은 친구들의 별점을 불러오는 중…</small>`;
 }
@@ -302,6 +303,7 @@ async function paintRates(isbn, title) {
 async function openSheet(isbn, scanInfo, opts = {}) {
   sheetMode(!!opts.info);
   if (opts.info) paintRates(isbn, opts.title);
+  if (opts.snu != null) paintSnu(opts.snu);
   const { read: existing, fo: foRec } = recsOf(isbn);
   const ex0 = existing || foRec; // 화면에 보여 줄 내 기록
   sheet = { isbn, book: null, existing, fo: foRec };
@@ -3299,6 +3301,68 @@ $("tbList").addEventListener("click", async (e) => {
   paintRates("", t);
 });
 const tbHtml = (gs) => gs.length ? `<span class="tb-gs">${gs.map((g) => { const nm = g === "중" ? "중학교" : g === "고" ? "고등학교" : `초등 ${g}학년`; return `<i class="tb-g${g === "중" ? " m" : g === "고" ? " h" : ""}" title="${nm} 교과서 수록도서" aria-label="${nm} 교과서 수록">${g}</i>`; }).join("")}</span>` : "";
+
+// ---------- 서울대 추천도서 (홈 버튼 → 분야 탭 · 표지 책장 · 책 소개) ----------
+let SNU = null, SNU_COVER = {}, snuTab = "전체";
+const SNU_TABS = ["전체", "문학", "인문", "사회", "과학"];
+async function snuLoad() {
+  if (!SNU) SNU = (await import("./snu.js")).SNU;
+  if (!Object.keys(SNU_COVER).length) { try { SNU_COVER = (await import("./snucovers.js")).SNU_COVER; } catch {} }
+}
+const snuAu = (i) => SNU[i][1] || SNU_COVER[i]?.[3] || "";
+function snuMine() {
+  const hit = new Map();
+  SNU.forEach(([t], i) => {
+    const isbn = SNU_COVER[i]?.[2], nt0 = nT(t), a0 = snuAu(i).replace(/\s/g, "").split(/[,·]/)[0];
+    const r = records.find((r) => {
+      if (isbn && r.isbn === isbn) return true;
+      const nt = nT(r.title), au = String(r.authors || "").replace(/\s/g, ""), auOk = a0 && au.includes(a0);
+      return (nt === nt0 && (nt0.length >= 4 || auOk)) || (auOk && nt0.length >= 3 && nt.startsWith(nt0));
+    });
+    if (r) hit.set(i, r);
+  });
+  return hit;
+}
+function renderSnu() {
+  const mine = snuMine();
+  $("snuTabs").innerHTML = SNU_TABS.map((c) => {
+    const ix = SNU.map((x, i) => i).filter((i) => c === "전체" || SNU[i][2] === c);
+    return `<button type="button" role="tab" data-c="${c}" aria-selected="${c === snuTab}"><b>${c}</b><small>${ix.filter((i) => mine.has(i)).length}/${ix.length}</small></button>`;
+  }).join("");
+  const list = SNU.map((x, i) => i).filter((i) => snuTab === "전체" || SNU[i][2] === snuTab);
+  $("snuCount").textContent = `${snuTab === "전체" ? "전체" : snuTab} ${list.length}권 · 읽은 책 ${list.filter((i) => mine.has(i)).length}권`;
+  $("snuList").innerHTML = list.map((i) => {
+    const t = SNU[i][0], a = snuAu(i), r = mine.get(i), c = r?.cover || SNU_COVER[i]?.[0];
+    return `<li data-i="${i}" title="${esc(t)}${a ? ` · ${esc(a)}` : ""}">
+      ${c ? `<img class="cover" src="${esc(c)}" alt="${esc(t)}" loading="lazy">` : `<div class="cover tb-nocover"><b>${esc(t)}</b><small>${esc(a)}</small></div>`}
+      ${r ? `<span class="done-badge" aria-label="기록한 책">✓</span>` : ""}</li>`;
+  }).join("");
+}
+function paintSnu(i) {
+  const [, , cat, y0, y1, ny, best, cols] = SNU[i];
+  const cs = cols.length > 4 ? `${cols.slice(0, 4).join(", ")} 외 ${cols.length - 4}곳` : cols.join(", ");
+  $("sSnu").innerHTML = `<h4>🎓 서울대 신입생 추천 · ${esc(cat)}</h4>
+    <div class="sn-g"><div><b>${ny}년</b><small>추천 받은 해</small></div><div><b>${best ? `${best}위` : "–"}</b><small>TOP 순위 최고</small></div><div><b>${cols.length}곳</b><small>단과대 TOP3</small></div></div>
+    <p>${y0 === y1 ? `${y0}년` : `${y0}~${y1}년`}${cs ? ` · ${esc(cs)}` : ""}</p>`;
+  $("sSnu").hidden = false;
+}
+$("snuOpen").addEventListener("click", async () => {
+  try { await snuLoad(); } catch { toast("목록을 불러오지 못했어요"); return; }
+  renderSnu(); $("snuPage").showModal(); $("snuPage").scrollTop = 0;
+});
+$("snuClose").addEventListener("click", () => $("snuPage").close());
+$("snuTabs").addEventListener("click", (e) => { const b = e.target.closest("[data-c]"); if (!b) return; snuTab = b.dataset.c; renderSnu(); });
+$("snuList").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-i]"); if (!b) return;
+  const i = Number(b.dataset.i), t = SNU[i][0], a = snuAu(i), r = snuMine().get(i);
+  const isbn = r?.isbn || SNU_COVER[i]?.[2], cover = r?.cover || SNU_COVER[i]?.[0] || "";
+  if (isbn) { openSheet(isbn, null, { info: true, title: t, author: a, cover, snu: i }); return; }
+  sheet = { isbn: "", book: null, existing: null, fo: null }; sheetMode(true);
+  $("sCat").textContent = "서울대 추천도서"; $("sTitle").textContent = t; $("sAuthor").textContent = a ? `〈작가〉 ${a}` : "";
+  $("sPages").textContent = ""; $("sDesc").textContent = ""; $("sMine").hidden = true;
+  setImg($("sCover"), cover); paintSnu(i); $("scanSheet").showModal();
+  paintRates("", t);
+});
 
 // ---------- 신고 ----------
 const BAN_MSG = "글쓰기가 잠시 막혀 있어요. 관리자에게 문의해 주세요";

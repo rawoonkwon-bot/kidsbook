@@ -42,11 +42,16 @@
         <button type="button" class="ring-card" id="ringStampEnBtn" aria-label="영어책 스탬프 보기"><div class="ring en" id="ringStampEn"></div><small>영어책 스탬프</small></button>
       </div>
 
-      <button type="button" class="tb-card" id="tbOpen">
-        <span class="tb-ic" data-ico="book"></span>
-        <span class="tb-txt"><b>교과서 수록도서</b><small>초등 1~6학년 · 중학교 수록도서 보기</small></span>
-        <span class="tb-go">›</span>
-      </button>
+      <div class="tb-row">
+        <button type="button" class="tb-card" id="tbOpen">
+          <span class="tb-ic" data-ico="book"></span>
+          <span class="tb-txt"><b>교과서 수록도서</b></span>
+        </button>
+        <button type="button" class="tb-card" id="snuOpen">
+          <span class="tb-ic snu-ic" aria-hidden="true">🎓</span>
+          <span class="tb-txt"><b>서울대 추천도서</b></span>
+        </button>
+      </div>
 
       <div id="popWrap" hidden>
         <div class="pop-head"><h3 class="sec-title">인기글</h3><button type="button" class="link-btn" id="popMore">게시판 가기 ›</button></div>
@@ -226,6 +231,7 @@
       </div>
       <p class="s-desc" id="sDesc"></p>
       <p class="s-mine" id="sMine" hidden></p>
+      <div class="s-snu" id="sSnu" hidden></div>
       <div class="s-rates" id="sRates" hidden></div>
       <p class="s-note" id="sNote">일부 전집의 낱권 도서 정보가 다르다면 [셀프등록] 하세요</p>
       <button class="btn lime big" value="ok" id="sOk">확인</button>
@@ -401,6 +407,19 @@
       <div class="tb-tools"><span id="tbCount"></span></div>
       <ul class="shelf tb-shelf" id="tbList"></ul>
       <p class="tmdb-note" id="tbSrc"></p>
+    </div>
+  </dialog>
+
+  <!-- 서울대 추천도서 -->
+  <dialog id="snuPage" class="page">
+    <div class="page-in">
+      <div class="page-top"><button type="button" class="x-btn" id="snuClose" aria-label="닫기">✕</button></div>
+      <h2 class="page-title">🎓 서울대 추천도서</h2>
+      <p class="ws-help">서울대 신입생들이 고등학교 때 감명 깊게 읽은 책이에요. 많이 뽑힌 순서로 보여 줘요. 기록한 책은 ✓ 표시가 돼요.</p>
+      <div class="tb-tabs snu-tabs" id="snuTabs" role="tablist" aria-label="분야"></div>
+      <div class="tb-tools"><span id="snuCount"></span></div>
+      <ul class="shelf tb-shelf" id="snuList"></ul>
+      <p class="tmdb-note">출처: 서울대학교 입학본부 아로리 「신입생의 서재」 2012~2026. 표지는 책 검색으로 찾은 것이라 판이 다를 수 있어요.</p>
     </div>
   </dialog>
 
