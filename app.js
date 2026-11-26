@@ -3140,14 +3140,7 @@ function tbKidTab() {
   const g = gradeOf(kids.find((k) => k.id === activeKid) || {});
   return /^초[1-6]$/.test(g) ? g[1] : /^(중|고|졸업)/.test(g) ? "중" : "1";
 }
-function renderTbCard() {
-  const g = tbKidTab(), mine = tbMine();
-  const idx = TEXTBOOK.map((x, i) => i).filter((i) => TEXTBOOK[i][2].includes(g));
-  const n = idx.filter((i) => mine.has(i)).length;
-  const kid = kids.find((k) => k.id === activeKid);
-  $("tbSum").textContent = `${kid ? `${kid.nick} · ` : ""}${tbName(g)} ${idx.length}권 중 ${n}권 읽음`;
-  $("tbBar").firstElementChild.style.width = `${idx.length ? (n / idx.length) * 100 : 0}%`;
-}
+function renderTbCard() {} // 홈 카드는 정보용 (읽은 권수는 목록 안에서만)
 let TB_COVER = {}; // "제목|지은이" → 표지 주소 (tbcovers.js, 목록을 열 때 한 번 불러옴)
 function renderTb() {
   const mine = tbMine();
