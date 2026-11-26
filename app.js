@@ -791,7 +791,7 @@ function fillView(r) {
   $("vHome").checked = !!r.home; $("vHome").disabled = !!PEEK;
   $("vTimes").innerHTML = timesRead(r) ? `${tallySvg(timesRead(r))}<span>${timesRead(r)}번 ${isFo(r) ? "들었어요" : "읽었어요"}</span>` : "";
   $("vMore").hidden = false;
-  $("vTime").hidden = isFo(r) || !!PEEK; // 한글책·영어책: 읽은 시간은 포트폴리오 기록으로 남김
+  $("vTime").hidden = true; // 읽은 시간은 책마다 적지 않고 포트폴리오에서 그날 한글책·영어책 전체로 적어요
   $("vMore").textContent = r.done ? `🔁 다시 ${isFo(r) ? "듣기" : "읽기"} (${rounds + 1}번째)` : "➕ 이어서 기록하기";
   $("vSessH").textContent = isFo(r) ? "🎧 들은 기록" : "📖 읽은 기록";
   $("vActivity").hidden = isFo(r) || !(r.done && !(r.bonusRounds || []).includes(rounds));
@@ -1008,8 +1008,8 @@ function dayGroupsHtml(day) {
         // 박스 제목에 종류 이름·아이콘이 있으니, 기록에는 내용만
         const mins = j.minutes ? fmtMin(j.minutes) : "";
         const note = c.kind === "note" && !j.what;
-        const main = j.what || mins || c.name;
-        const sub = j.what ? [mins, j.text || ""].filter(Boolean).join(" · ") : mins ? j.text || "" : "";
+        const main = j.total ? `⏱ 전체 읽은 시간 ${mins}` : j.what || mins || c.name;
+        const sub = j.total ? j.text || "" : j.what ? [mins, j.text || ""].filter(Boolean).join(" · ") : mins ? j.text || "" : "";
         rows += `<div class="day-item link" data-edit="${j.id}">${j.cover ? `<img src="${esc(j.cover)}" alt="">` : ""}
           <div class="grow">${note ? richHtml(j.text, j.photos || [], "ph-row", "dn-text") : `<b>${esc(main)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}${j.photos?.length ? `<div class="ph-row" data-paths="${esc(j.photos.join("|"))}"></div>` : ""}`}</div>
           <button type="button" class="x" data-del="${j.id}" aria-label="지우기">✕</button></div>`;
@@ -1043,7 +1043,7 @@ function fillDay(day) {
     html += `<div class="day-actions">
         <button type="button" class="btn lime" data-act="scan">📷 책 스캔</button>
         <button type="button" class="btn ghost ic-btn" data-act="title" style="background:var(--soft)">${ico("search")} 책 검색</button>
-        ${c.hybrid ? `<button type="button" class="btn ghost" data-act="entry" style="background:var(--soft)">✏️ 직접 적기</button>` : c.book ? `<button type="button" class="btn ghost ic-btn" data-act="entry" style="background:var(--soft)">⏱ 읽은 시간 적기</button>` : ""}
+        ${c.hybrid ? `<button type="button" class="btn ghost" data-act="entry" style="background:var(--soft)">✏️ 직접 적기</button>` : c.book ? `<button type="button" class="btn ghost ic-btn" data-act="total" style="background:var(--soft)">⏱ 읽은 시간</button>` : ""}
       </div>`;
     html += ongoing.length ? `<small>읽고 있는 ${c.name} (누르면 이 날 읽은 쪽수를 기록해요)</small>` +
       ongoing.map((r) => `<div class="day-item link" data-more="${r.id}">
@@ -1112,6 +1112,7 @@ $("dayList").addEventListener("click", (e) => {
   else if (t.dataset.act === "isbn") openManual();
   else if (t.dataset.act === "title") openTitle();
   else if (t.dataset.act === "entry") { openDayKey = day; openEntry(dayPanel); }
+  else if (t.dataset.act === "total") { openDayKey = day; openEntry(dayPanel, journal.find((j) => j.day === day && j.cat === dayPanel && j.total) || null, true); }
   else if (t.dataset.more) openRecord({ existing: records.find((r) => r.id === t.dataset.more) });
   else if (t.dataset.view) openView(t.dataset.view);
 });
@@ -1132,9 +1133,10 @@ function maybeReturn() {
 let entryCat = null;
 // entry 가 있으면 그 기록 고치기
 let editEntry = null;
-function openEntry(cat, entry = null) {
-  const c = CAT[cat]; entryCat = cat; editEntry = entry;
-  $("eTitle").textContent = `${c.name}${c.book ? " 읽은 시간" : ""}${entry ? " 고치기" : ""} · ${prettyDay(entry?.day || openDayKey)}`;
+let entryTotal = false; // 한글책·영어책: 그날 전체 읽은 시간 (책 이름 없이 시간만)
+function openEntry(cat, entry = null, total = false) {
+  const c = CAT[cat]; entryCat = cat; editEntry = entry; entryTotal = !!(c.book && (total || entry?.total));
+  $("eTitle").textContent = `${c.name}${entryTotal ? " 전체 읽은 시간" : c.book ? " 읽은 시간" : ""}${entry ? " 고치기" : ""} · ${prettyDay(entry?.day || openDayKey)}`;
   // 수학: 문제집을 검색해서 고르면 표지가 함께 남아요
   eCover = entry?.cover || "";
   // 흘려듣기: 영화·TV를 검색해서 고르면 포스터가 함께 남아요
@@ -1144,6 +1146,7 @@ function openEntry(cat, entry = null) {
   paintECover();
   $("eWhatWrap").hidden = !c.what; $("eWhatLabel").textContent = c.what || ""; $("eWhat").placeholder = c.whatPh || ""; $("eWhat").value = "";
   $("eAmountWrap").hidden = !c.amount; $("eAmountLabel").textContent = (c.amount || "").replace("몇 분", "얼마나"); $("eUnit").textContent = c.unit || ""; $("eAmount").value = ""; $("eHour").value = "";
+  if (entryTotal) { $("eWhatWrap").hidden = true; $("eAmountLabel").textContent = `오늘 ${c.name}을 모두 얼마나 읽었나요?`; }
   $("eTextWrap").hidden = false; $("eTextLabel").textContent = c.text || "한 줄 메모 (선택)"; $("eText").placeholder = c.textPh || ""; $("eText").value = "";
   $("eText").rows = c.kind === "note" ? 9 : c.text ? 5 : 2;
   eRich.photos().forEach((p) => p.file && URL.revokeObjectURL(p.url));
@@ -1232,13 +1235,16 @@ $("entryDialog").addEventListener("close", async () => {
   const all = rich.items;
   const kept = all.filter((p) => p.path).map((p) => p.path);
   const picked = all.filter((p) => p.file);
+  const total = entryTotal; entryTotal = false;
+  if (total && !minutes) { toast("읽은 시간을 적어 주세요"); return; }
   if (!what && !text && !minutes && !all.length) { toast("내용을 적어 주세요"); return; }
   const entry = old || { id: crypto.randomUUID?.() || String(Date.now()), day: returnDay || localDay(), cat, ...(entryBook ? { book: entryBook } : {}) };
   if (old) {
     const removed = (old.photos || []).filter((p) => !kept.includes(p));
     if (removed.length) sync.deletePhotos(removed);
   }
-  Object.assign(entry, { what, minutes, text });
+  Object.assign(entry, { what: total ? "" : what, minutes, text });
+  if (total) entry.total = true;
   if (eCover && what) entry.cover = eCover; else delete entry.cover;
   if (kept.length) entry.photos = kept; else delete entry.photos;
   if (picked.length) {
