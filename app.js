@@ -282,7 +282,25 @@ let sheet = null; // { isbn, book, existing, fo }
 // 같은 책이라도 "읽은 기록"과 "집중듣기 기록"은 따로 둬요 (영어책은 듣고 나서 또 읽기도 하니까)
 const recsOf = (isbn) => { const all = isbn ? records.filter((r) => r.isbn === isbn) : []; return { read: all.find((r) => !isFo(r)) || null, fo: all.find(isFo) || null }; };
 const bookOfRec = (r) => (r ? { title: r.title, authors: r.authors ? [r.authors] : [], publisher: r.publisher, category: r.category, pages: r.totalPages, cover: r.cover, description: r.description } : null);
-async function openSheet(isbn, scanInfo) {
+// 교과서 수록도서에서 열 때(info): 기록하기 없이 책 소개 + 읽은 친구들 별점만
+function sheetMode(info) {
+  $("sSelf").hidden = $("sNote").hidden = $("sOk").hidden = $("sTiming").hidden = info;
+  $("sRates").hidden = !info; if (info) $("sRates").innerHTML = `<small>읽은 친구들의 별점을 불러오는 중…</small>`;
+}
+async function paintRates(isbn, title) {
+  let d = null;
+  try { d = await sync.bookRatings(isbn, title); } catch { d = null; }
+  if ($("sRates").hidden) return;
+  if (!d) { $("sRates").innerHTML = `<small>별점은 로그인하고 인터넷에 연결돼 있을 때 볼 수 있어요</small>`; return; }
+  const notes = (d.notes || []).map((x) => `<li><b>${esc(x.grade ? `${x.grade} 친구` : "친구")}</b>${x.score ? ` ${starsHtml(Number(x.score))}` : ""}<span>${esc(x.note)}</span></li>`).join("");
+  $("sRates").innerHTML = `<h4>이 책을 읽은 친구들</h4>` + (d.n
+    ? `<div class="sr-avg">${starsHtml(Number(d.avg))}<b>${Number(d.avg).toFixed(1)}</b><small>${d.n}명이 별점을 줬어요${d.readers > d.n ? ` · 읽은 친구 ${d.readers}명` : ""}</small></div>`
+    : `<p class="sr-none">${d.readers ? `읽은 친구 ${d.readers}명 · 아직 별점이 없어요` : "아직 이 책을 읽은 친구가 없어요"}</p>`) +
+    (notes ? `<ul class="sr-notes">${notes}</ul>` : "");
+}
+async function openSheet(isbn, scanInfo, opts = {}) {
+  sheetMode(!!opts.info);
+  if (opts.info) paintRates(isbn, opts.title);
   const { read: existing, fo: foRec } = recsOf(isbn);
   const ex0 = existing || foRec; // 화면에 보여 줄 내 기록
   sheet = { isbn, book: null, existing, fo: foRec };
@@ -309,6 +327,10 @@ async function openSheet(isbn, scanInfo) {
   $("sTiming").textContent = parts.join(" · ");
   $("sOk").disabled = false;
 
+  if (!book && !ex0 && opts.info) { // 교과서 목록: 목록의 제목·지은이로라도 보여 줌
+    $("sTitle").textContent = opts.title; $("sAuthor").textContent = `〈작가〉 ${opts.author || "모름"}`;
+    setImg($("sCover"), opts.cover); return;
+  }
   if (!book && !ex0) {
     $("sTitle").textContent = "책 정보를 찾지 못했어요";
     $("sAuthor").textContent = "셀프등록에서 제목을 적으면 다른 판의 표지와 쪽수를 찾아 줘요. 한 번 등록하면 다음부터는 누구나 바로 찾아요.";
@@ -3170,11 +3192,14 @@ $("tbList").addEventListener("click", async (e) => {
     } catch {}
     b.classList.remove("loading");
   }
-  $("tbPage").close();
-  if (isbn) { openSheet(isbn, null); return; } // 스캔한 것처럼 책 소개 → 기록하기
-  if (r) { openView(r.id); return; } // 기록한 책인데 소개를 못 찾으면 그 책 기록으로
-  openRecord({ self: true, book: { title: t, authors: [a] } }); // 못 찾으면 제목으로 바로 기록
-  $("rFind").click();
+  // 책 소개 + 읽은 친구들 별점 (기록하기는 없음). 목록 위에 겹쳐 열려서 닫으면 목록으로 돌아와요
+  const cover = r?.cover || TB_COVER[t + "|" + a] || "";
+  if (isbn) { openSheet(isbn, null, { info: true, title: t, author: a, cover }); return; }
+  sheet = { isbn: "", book: null, existing: null, fo: null }; sheetMode(true);
+  $("sCat").textContent = "교과서 수록도서"; $("sTitle").textContent = t; $("sAuthor").textContent = `〈작가〉 ${a}`;
+  $("sPages").textContent = ""; $("sDesc").textContent = "책 소개를 찾지 못했어요"; $("sMine").hidden = true;
+  setImg($("sCover"), cover); $("scanSheet").showModal();
+  paintRates("", t);
 });
 const tbHtml = (gs) => gs.length ? `<span class="tb-gs">${gs.map((g) => { const nm = g === "중" ? "중학교" : g === "고" ? "고등학교" : `초등 ${g}학년`; return `<i class="tb-g${g === "중" ? " m" : g === "고" ? " h" : ""}" title="${nm} 교과서 수록도서" aria-label="${nm} 교과서 수록">${g}</i>`; }).join("")}</span>` : "";
 

@@ -225,6 +225,14 @@ export async function fetchUser(id) {
 }
 
 // ---------- 함께 쓰는 책 목록 (바코드로 못 찾은 책을 회원이 등록) ----------
+// 이 책을 읽은 친구들의 별점·한 줄 독후감 (공개한 집 + 우리 집, 이름 대신 학년만)
+export async function bookRatings(isbn, title) {
+  if (!user) return null;
+  const c = await client();
+  const { data, error } = await c.rpc("book_ratings", { p_isbn: isbn || "", p_title: (title || "").slice(0, 200) });
+  if (error) throw error;
+  return data;
+}
 export async function sharedBook(isbn) {
   if (!user || !/^\d{13}$/.test(isbn || "")) return null;
   const c = await client();
