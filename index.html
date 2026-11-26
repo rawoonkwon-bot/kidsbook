@@ -256,8 +256,6 @@
         <p class="r-desc" id="rDesc"></p>
       </div>
 
-      <h3 class="mark">시작 전 확인</h3>
-
       <div class="field" id="rKidWrap" hidden>
         <span>누구 기록인가요?</span>
         <div class="seg r-kids" id="rKids" role="radiogroup" aria-label="자녀 고르기"></div>
@@ -305,10 +303,9 @@
           <button type="button" data-s="reading"><span data-ico="bookmark"></span><b id="stReadB">읽고 있는 책</b><small id="stReadS">지금 읽는 중</small></button>
           <button type="button" data-s="home" class="home"><span data-ico="home"></span><b>우리 집 책장</b><small>집에 있는 책</small></button>
         </div>
-        <p class="check-help">'우리 집 책장'은 따로 켜고 끌 수 있어요. 도서관에서 빌린 책은 꺼 두세요.</p>
       </div>
       <div class="field">
-        <span>평점 <small>별 반쪽도 돼요</small></span>
+        <span>평점</span>
         <div class="stars half" id="rStars" role="radiogroup" aria-label="평점"></div>
       </div>
       <div class="field" id="focusRow" hidden>
@@ -482,6 +479,7 @@
         <dt>내 생각</dt><dd id="vNote"></dd>
         <dt>분야</dt><dd><select id="vCat" aria-label="분야"></select></dd>
       </dl>
+      <div class="v-cheer" id="vCheer" hidden></div>
       <div class="row spread">
         <button class="btn danger" value="delete" formnovalidate>삭제</button>
         <button class="btn ghost" value="close">닫기</button>
@@ -748,12 +746,25 @@
     </div>
   </dialog>
 
+  <!-- 방명록 -->
+  <dialog id="gbPage" class="page">
+    <div class="page-in">
+      <div class="page-top"><button type="button" class="x-btn" id="gbClose" aria-label="닫기">✕</button></div>
+      <h2 class="page-title" id="gbHead">방명록</h2>
+      <form class="gb-form" id="gbForm">
+        <textarea id="gbIn" maxlength="300" rows="3" placeholder="따뜻한 인사를 남겨 주세요 (300자까지)"></textarea>
+        <div class="gb-fr"><label class="gb-sec-chk"><input type="checkbox" id="gbSecret" /> 🔒 비밀글 <small>(주인만 봐요)</small></label><button class="btn dark" id="gbSend">남기기</button></div>
+      </form>
+      <ul class="gb-list" id="gbList"></ul>
+    </div>
+  </dialog>
+
   <!-- 새 댓글 알림 -->
   <dialog id="alertPage" class="page">
     <div class="page-in">
       <div class="page-top"><button type="button" class="x-btn" id="alClose" aria-label="닫기">✕</button></div>
-      <h2 class="al-h">🔔 새 댓글</h2>
-      <p class="muted al-sub">내 글에 달린 댓글과 내 댓글에 달린 답글이에요 (최근 30일)</p>
+      <h2 class="al-h">🔔 새 소식</h2>
+      <p class="muted al-sub">댓글·답글·방명록·응원이에요 (최근 30일)</p>
       <ul class="al-list" id="alList"></ul>
     </div>
   </dialog>

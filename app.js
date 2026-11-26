@@ -15,6 +15,7 @@ const AUTH = await sync.boot();
 const PARAMS = new URLSearchParams(location.search);
 const PEEK_ID = AUTH.user && !AUTH.offline ? PARAMS.get("peek") : null;
 let PEEK = PEEK_ID ? await sync.fetchUser(PEEK_ID).catch(() => null) : null;
+let PEEK_UID = PEEK_ID || null; // 구경 중인 집 (책 응원을 보낼 곳)
 const mem = new Map();
 // 엄마 별명(게시판 작성자 이름): null = 아직 없음, undefined = 인터넷 문제로 모름
 let PROFILE;
@@ -794,6 +795,7 @@ function fillView(r) {
   $("vActivity").hidden = isFo(r) || !(r.done && !(r.bonusRounds || []).includes(rounds));
   $("vScore").innerHTML = r.score ? `${starsHtml(r.score)} ${r.score}점` : "주지 않았어요";
   $("vNote").textContent = r.note || "적지 않았어요";
+  paintCheer(r);
   $("vCat").value = BOOK_CATS.includes(r.category) ? r.category : "";
   $("vTotalRow").hidden = !!r.totalPages;
   $("vTotal").value = "";
@@ -1845,7 +1847,8 @@ for (const id of ["momResList", "momFound", "nbList"]) {
   $(id).addEventListener("click", (e) => { const b = e.target.closest("[data-u]"); if (b) openMom(b.dataset.u); });
 }
 // 앱을 다시 열지 않고 화면만 친구 책장으로 바꾸기 (구경하는 동안은 휴대폰에 아무것도 저장하지 않음)
-function enterPeek(data, kid) {
+function enterPeek(data, kid, uid = null) {
+  PEEK_UID = uid;
   fillMem(data, kid);
   PEEK = data; store = memStore;
   loadState();
@@ -1854,7 +1857,7 @@ function enterPeek(data, kid) {
 }
 function exitPeek() {
   if (PARAMS.get("peek")) { location.href = "/#stats"; return; } // 주소로 들어온 구경은 다시 열기
-  PEEK = null; store = localStore; mem.clear();
+  PEEK = null; PEEK_UID = null; store = localStore; mem.clear();
   loadState();
   document.body.classList.remove("peek"); $("peekBar").hidden = true;
   renderKids(); render(); go("stats");
@@ -2523,6 +2526,7 @@ function paintBlog(root, st) {
   root.innerHTML = `<div class="bl-wrap"><aside class="bl-side">
     <div class="bl-head">${avatar(st.nick, st.face, "av big")}<div class="grow"><h2>${esc(st.nick)}님의 블로그</h2><p>글 ${st.list.length}</p></div>
       ${st.me ? `<button type="button" class="follow-btn" data-act="write">✏️ 글쓰기</button>` : `<button type="button" class="follow-btn${nb ? " on" : ""}" data-act="follow">${nb ? "이웃 ✓" : "＋ 이웃 추가"}</button>`}</div>
+    <section class="gb-sec">${gbPreview(st)}</section>
     ${st.me ? "" : `<section><h3 class="sec-title">아이 책장</h3><div class="browse">${kl.length
       ? kl.map((k) => `<button type="button" class="kid" data-act="kid" data-k="${esc(k.id)}">${esc(k.nick)}${gradeOf(k) ? ` <small class="grade">${gradeOf(k)}</small>` : ""}</button>`).join("")
       : `<small class="muted">${st.data ? "아직 등록한 아이가 없어요." : "책장을 나만 보기로 해 둔 집이에요."}</small>`}</div></section>`}
@@ -2541,8 +2545,102 @@ function paintBlog(root, st) {
           <small>${!st.cat && catOf(st, b) !== NOCAT ? `${esc(st.cats.find((c) => c.id === b.cat).name)} · ` : ""}${ago(b.created_at)}${b.tags?.length ? ` · #${esc(b.tags[0])}` : ""} · ${b.is_public ? `조회 ${b.views || 0}` : "🔒 나만 보기"}</small></span></button></li>`).join("")}</ul>`}
     </section></div></div>`;
   fillTopicImgs(root);
+  if (!st.gb) loadGuest(st).then(() => { const s = root.querySelector(".gb-sec"); if (s) s.innerHTML = gbPreview(st); });
 }
 const blogTops = blogTopics;
+
+// ---------- 방명록: 블로그 옆에 최근 글 2개 + 전체보기 ----------
+async function loadGuest(st) {
+  try { st.gb = await sync.guestbook(st.uid); } catch { st.gb = st.gb || null; }
+  return st.gb;
+}
+function gbPreview(st) {
+  const top = (st.gb || []).filter((g) => !g.parent_id);
+  const head = `<div class="pop-head"><h3 class="sec-title">방명록 ${st.gb ? `<small class="muted">${top.length}</small>` : ""}</h3><button type="button" class="link-btn" data-act="guest">${st.me ? "전체보기 ›" : "✍️ 남기기"}</button></div>`;
+  if (!st.gb) return head + `<p class="muted bl-msg sm">불러오는 중…</p>`;
+  if (!top.length) return head + `<p class="muted bl-msg sm">${st.me ? "아직 방명록이 없어요. 이웃이 인사를 남기면 여기에 보여요." : "첫 인사를 남겨 보세요 😊"}</p>`;
+  return head + `<ul class="gb-mini">${top.slice(0, 2).map((g) => `<li><button type="button" data-act="guest">${avatar(g.nick, g.face, "av sm")}<span><b>${esc(g.nick)}</b>${g.secret ? " 🔒" : ""}<em>${esc(g.body.length > 50 ? g.body.slice(0, 50) + "…" : g.body)}</em></span></button></li>`).join("")}</ul>`;
+}
+let gbNow = null, gbReply = null;
+async function openGuest(st) {
+  gbNow = st; gbReply = null;
+  $("gbHead").textContent = st.me ? "내 방명록" : `${st.nick}님의 방명록`;
+  $("gbForm").hidden = !!st.me; $("gbIn").value = ""; $("gbSecret").checked = false;
+  paintGuest(); $("gbPage").showModal();
+  await loadGuest(st); if (gbNow === st) paintGuest();
+}
+function paintGuest() {
+  const st = gbNow; if (!st) return;
+  if (!st.gb) { $("gbList").innerHTML = `<li class="muted">불러오는 중…</li>`; return; }
+  const me = sync.myId(), all = st.gb, top = all.filter((g) => !g.parent_id);
+  const row = (g, sub) => `<li class="gb-item${sub ? " sub" : ""}">
+      <div class="gb-top">${avatar(g.nick, g.face, "av sm")}<b>${esc(g.nick)}</b>${g.secret ? `<span class="gb-lock">🔒 비밀글</span>` : ""}<small>${ago(g.created_at)}</small>
+        <span class="gb-acts">${!sub && st.me ? `<button type="button" class="link-btn" data-g="reply" data-id="${g.id}">답글</button>` : ""}${g.user_id === me || st.me ? `<button type="button" class="icon-btn" data-g="del" data-id="${g.id}" aria-label="지우기" title="지우기">${ico("trash")}</button>` : `<button type="button" class="icon-btn" data-g="flag" data-id="${g.id}" aria-label="신고" title="신고">${ico("flag")}</button>`}</span></div>
+      <p>${esc(g.body)}</p>
+      ${gbReply === g.id ? `<div class="gb-rbox"><input id="gbRIn" maxlength="300" placeholder="답글을 남겨요" /><button type="button" class="pill-btn" data-g="send" data-id="${g.id}">남기기</button></div>` : ""}</li>`;
+  $("gbList").innerHTML = top.length ? top.map((g) => row(g) + [...all].filter((x) => x.parent_id === g.id).reverse().map((x) => row(x, true)).join("")).join("")
+    : `<li class="muted">${st.me ? "아직 방명록이 없어요" : "첫 인사를 남겨 보세요 😊"}</li>`;
+  if (gbReply) setTimeout(() => $("gbRIn")?.focus(), 30);
+}
+$("gbClose").addEventListener("click", () => $("gbPage").close());
+$("gbPage").addEventListener("close", () => { if (gbNow) for (const r of [$("myBlog"), $("momBlog")]) { const s = r.querySelector(".gb-sec"); if (s && (gbNow === myBlog || gbNow === momNow)) s.innerHTML = gbPreview(gbNow); } });
+$("gbForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const body = $("gbIn").value.trim(); if (!body || !gbNow) return;
+  if (!sync.myNick()) { toast("방명록을 남기려면 엄마 별명을 먼저 정해 주세요"); openNick(false); return; }
+  $("gbSend").disabled = true;
+  try { await sync.addGuest(gbNow.uid, body, $("gbSecret").checked); $("gbIn").value = ""; $("gbSecret").checked = false; await loadGuest(gbNow); paintGuest(); toast("방명록을 남겼어요"); }
+  catch (err) { toast(/ban/i.test(String(err?.message)) ? BAN_MSG : "남기지 못했어요. 인터넷 연결을 확인해 주세요"); }
+  $("gbSend").disabled = false;
+});
+$("gbList").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-g]"); if (!b || !gbNow) return;
+  const { g, id } = b.dataset;
+  if (g === "reply") { gbReply = gbReply === id ? null : id; paintGuest(); }
+  else if (g === "send") {
+    const body = $("gbRIn").value.trim(); if (!body) return;
+    b.disabled = true;
+    try { await sync.addGuest(gbNow.uid, body, !!gbNow.gb.find((x) => x.id === id)?.secret, id); gbReply = null; await loadGuest(gbNow); paintGuest(); }
+    catch { toast("남기지 못했어요. 인터넷 연결을 확인해 주세요"); b.disabled = false; }
+  } else if (g === "del") {
+    if (!confirm("이 방명록 글을 지울까요?")) return;
+    try { await sync.deleteGuest(id); await loadGuest(gbNow); paintGuest(); } catch { toast("지우지 못했어요"); }
+  } else if (g === "flag") reportIt("guest", id);
+});
+
+// ---------- 👏 책 응원: 다른 집 아이 책 기록에 응원 보내기 / 내 책에 받은 응원 보기 ----------
+async function paintCheer(r) {
+  const box = $("vCheer"), me = sync.myId();
+  const owner = PEEK ? PEEK_UID : me;
+  box.hidden = !me || AUTH.offline || !owner; if (box.hidden) return;
+  box.innerHTML = `<small class="muted">응원을 불러오는 중…</small>`;
+  let list;
+  try { list = await sync.cheers(owner, r.id); } catch { box.innerHTML = `<small class="muted">응원은 인터넷에 연결돼 있을 때 볼 수 있어요</small>`; return; }
+  if (viewing !== r) return;
+  const msgs = list.filter((c) => c.body).slice(0, 5).map((c) => `<li><b>${esc(c.nick)}</b><span>${esc(c.body)}</span><small>${ago(c.created_at)}</small></li>`).join("");
+  if (PEEK) {
+    const mine = list.find((c) => c.user_id === me);
+    box.innerHTML = `<div class="ch-head"><b>👏 응원 ${list.length}</b></div>` + (mine
+      ? `<p class="ch-done">응원했어요 ✓${mine.body ? ` 「${esc(mine.body)}」` : ""} <button type="button" class="link-btn" data-c="undo" data-id="${mine.id}">취소</button></p>`
+      : `<div class="ch-form"><input id="chIn" maxlength="100" placeholder="한 줄 응원 (안 써도 돼요) 예: 멋지다! 나도 읽어 볼래" /><button type="button" class="btn lime" data-c="send">👏 응원하기</button></div>`) +
+      (msgs ? `<ul class="ch-list">${msgs}</ul>` : "");
+  } else {
+    box.innerHTML = `<div class="ch-head"><b>👏 받은 응원 ${list.length}</b></div>` + (list.length
+      ? (msgs ? `<ul class="ch-list">${msgs}</ul>` : `<p class="muted ch-none">${list.map((c) => esc(c.nick)).slice(0, 5).join(", ")}님이 응원했어요</p>`)
+      : `<p class="muted ch-none">아직 받은 응원이 없어요. 이웃이 책장을 구경하다 응원을 보낼 수 있어요.</p>`);
+  }
+}
+$("vCheer").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-c]"); if (!b || !viewing || !PEEK || !PEEK_UID) return;
+  const r = viewing;
+  if (b.dataset.c === "send" && !sync.myNick()) { toast("응원하려면 엄마 별명을 먼저 정해 주세요"); openNick(false); return; }
+  b.disabled = true;
+  try {
+    if (b.dataset.c === "send") { await sync.addCheer(PEEK_UID, r.kid, r.id, r.title, $("chIn").value.trim()); toast("👏 응원을 보냈어요!"); }
+    else await sync.deleteCheer(b.dataset.id);
+    paintCheer(r);
+  } catch { toast("보내지 못했어요. 인터넷 연결을 확인해 주세요"); b.disabled = false; }
+});
 async function renderMyBlog(force = false) {
   const root = $("myBlog");
   if (!AUTH.user || AUTH.offline) { root.innerHTML = `<p class="muted bl-msg">블로그는 인터넷에 연결돼 있을 때 볼 수 있어요.</p>`; return; }
@@ -2576,6 +2674,7 @@ async function blogAct(e, st, root) {
   else if (a === "view") { st.view = b.dataset.v; paintBlog(root, st); }
   else if (a === "cat") { st.cat = st.cat === b.dataset.c ? "" : b.dataset.c; paintBlog(root, st); }
   else if (a === "cats") openBcEdit();
+  else if (a === "guest") openGuest(st);
   else if (a === "topics") openGrid(st, { mode: "topic", type: b.dataset.t });
   else if (a === "tag") openGrid(st, { mode: "tag", tag: b.dataset.tag });
   else if (a === "kid") {
@@ -2583,7 +2682,7 @@ async function blogAct(e, st, root) {
     for (const id of ["topicsPage", "postView", "blogView", "momPage"]) if ($(id).open) $(id).close();
     momNow = null;
     if (!data) { toast("지금은 볼 수 없는 책장이에요 (나만 보기로 바뀌었을 수 있어요)", 3500); return; }
-    enterPeek(data, b.dataset.k);
+    enterPeek(data, b.dataset.k, st.uid);
   } else if (a === "follow") {
     const { uid, nick, face } = st, on = !follows.has(uid);
     if (!on && !confirm(`${nick}님을 이웃에서 뺄까요?`)) return;
@@ -3070,10 +3169,10 @@ $("bellBtn").addEventListener("click", async () => {
   $("alertPage").showModal();
   await checkAlerts();
   $("alList").innerHTML = alerts.map((a) => `<li><button type="button" class="al-row${Date.parse(a.created_at) > seen ? " new" : ""}" data-src="${a.src}" data-ref="${esc(a.ref)}">
-      <span class="al-ic">${a.src === "blog" ? "📝" : "💬"}</span>
-      <span class="al-tx"><span><b>${esc(a.nick || "(알 수 없음)")}</b> 님이 ${a.reply ? "내 댓글에 답글을" : `내 ${a.src === "blog" ? "블로그 글" : "글"}에 댓글을`} 남겼어요</span>
-        <small>「${esc(a.title)}」 · ${ago(a.created_at)}</small><em>${esc(a.body.length > 60 ? a.body.slice(0, 60) + "…" : a.body)}</em></span></button></li>`).join("")
-    || `<li class="muted">최근 30일 동안 새 댓글이 없어요</li>`;
+      <span class="al-ic">${{ blog: "📝", guest: "📖", cheer: "👏" }[a.src] || "💬"}</span>
+      <span class="al-tx"><span><b>${esc(a.nick || "(알 수 없음)")}</b> 님이 ${a.src === "guest" ? (a.reply ? "방명록에 답글을" : "내 방명록에 글을") : a.src === "cheer" ? "책 기록에 응원을" : a.reply ? "내 댓글에 답글을" : `내 ${a.src === "blog" ? "블로그 글" : "글"}에 댓글을`} ${a.src === "cheer" ? "보냈어요" : "남겼어요"}</span>
+        <small>${a.title ? `「${esc(a.title)}」 · ` : ""}${ago(a.created_at)}</small>${a.body ? `<em>${esc(a.body.length > 60 ? a.body.slice(0, 60) + "…" : a.body)}</em>` : ""}</span></button></li>`).join("")
+    || `<li class="muted">최근 30일 동안 새 소식이 없어요</li>`;
   localStorage.setItem(seenKey(), String(Date.now()));
   $("bellN").hidden = true;
 });
@@ -3081,7 +3180,13 @@ $("alClose").addEventListener("click", () => $("alertPage").close());
 $("alList").addEventListener("click", (e) => {
   const b = e.target.closest("[data-ref]"); if (!b) return;
   $("alertPage").close();
-  if (b.dataset.src === "blog") openBlogPost(b.dataset.ref); else openPost(b.dataset.ref);
+  const { src, ref } = b.dataset;
+  if (src === "blog") openBlogPost(ref);
+  else if (src === "guest") { // 내 방명록이면 내 것, 남의 방명록(내 글에 달린 답글)이면 그 집 것
+    if (ref === sync.myId()) { go("blog"); renderMyBlog().then(() => myBlog && openGuest(myBlog)); }
+    else loadBlog(ref).then((st) => openGuest(st)).catch(() => toast("불러오지 못했어요"));
+  } else if (src === "cheer") { go("home"); openView(ref); }
+  else openPost(ref);
 });
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") checkAlerts(); });
 setInterval(() => { if (document.visibilityState === "visible") checkAlerts(); }, 3 * 60 * 1000);
@@ -3205,7 +3310,7 @@ async function reportIt(kind, id) {
 }
 
 // ---------- 👑 회원 관리 (관리자만) ----------
-const KIND_KO = { post: "게시판 글", comment: "게시판 댓글", blog: "블로그 글", blog_comment: "블로그 댓글" };
+const KIND_KO = { post: "게시판 글", comment: "게시판 댓글", blog: "블로그 글", blog_comment: "블로그 댓글", guest: "방명록" };
 const DAY = 864e5;
 let admMembers = [], admSort = "recent", admUser = null;
 const maskEmail = (e) => String(e || "").replace(/^(.{1,3})[^@]*@.*$/, "$1…@…");
@@ -3264,7 +3369,9 @@ const wRow = (w, who, dismiss) => `<li class="w-row"><div><small>${KIND_KO[w.kin
   <span class="w-acts">${w.ref && w.author !== null ? `<button type="button" data-view="${w.kind}" data-ref="${esc(w.ref)}" title="보기" aria-label="보기">${ico("eye")}</button>` : ""}<button type="button" class="del" data-del="${w.kind}" data-id="${esc(w.id)}" title="지우기" aria-label="지우기">${ico("trash")}</button>${dismiss ? `<button type="button" class="ok" data-dis="${w.kind}" data-id="${esc(w.id)}" title="괜찮음 (신고만 정리)" aria-label="괜찮음">${ico("check")}</button>` : ""}</span></li>`;
 async function wAction(e, after) {
   const v = e.target.closest("[data-view]"), d = e.target.closest("[data-del]"), s = e.target.closest("[data-dis]");
-  if (v) { v.dataset.view.startsWith("blog") ? openBlogPost(v.dataset.ref) : openPost(v.dataset.ref); return; }
+  if (v) { const k = v.dataset.view, ref = v.dataset.ref;
+    if (k === "guest") loadBlog(ref).then((st) => openGuest(st)).catch(() => toast("불러오지 못했어요"));
+    else k.startsWith("blog") ? openBlogPost(ref) : openPost(ref); return; }
   if (d) {
     if (!confirm(`이 ${KIND_KO[d.dataset.del]}을(를) 지울까요?\n되돌릴 수 없어요.`)) return;
     try { await sync.adminDelete(d.dataset.del, d.dataset.id); toast("지웠어요"); boardLoaded = ""; after(); } catch { toast("지우지 못했어요"); }

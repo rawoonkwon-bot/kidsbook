@@ -1271,3 +1271,58 @@ body.peek #wsOpen { display: none; }
 .sr-notes li { font-size: 14px; line-height: 1.45; border-top: 1px solid var(--line); padding-top: 8px; }
 .sr-notes li b { font-size: 12px; color: var(--forest); }
 .sr-notes li span { display: block; margin-top: 2px; }
+
+/* 방명록 */
+.gb-sec { margin-bottom: 6px; }
+.gb-mini { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.gb-mini button { width: 100%; display: flex; gap: 8px; align-items: flex-start; border: 0; background: var(--card); box-shadow: var(--raise-s); border-radius: 14px; padding: 10px 12px; text-align: left; font: inherit; color: var(--ink); cursor: pointer; }
+.gb-mini b { font-size: 13px; }
+.gb-mini em { display: block; font-style: normal; font-size: 13px; color: var(--muted); margin-top: 2px; }
+.gb-form { margin: 6px 0 14px; }
+.gb-form textarea { width: 100%; box-sizing: border-box; border: 0; border-radius: 14px; background: var(--card); box-shadow: var(--inset); padding: 12px 14px; font: inherit; font-size: 15px; resize: vertical; }
+.gb-fr { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; gap: 8px; }
+.gb-sec-chk { font-size: 14px; display: inline-flex; align-items: center; gap: 5px; }
+.gb-sec-chk small { color: var(--muted); }
+.gb-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.gb-item { background: var(--card); box-shadow: var(--raise-s); border-radius: 16px; padding: 12px 14px; }
+.gb-item.sub { margin-left: 26px; background: var(--soft); box-shadow: none; }
+.gb-item.sub::before { content: "↳"; float: left; margin: 0 6px 0 -18px; color: var(--muted); }
+.gb-top { display: flex; align-items: center; gap: 7px; }
+.gb-top b { font-size: 14px; }
+.gb-top small { font-size: 12px; color: var(--muted); }
+.gb-lock { font-size: 11px; color: #8A3F14; background: #FFEBDD; border-radius: 999px; padding: 1px 7px; }
+.gb-acts { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; }
+.gb-acts .icon-btn { width: 30px; height: 30px; border: 0; background: transparent; color: var(--muted); display: grid; place-items: center; cursor: pointer; }
+.gb-acts .icon-btn .ico { width: 16px; height: 16px; }
+.gb-item p { margin: 6px 0 0; font-size: 15px; line-height: 1.5; white-space: pre-wrap; }
+.gb-rbox { display: flex; gap: 6px; margin-top: 8px; }
+.gb-rbox input { flex: 1; min-width: 0; border: 0; border-radius: 12px; background: var(--card); box-shadow: var(--inset); padding: 9px 12px; font: inherit; }
+/* 책 응원 */
+.v-cheer { margin: 14px 0 6px; padding: 14px; border-radius: 16px; background: #FFF6E5; }
+.ch-head b { font-size: 15px; }
+.ch-form { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.ch-form input { border: 0; border-radius: 12px; background: #fff; padding: 11px 12px; font: inherit; font-size: 14px; }
+.ch-done { margin: 8px 0 0; font-size: 14px; color: var(--forest); font-weight: 700; }
+.ch-none { margin: 6px 0 0; font-size: 13px; }
+.ch-list { list-style: none; padding: 0; margin: 10px 0 0; display: flex; flex-direction: column; gap: 6px; }
+.ch-list li { font-size: 14px; background: #fff; border-radius: 12px; padding: 8px 10px; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.ch-list b { font-size: 12px; color: #B95A26; }
+.ch-list small { margin-left: auto; font-size: 11px; color: var(--muted); }
+.av.sm { width: 26px; height: 26px; font-size: 12px; }
+
+/* 책 기록 화면: 한 화면에 간단히 (책 소개는 스캔 직후 창에서만 보여요) */
+#recordPage #rDescHead, #recordPage #rDesc { display: none !important; }
+#recordPage .r-card { padding: 12px; gap: 8px; }
+#recordPage .r-book { grid-template-columns: 72px 1fr; gap: 12px; align-items: center; }
+#recordPage .r-book img { width: 72px; }
+#recordPage .r-info h3 { font-size: 18px; margin: 0; }
+#recordPage .r-info p { font-size: 13px; margin: 2px 0 0; }
+#recordPage .page-in { gap: 14px; }
+#recordPage .field { gap: 6px; }
+#recordPage .date-say { font-size: 13px; margin: 0; }
+#recordPage .st-cards button { padding: 10px 6px 9px; }
+#recordPage .st-cards button .ico { width: 20px; height: 20px; margin-bottom: 2px; }
+#recordPage .st-cards small { display: none; }
+/* 별점: 버튼 안에서만 겹치게 (독후활동 화면 별이 커지던 오류) */
+.stars button { position: relative; }
+.stars .sb svg { width: 100%; height: 100%; display: block; }

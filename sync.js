@@ -526,6 +526,40 @@ export async function deleteBlogComment(id) {
   const { error } = await c.from("blog_comments").delete().eq("id", id);
   if (error) throw error;
 }
+// ---------- 방명록 (블로그마다 · 비밀글은 주인과 쓴 사람만) ----------
+export async function guestbook(owner) {
+  const c = await client();
+  const { data, error } = await c.from("guestbook").select("id, owner, parent_id, body, secret, created_at, user_id, profiles(nick, face)").eq("owner", owner).order("created_at", { ascending: false }).limit(200);
+  if (error) throw error;
+  return (data || []).map((x) => ({ ...x, nick: x.profiles?.nick || "(알 수 없음)", face: x.profiles?.face || null }));
+}
+export async function addGuest(owner, body, secret = false, parentId = null) {
+  const c = await client();
+  const { error } = await c.from("guestbook").insert({ owner, body, secret, parent_id: parentId });
+  if (error) throw error;
+}
+export async function deleteGuest(id) {
+  const c = await client();
+  const { error } = await c.from("guestbook").delete().eq("id", id);
+  if (error) throw error;
+}
+// ---------- 책 응원 (다른 집 아이 책 기록에 👏 + 짧은 한 줄) ----------
+export async function cheers(owner, recId) {
+  const c = await client();
+  const { data, error } = await c.from("book_cheers").select("id, body, created_at, user_id, profiles(nick, face)").eq("owner", owner).eq("rec_id", recId).order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data || []).map((x) => ({ ...x, nick: x.profiles?.nick || "(알 수 없음)" }));
+}
+export async function addCheer(owner, kid, recId, title, body) {
+  const c = await client();
+  const { error } = await c.from("book_cheers").upsert({ owner, kid, rec_id: recId, title: (title || "").slice(0, 200), body: (body || "").slice(0, 100), user_id: user.id }, { onConflict: "owner,rec_id,user_id" });
+  if (error) throw error;
+}
+export async function deleteCheer(id) {
+  const c = await client();
+  const { error } = await c.from("book_cheers").delete().eq("id", id);
+  if (error) throw error;
+}
 // 내 글에 달린 새 댓글 · 내 댓글에 달린 답글
 export async function myAlerts(since) {
   const c = await client();
