@@ -883,6 +883,9 @@ function decorate(c) {
     const listen = c.key === "listen" || c.key === "focus";
     Object.assign(d, { what: listen ? "무엇을 들었나요?" : "무엇을 했나요?", whatPh: PH[c.key] || "예: 오늘 한 것", amount: "얼마나 했나요?", unit: "분" });
   }
+  // 한글책·영어책·흘려듣기: 그날 전체 시간은 포트폴리오 제목 줄에서 바로 적음 (흘려듣기 창에는 시간 칸 없음)
+  if (c.kind === "book" || c.key === "listen") d.tot = true;
+  if (c.key === "listen") d.amount = null;
   if (c.kind === "note") Object.assign(d, { text: c.key === "memo" ? "메모 · 일기" : c.key === "secret" ? "🔒 나만 보는 비밀 메모" : "내용", textPh: c.key === "secret" ? "여기 쓴 글과 사진은 나만 볼 수 있어요. 친구들은 책장을 구경해도 못 봐요." : "오늘 있었던 일, 느낀 점, 칭찬할 점을 일기처럼 자유롭게 적어요" });
   return d;
 }
@@ -925,7 +928,7 @@ const booksOn = (day, shelf) => records.flatMap((r) =>
 const journalOn = (day, cat) => journal.filter((j) => j.day === day && j.cat === cat);
 // 책 기록이 있는 날, 그 책에 따로 적은 읽은 시간 → 책 줄에 합쳐 보여 줌
 const mergedTime = (day, c, j) => !!(c.book && j.book && j.minutes && booksOn(day, c.key).some(({ r }) => r.id === j.book));
-const countOn = (day, c) => (c.book || c.hybrid ? booksOn(day, c.key).length : 0) + journalOn(day, c.key).filter((j) => !mergedTime(day, c, j)).length;
+const countOn = (day, c) => (c.book || c.hybrid ? booksOn(day, c.key).length : 0) + journalOn(day, c.key).filter((j) => !mergedTime(day, c, j) && !(c.tot && j.total)).length;
 const catsOn = (day) => CATS.filter((c) => countOn(day, c));
 
 let calYM = localDay().slice(0, 7);
@@ -1009,7 +1012,7 @@ $("calNext").addEventListener("click", () => { const [y, m] = calYM.split("-").m
 $("calGrid").addEventListener("click", (e) => { const b = e.target.closest("button[data-day]"); if (b && !b.disabled) { selDay = b.dataset.day; renderCalendar(); } });
 
 // 그날 기록: 카테고리마다 한 블록
-function dayGroupsHtml(day) {
+function dayGroupsHtml(day, sheet = false) { // sheet: "이 날 기록 더하기" 창 (기록이 없어도 시간 줄을 보여 줌)
   let html = "";
   for (const c of CATS) {
     let rows = "", n = 0;
@@ -1027,7 +1030,7 @@ function dayGroupsHtml(day) {
     {
       for (const j of journalOn(day, c.key)) {
         if (mergedTime(day, c, j)) continue; // 위 책 줄에 이미 보임
-        if (c.book && j.total) continue; // 그날 전체 읽은 시간은 제목 줄에
+        if (c.tot && j.total) continue; // 그날 전체 시간은 제목 줄에
         n++;
         // 박스 제목에 종류 이름·아이콘이 있으니, 기록에는 내용만
         const mins = j.minutes ? fmtMin(j.minutes) : "";
@@ -1039,11 +1042,11 @@ function dayGroupsHtml(day) {
           <button type="button" class="x" data-del="${j.id}" aria-label="지우기">✕</button></div>`;
       }
     }
-    if (c.book) { // 한글책·영어책: 제목 줄에서 그날 전체 읽은 시간을 바로 적기 (책 기록이 없는 날도 칸은 보여요)
+    if (c.tot) { // 한글책·영어책·흘려듣기: 제목 줄에서 그날 전체 시간을 바로 적기 (기록이 없는 날도 칸은 보여요)
       const m = journalOn(day, c.key).find((j) => j.total)?.minutes || 0;
-      const tot = PEEK ? (m ? `<span class="dg-tot ro">⏱ ${fmtMin(m)}</span>` : "")
-        : `<span class="dg-tot" data-tot="${c.key}" data-day="${day}">⏱<input type="number" class="tot-h" inputmode="numeric" min="0" max="23" placeholder="0" value="${m >= 60 ? Math.floor(m / 60) : ""}" aria-label="${esc(c.name)} 읽은 시간(시간)"><i>시간</i><input type="number" class="tot-m" inputmode="numeric" min="0" max="59" placeholder="0" value="${m % 60 || ""}" aria-label="${esc(c.name)} 읽은 시간(분)"><i>분</i></span>`;
-      if (n || tot) html += `<section class="day-group"><h4 class="dg-head" style="color:${c.color}">${c.svg}<b>${esc(c.name)}</b>${tot}${n ? `<small>${n}</small>` : ""}</h4>${rows}</section>`;
+      const tot = PEEK ? (m ? `<span class="dg-tot ro">${ico("clock")} ${fmtMin(m)}</span>` : "")
+        : `<span class="dg-tot" data-tot="${c.key}" data-day="${day}">${ico("clock")}<input type="number" class="tot-h" inputmode="numeric" min="0" max="23" placeholder="0" value="${m >= 60 ? Math.floor(m / 60) : ""}" aria-label="${esc(c.name)} 시간(시간)"><i>시간</i><input type="number" class="tot-m" inputmode="numeric" min="0" max="59" placeholder="0" value="${m % 60 || ""}" aria-label="${esc(c.name)} 시간(분)"><i>분</i></span>`;
+      if (n || m || (sheet && tot)) html += `<section class="day-group"><h4 class="dg-head" style="color:${c.color}">${c.svg}<b>${esc(c.name)}</b>${tot}${n ? `<small>${n}</small>` : ""}</h4>${rows}</section>`;
       continue;
     }
     if (n) html += `<section class="day-group"><h4 class="dg-head" style="color:${c.color}">${c.svg}<b>${esc(c.name)}</b><small>${n}</small></h4>${rows}</section>`;
@@ -1082,7 +1085,7 @@ function fillDay(day) {
         <div class="grow"><b>${esc(r.title)}</b><small>${progressText(r) || "아직 쪽수 기록 없음"}</small></div><span>➕</span></div>`).join("")
       : `<small>읽고 있는 ${c.name} 책이 없어요. 책 스캔으로 새 책을 기록해 보세요.</small>`;
   } else {
-    html = dayGroupsHtml(day);
+    html = dayGroupsHtml(day, true);
     if (!html) html = `<small style="text-align:center">아직 이 날의 기록이 없어요. 위 카테고리를 눌러 기록해 보세요.</small>`;
   }
   $("dayList").innerHTML = html;
@@ -1199,6 +1202,7 @@ function openEntry(cat, entry = null, total = false) {
   paintPhotos();
   $("dayDialog").close("away"); returnDay = openDayKey || returnDay;
   $("entryDialog").showModal();
+  requestAnimationFrame(() => eRich.fit());
 }
 // 일기 사진: 최대 10장, 올리기 전에 작게 줄임(긴 쪽 1280px)
 const MAX_PHOTOS = 10; // 한 글에 사진 최대 장수
@@ -1263,7 +1267,8 @@ $("entryDialog").addEventListener("close", async () => {
   const old = editEntry; editEntry = null;
   const isNote = CAT[cat].kind === "note";
   const rich = isNote ? eRich.get() : { body: "", items: [] };
-  const what = $("eWhat").value.trim(), text = isNote ? rich.body : $("eText").value.trim(), minutes = ((parseInt($("eHour").value, 10) || 0) * 60 + (parseInt($("eAmount").value, 10) || 0)) || null;
+  const what = $("eWhat").value.trim(), text = isNote ? rich.body : $("eText").value.trim(), minutes = !CAT[cat].amount && !entryTotal ? (old?.minutes || null) // 시간 칸이 없는 창(흘려듣기): 예전에 적은 시간은 그대로 둠
+    : ((parseInt($("eHour").value, 10) || 0) * 60 + (parseInt($("eAmount").value, 10) || 0)) || null;
   const all = rich.items;
   const kept = all.filter((p) => p.path).map((p) => p.path);
   const picked = all.filter((p) => p.file);
@@ -1315,11 +1320,16 @@ function renderStats() {
   const readMins = readRecs().reduce((a, r) => a + minsOf(r), 0) + journal.filter((j) => (j.cat === "ko" || j.cat === "en") && j.minutes).reduce((a, j) => a + j.minutes, 0);
   const focusMins = records.filter(isFo).reduce((a, r) => a + minsOf(r), 0) + journal.filter((j) => j.cat === "focus").reduce((a, j) => a + (j.minutes || 0), 0);
   const recDays = new Set([...records.flatMap((r) => r.sessions.map((s) => s.day)), ...journal.map((j) => j.day)]).size;
+  // 영어 시간: 흘려듣기 + 집중듣기 + 영어책
+  const jMins = (k) => journal.filter((j) => j.cat === k && j.minutes).reduce((a, j) => a + j.minutes, 0);
+  const engMins = jMins("listen") + focusMins + jMins("en") + records.filter((r) => !isFo(r) && shelfOf(r) === "en").reduce((a, r) => a + minsOf(r), 0);
+  // 기록이 0인 칸은 보이지 않게
   $("statTiles").innerHTML = [
     ["읽은 책", readRecs().length, "권"], ["기록한 날", recDays, "일"],
-    ["읽은 쪽수", pages.toLocaleString(), "쪽"], ["독서 포인트", totalPoints().toLocaleString(), "점"],
-    ["책 읽은 시간", readMins ? fmtMin(readMins) : "-", ""], ["집중듣기 시간", fmtMin(focusMins), ""],
-  ].map(([k, v, u]) => `<div class="tile"><small>${k}</small><b>${v}<em>${u}</em></b></div>`).join("");
+    ["읽은 쪽수", pages ? pages.toLocaleString() : 0, "쪽"], ["독서 포인트", totalPoints().toLocaleString(), "점"],
+    ["책 읽은 시간", readMins && fmtMin(readMins), ""], ["집중듣기 시간", focusMins && fmtMin(focusMins), ""],
+    ["영어 시간", engMins && fmtMin(engMins), "", "흘려듣기·집중듣기·영어책"],
+  ].filter(([, v]) => v && v !== "0").map(([k, v, u, sub]) => `<div class="tile"><small>${k}</small><b>${v}<em>${u}</em></b>${sub ? `<small class="tile-sub">${sub}</small>` : ""}</div>`).join("");
 
   // 한글책 / 영어책 / 집중듣기
   const groups = Object.keys(SHELVES).map((k) => {
@@ -1333,7 +1343,7 @@ function renderStats() {
       ${groups.filter((g) => g.n).map((g) => `<i style="width:${(g.n / sum) * 100}%;background:${g.color}" title="${shelfName(g.k)} ${g.n}권"></i>`).join("")}
     </div>
     <div class="split-legend">
-      ${groups.map((g) => `<span><i style="background:${g.color}"></i>${shelfName(g.k)} <b>${g.n}권</b> <em>${g.k === "focus" ? fmtMin(g.m) : g.p.toLocaleString() + "쪽" + (g.m ? ` · ${fmtMin(g.m)}` : "")}</em></span>`).join("")}
+      ${groups.filter((g) => g.n || g.m).map((g) => `<span><i style="background:${g.color}"></i>${shelfName(g.k)} <b>${g.n}권</b> <em>${g.k === "focus" ? fmtMin(g.m) : g.p.toLocaleString() + "쪽" + (g.m ? ` · ${fmtMin(g.m)}` : "")}</em></span>`).join("")}
     </div>` : `<p class="empty">아직 기록이 없어요</p>`;
 
   // 분야별
@@ -1391,12 +1401,13 @@ function renderMath() {
 
 // ---------- 소식: 읽은 시간 그래프 (이번 주 = 요일별 / 한 달 = 주별, 세로는 시간) ----------
 let timeRange = "w";
-const TKIND = [["ko", "한글책", "#2F5D3A"], ["en", "영어책", "#6F9F97"], ["fo", "집중듣기", "#C89B3C"]];
+const TKIND = [["ko", "한글책", "#2F5D3A"], ["en", "영어책", "#6F9F97"], ["fo", "집중듣기", "#C89B3C"], ["li", "흘려듣기", "#E8915B"]];
+const TK = TKIND.map(([k]) => k), ENG = ["en", "fo", "li"]; // 영어 = 영어책 + 집중듣기 + 흘려듣기
 function minutesByDay() { // { "2026-11-25": { ko, en, fo } }
   const m = {};
-  const add = (day, k, v) => { if (!v) return; (m[day] ||= { ko: 0, en: 0, fo: 0 })[k] += v; };
+  const add = (day, k, v) => { if (!v) return; (m[day] ||= { ko: 0, en: 0, fo: 0, li: 0 })[k] += v; };
   for (const r of records) { const k = isFo(r) ? "fo" : shelfOf(r) === "en" ? "en" : "ko"; for (const s of r.sessions) add(s.day, k, s.minutes || 0); }
-  for (const j of journal) { const k = j.cat === "focus" ? "fo" : j.cat === "ko" || j.cat === "en" ? j.cat : null; if (k) add(j.day, k, j.minutes || 0); }
+  for (const j of journal) { const k = j.cat === "focus" ? "fo" : j.cat === "listen" ? "li" : j.cat === "ko" || j.cat === "en" ? j.cat : null; if (k) add(j.day, k, j.minutes || 0); }
   return m;
 }
 function renderTimeChart() {
@@ -1412,9 +1423,12 @@ function renderTimeChart() {
       cols.push({ label: `${w}주`, days, title: `${mo + 1}월 ${s}~${Math.min(last, s + 6)}일`, future: days[0] > today });
     }
   }
-  for (const c of cols) { c.v = { ko: 0, en: 0, fo: 0 }; for (const d of c.days) if (md[d]) for (const k of ["ko", "en", "fo"]) c.v[k] += md[d][k]; c.t = c.v.ko + c.v.en + c.v.fo; }
-  const tot = { ko: 0, en: 0, fo: 0 }; for (const c of cols) for (const k in tot) tot[k] += c.v[k];
-  $("timeTotals").innerHTML = TKIND.map(([k, n, col]) => `<div><small><i style="background:${col}"></i>${n}</small><b>${tot[k] ? fmtMin(tot[k]) : "-"}</b></div>`).join("");
+  for (const c of cols) { c.v = Object.fromEntries(TK.map((k) => [k, 0])); for (const d of c.days) if (md[d]) for (const k of TK) c.v[k] += md[d][k]; c.t = TK.reduce((a, k) => a + c.v[k], 0); }
+  const tot = Object.fromEntries(TK.map((k) => [k, 0])); for (const c of cols) for (const k in tot) tot[k] += c.v[k];
+  // 기록이 0인 항목은 빼고, 영어(영어책·집중듣기·흘려듣기)는 합쳐서 한 칸 더
+  const eng = ENG.reduce((a, k) => a + tot[k], 0);
+  $("timeTotals").innerHTML = TKIND.filter(([k]) => tot[k]).map(([k, n, col]) => `<div><small><i style="background:${col}"></i>${n}</small><b>${fmtMin(tot[k])}</b></div>`).join("") +
+    (eng ? `<div class="tt-eng"><small>영어 모두</small><b>${fmtMin(eng)}</b></div>` : "");
   // 세로축: 시간 단위 (가장 긴 막대를 넉넉히 담는 정수 시간)
   const maxH = Math.max(1, Math.ceil(Math.max(0, ...cols.map((c) => c.t)) / 60));
   const step = maxH <= 4 ? 1 : maxH <= 8 ? 2 : Math.ceil(maxH / 4);
@@ -1424,7 +1438,7 @@ function renderTimeChart() {
     <div class="tc-plot">${ticks.map((h) => `<i class="tc-g" style="bottom:${(h / top) * 100}%"></i>`).join("")}
     <div class="tc-cols" style="grid-template-columns:repeat(${cols.length},1fr)">${cols.map((c, i) => `<button type="button" class="tc-col${c.future ? " fut" : ""}" data-i="${i}" aria-label="${c.title} ${fmtMin(c.t)}">
       <span class="tc-stack" style="height:${(c.t / 60 / top) * 100}%">${TKIND.map(([k, , col]) => (c.v[k] ? `<em style="flex:${c.v[k]};background:${col}"></em>` : "")).join("")}</span><small>${c.label}</small></button>`).join("")}</div></div>`;
-  const all = tot.ko + tot.en + tot.fo;
+  const all = TK.reduce((a, k) => a + tot[k], 0);
   $("timeInfo").textContent = all ? `${timeRange === "w" ? "이번 주" : `${now.getMonth() + 1}월`} 모두 ${fmtMin(all)} · 막대를 누르면 자세히 보여요` : "아직 적은 시간이 없어요. 포트폴리오나 책 기록 보기에서 읽은 시간을 적어 보세요.";
   $("timeChart").onclick = (e) => {
     const b = e.target.closest(".tc-col"); if (!b) return;
@@ -2327,6 +2341,7 @@ function openWrite(p = null) {
   topicTo = "peTopic"; wTopic = p?.topic?.title ? { ...p.topic } : null;
   paintWTopic();
   $("postEdit").showModal();
+  requestAnimationFrame(() => pRich.fit()); setTimeout(() => pRich.fit(), 300);
 }
 $("bWrite").addEventListener("click", () => openWrite());
 $("peBoard").addEventListener("click", (e) => { const b = e.target.closest("[data-b]"); if (b) [...$("peBoard").children].forEach((x) => x.setAttribute("aria-checked", String(x === b))); });

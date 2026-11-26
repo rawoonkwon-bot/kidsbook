@@ -30,7 +30,8 @@ export function richHtml(body, photos = [], rowCls = "ph-row", textCls = "rt-p")
 // 편집기: root 안에 글칸(textarea)과 사진을 번갈아 둠
 export function makeRich(root, { placeholder = "", max = 10, onChange = () => {} } = {}) {
   let last = null, lastPos = 0;
-  const grow = (ta) => { ta.style.height = "auto"; ta.style.height = ta.scrollHeight + "px"; };
+  // 글칸 높이 맞추기. 창이 숨어 있을 때는 높이를 잴 수 없어서 건너뜀 (0으로 줄어들어 글이 잘려 보이던 문제)
+  const grow = (ta) => { if (!ta.getClientRects().length) return; ta.style.height = "auto"; ta.style.height = ta.scrollHeight + "px"; };
   const textBox = (v = "") => {
     const ta = document.createElement("textarea");
     ta.className = "rt-ta"; ta.rows = 1; ta.value = v; ta.maxLength = 20000;
@@ -116,7 +117,9 @@ export function makeRich(root, { placeholder = "", max = 10, onChange = () => {}
   let lastW = 0;
   new ResizeObserver(() => { const w = root.clientWidth; if (!w) { lastW = 0; return; } if (w !== lastW) { lastW = w; blocks().filter((b) => b.tagName === "TEXTAREA").forEach(grow); } }).observe(root);
   set("");
-  return { set, get, insert, photos, refresh, focus, clear: () => set("") };
+  // 창을 연 뒤 다시 맞춤 (고치기로 열 때 본문 전체가 보이게)
+  const fit = () => blocks().filter((b) => b.tagName === "TEXTAREA").forEach(grow);
+  return { set, get, insert, photos, refresh, focus, fit, clear: () => set("") };
 }
 
 // ---------- 블로그용: 글씨 크기·색까지 되는 편집기 (contenteditable) ----------

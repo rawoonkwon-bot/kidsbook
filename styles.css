@@ -1048,7 +1048,7 @@ body.peek #wsOpen { display: none; }
 .rt { padding: 6px 12px 12px; min-height: 220px; display: flex; flex-direction: column; }
 #eRich { min-height: 180px; }
 .rt-ta { border: 0 !important; background: transparent !important; box-shadow: none !important; padding: 6px 0 !important; margin: 0; resize: none; overflow: hidden; min-height: 34px; font-size: 16px; line-height: 1.7; width: 100%; outline: none; }
-.rt > .rt-ta:last-child { flex: 1; min-height: 80px; }
+.rt > .rt-ta:last-child { flex: 1 0 auto; min-height: 80px; } /* 1 1 0 이면 글이 길어도 칸이 줄어 글이 잘려 보임 */
 .rt-ph { position: relative; margin: 4px 0; }
 .rt-ph img { display: block; width: 100%; max-height: 70vh; object-fit: contain; border-radius: 12px; background: var(--soft); min-height: 80px; }
 .rt-x { position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; border-radius: 50%; border: 0; background: rgba(20, 22, 26, .6); color: #fff; font-size: 13px; cursor: pointer; }
@@ -1352,8 +1352,12 @@ body.peek #wsOpen { display: none; }
 .s-snu p { font-size: 13px; color: var(--muted); margin: 10px 0 0; line-height: 1.5; }
 /* 한글책·영어책 제목 줄: 그날 전체 읽은 시간 바로 적기 */
 .dg-tot { display: inline-flex; align-items: center; gap: 3px; margin-left: 8px; font-size: 13px; color: var(--muted); font-weight: 600; }
-.dg-tot input { width: 38px; font: inherit; font-size: 14px; color: var(--ink); text-align: center; padding: 4px 2px; border: 1px solid var(--line, #ddd); border-radius: 8px; background: #fff; -moz-appearance: textfield; }
+.dg-tot input { width: 38px; font: inherit; font-size: 14px; font-weight: 400; color: var(--ink); text-align: center; padding: 4px 2px; border: 1px solid var(--line, #ddd); border-radius: 8px; background: #fff; -moz-appearance: textfield; }
 .dg-tot input::-webkit-outer-spin-button, .dg-tot input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .dg-tot i { font-style: normal; font-size: 10.5px; font-weight: 500; margin: 0 2px 0 1px; }
 .dg-tot button { border: 0; border-radius: 999px; background: var(--forest); color: #F3EFE6; font: inherit; font-size: 12px; font-weight: 700; padding: 5px 10px; margin-left: 3px; cursor: pointer; }
 .dg-tot.ro { color: var(--forest); }
+.dg-tot .ico { width: 15px; height: 15px; margin-right: 2px; }
+.tchips3 .tt-eng { background: #E8F0EE; }
+.tchips3 .tt-eng small { color: #3E6D66; font-weight: 700; }
+.tile .tile-sub { font-size: 11px; font-weight: 500; margin-top: 2px; }
