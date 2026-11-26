@@ -965,8 +965,31 @@ function renderDayInline() {
   fillPhotoRows($("diList"));
 }
 $("diAdd").addEventListener("click", () => openDay(selDay));
+// 한글책·영어책 제목 줄의 "그날 전체 읽은 시간": 칸에서 나가면 자동 저장 (하루 1개, 비우면 지움)
+function saveTotal(box) {
+  if (PEEK) return;
+  const cat = box.dataset.tot, day = box.dataset.day;
+  const minutes = (parseInt(box.querySelector(".tot-h").value, 10) || 0) * 60 + (parseInt(box.querySelector(".tot-m").value, 10) || 0);
+  const old = journal.find((j) => j.day === day && j.cat === cat && j.total);
+  if ((old?.minutes || 0) === minutes) return; // 바뀐 게 없으면 그대로
+  if (!minutes) { journal = journal.filter((j) => j !== old); toast(`${CAT[cat].name} 읽은 시간을 지웠어요`); }
+  else {
+    if (old) old.minutes = minutes;
+    else journal.push({ id: crypto.randomUUID?.() || String(Date.now()), day, cat, what: "", minutes, text: "", total: true });
+    toast(`✓ ${CAT[cat].name} ${fmtMin(minutes)} 저장했어요`);
+  }
+  saveJournal(); render(); if (openDayKey && $("dayDialog").open) fillDay(openDayKey);
+}
+// 시간 칸 → 분 칸으로 옮길 때는 저장하지 않고, 두 칸 밖으로 나가면 저장
+document.addEventListener("focusout", (e) => {
+  const box = e.target.closest?.("[data-tot]"); if (!box) return;
+  if (e.relatedTarget && box.contains(e.relatedTarget)) return;
+  setTimeout(() => saveTotal(box), 0);
+});
+document.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.closest?.("[data-tot] input")) { e.preventDefault(); e.target.blur(); } });
 $("diList").addEventListener("click", (e) => {
   if (e.target.closest(".ph-thumb")) return;
+  if (e.target.closest("[data-tot]")) return;
   const t = e.target.closest("[data-view],[data-del],[data-edit]"); if (!t) return;
   if (t.dataset.view) { openView(t.dataset.view); return; }
   if (PEEK) return; // 구경 중에는 보기만
@@ -1004,6 +1027,7 @@ function dayGroupsHtml(day) {
     {
       for (const j of journalOn(day, c.key)) {
         if (mergedTime(day, c, j)) continue; // 위 책 줄에 이미 보임
+        if (c.book && j.total) continue; // 그날 전체 읽은 시간은 제목 줄에
         n++;
         // 박스 제목에 종류 이름·아이콘이 있으니, 기록에는 내용만
         const mins = j.minutes ? fmtMin(j.minutes) : "";
@@ -1014,6 +1038,13 @@ function dayGroupsHtml(day) {
           <div class="grow">${note ? richHtml(j.text, j.photos || [], "ph-row", "dn-text") : `<b>${esc(main)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}${j.photos?.length ? `<div class="ph-row" data-paths="${esc(j.photos.join("|"))}"></div>` : ""}`}</div>
           <button type="button" class="x" data-del="${j.id}" aria-label="지우기">✕</button></div>`;
       }
+    }
+    if (c.book) { // 한글책·영어책: 제목 줄에서 그날 전체 읽은 시간을 바로 적기 (책 기록이 없는 날도 칸은 보여요)
+      const m = journalOn(day, c.key).find((j) => j.total)?.minutes || 0;
+      const tot = PEEK ? (m ? `<span class="dg-tot ro">⏱ ${fmtMin(m)}</span>` : "")
+        : `<span class="dg-tot" data-tot="${c.key}" data-day="${day}">⏱<input type="number" class="tot-h" inputmode="numeric" min="0" max="23" placeholder="0" value="${m >= 60 ? Math.floor(m / 60) : ""}" aria-label="${esc(c.name)} 읽은 시간(시간)"><i>시간</i><input type="number" class="tot-m" inputmode="numeric" min="0" max="59" placeholder="0" value="${m % 60 || ""}" aria-label="${esc(c.name)} 읽은 시간(분)"><i>분</i></span>`;
+      if (n || tot) html += `<section class="day-group"><h4 class="dg-head" style="color:${c.color}">${c.svg}<b>${esc(c.name)}</b>${tot}${n ? `<small>${n}</small>` : ""}</h4>${rows}</section>`;
+      continue;
     }
     if (n) html += `<section class="day-group"><h4 class="dg-head" style="color:${c.color}">${c.svg}<b>${esc(c.name)}</b><small>${n}</small></h4>${rows}</section>`;
   }
@@ -1043,7 +1074,7 @@ function fillDay(day) {
     html += `<div class="day-actions">
         <button type="button" class="btn lime" data-act="scan">📷 책 스캔</button>
         <button type="button" class="btn ghost ic-btn" data-act="title" style="background:var(--soft)">${ico("search")} 책 검색</button>
-        ${c.hybrid ? `<button type="button" class="btn ghost" data-act="entry" style="background:var(--soft)">✏️ 직접 적기</button>` : c.book ? `<button type="button" class="btn ghost ic-btn" data-act="total" style="background:var(--soft)">⏱ 읽은 시간</button>` : ""}
+        ${c.hybrid ? `<button type="button" class="btn ghost" data-act="entry" style="background:var(--soft)">✏️ 직접 적기</button>` : ""}
       </div>`;
     html += ongoing.length ? `<small>읽고 있는 ${c.name} (누르면 이 날 읽은 쪽수를 기록해요)</small>` +
       ongoing.map((r) => `<div class="day-item link" data-more="${r.id}">
@@ -1091,6 +1122,7 @@ $("dayCats").addEventListener("click", (e) => {
 });
 $("dayList").addEventListener("click", (e) => {
   if (e.target.closest(".ph-thumb")) return; // 사진은 크게 보기
+  if (e.target.closest("[data-tot]")) return;
   const t = e.target.closest("[data-act],[data-more],[data-view],[data-del],[data-edit]"); if (!t) return;
   const day = openDayKey;
   if (t.dataset.edit) {

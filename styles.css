@@ -1350,3 +1350,10 @@ body.peek #wsOpen { display: none; }
 .s-snu .sn-g b { display: block; font-size: 17px; }
 .s-snu .sn-g small { font-size: 11.5px; color: var(--muted); }
 .s-snu p { font-size: 13px; color: var(--muted); margin: 10px 0 0; line-height: 1.5; }
+/* 한글책·영어책 제목 줄: 그날 전체 읽은 시간 바로 적기 */
+.dg-tot { display: inline-flex; align-items: center; gap: 3px; margin-left: 8px; font-size: 13px; color: var(--muted); font-weight: 600; }
+.dg-tot input { width: 38px; font: inherit; font-size: 14px; color: var(--ink); text-align: center; padding: 4px 2px; border: 1px solid var(--line, #ddd); border-radius: 8px; background: #fff; -moz-appearance: textfield; }
+.dg-tot input::-webkit-outer-spin-button, .dg-tot input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.dg-tot i { font-style: normal; font-size: 10.5px; font-weight: 500; margin: 0 2px 0 1px; }
+.dg-tot button { border: 0; border-radius: 999px; background: var(--forest); color: #F3EFE6; font: inherit; font-size: 12px; font-weight: 700; padding: 5px 10px; margin-left: 3px; cursor: pointer; }
+.dg-tot.ro { color: var(--forest); }
