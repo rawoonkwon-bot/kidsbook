@@ -571,6 +571,15 @@ export async function deleteCheer(id) {
   if (error) throw error;
 }
 // 내 글에 달린 새 댓글 · 내 댓글에 달린 답글
+// 알림을 마지막으로 본 때 (휴대폰에서 보면 컴퓨터에서도 N이 꺼지게 계정에 저장)
+export async function alertSeen() {
+  const c = await client();
+  const { data } = await c.from("profiles").select("alert_seen").eq("user_id", user.id).maybeSingle();
+  return data?.alert_seen ? Date.parse(data.alert_seen) : 0;
+}
+export async function markAlertSeen(t = Date.now()) {
+  try { const c = await client(); await c.from("profiles").update({ alert_seen: new Date(t).toISOString() }).eq("user_id", user.id); } catch { /* 다음에 */ }
+}
 export async function myAlerts(since) {
   const c = await client();
   const { data, error } = await c.rpc("my_alerts", { since: new Date(since).toISOString() });

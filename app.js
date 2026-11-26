@@ -3245,22 +3245,26 @@ async function checkAlerts() {
   $("bellBtn").hidden = !sync.myId();
   if (!sync.myId()) return;
   try {
-    alerts = await sync.myAlerts(Date.now() - 30 * 864e5);
-    const seen = Number(localStorage.getItem(seenKey()) || 0);
+    const [list, srv] = await Promise.all([sync.myAlerts(Date.now() - 30 * 864e5), sync.alertSeen().catch(() => 0)]);
+    alerts = list;
+    // 다른 기기(휴대폰·컴퓨터)에서 이미 봤으면 여기서도 본 것으로
+    const seen = Math.max(Number(localStorage.getItem(seenKey()) || 0), srv);
+    localStorage.setItem(seenKey(), String(seen));
     $("bellN").hidden = !alerts.some((a) => Date.parse(a.created_at) > seen);
   } catch { /* 조용히 넘어가요 */ }
 }
 $("bellBtn").addEventListener("click", async () => {
-  const seen = Number(localStorage.getItem(seenKey()) || 0);
   $("alList").innerHTML = `<li class="muted">불러오는 중…</li>`;
   $("alertPage").showModal();
   await checkAlerts();
+  const seen = Number(localStorage.getItem(seenKey()) || 0);
   $("alList").innerHTML = alerts.map((a) => `<li><button type="button" class="al-row${Date.parse(a.created_at) > seen ? " new" : ""}" data-src="${a.src}" data-ref="${esc(a.ref)}">
       <span class="al-ic">${{ blog: "📝", guest: "📖", cheer: "👏", rcmt: "🗨️" }[a.src] || "💬"}</span>
       <span class="al-tx"><span><b>${esc(a.nick || "(알 수 없음)")}</b> 님이 ${a.src === "guest" ? (a.reply ? "방명록에 답글을" : "내 방명록에 글을") : a.src === "cheer" ? "책 기록에 응원을" : a.src === "rcmt" ? (a.reply ? "같이 댓글 단 기록에 댓글을" : "내 기록에 댓글을") : a.reply ? "내 댓글에 답글을" : `내 ${a.src === "blog" ? "블로그 글" : "글"}에 댓글을`} ${a.src === "cheer" ? "보냈어요" : "남겼어요"}</span>
         <small>${a.title ? `「${esc(a.title)}」 · ` : ""}${ago(a.created_at)}</small>${a.body ? `<em>${esc(a.body.length > 60 ? a.body.slice(0, 60) + "…" : a.body)}</em>` : ""}</span></button></li>`).join("")
     || `<li class="muted">최근 30일 동안 새 소식이 없어요</li>`;
-  localStorage.setItem(seenKey(), String(Date.now()));
+  const now = Date.now();
+  localStorage.setItem(seenKey(), String(now)); sync.markAlertSeen(now);
   $("bellN").hidden = true;
 });
 $("alClose").addEventListener("click", () => $("alertPage").close());
