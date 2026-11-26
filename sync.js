@@ -333,13 +333,13 @@ export async function getPost(id) {
   const c = await client();
   const [{ data: post, error }, { data: comments }, { data: mine }] = await Promise.all([
     c.from("posts").select("id, board, title, body, photos, pinned, views, topic, created_at, updated_at, user_id, profiles(nick, face), likes(count)").eq("id", id).maybeSingle(),
-    c.from("comments").select("id, parent_id, body, created_at, user_id, profiles(nick)").eq("post_id", id).order("created_at"),
+    c.from("comments").select("id, parent_id, body, created_at, user_id, profiles(nick, face)").eq("post_id", id).order("created_at"),
     c.from("likes").select("post_id").eq("post_id", id).eq("user_id", user.id).maybeSingle(),
   ]);
   if (error) throw error;
   if (!post) return null;
   return { ...post, nick: post.profiles?.nick || "(알 수 없음)", face: post.profiles?.face || null, nLikes: cnt(post.likes), liked: !!mine,
-    comments: (comments || []).map((x) => ({ ...x, nick: x.profiles?.nick || "(알 수 없음)" })) };
+    comments: (comments || []).map((x) => ({ ...x, nick: x.profiles?.nick || "(알 수 없음)", face: x.profiles?.face || null })) };
 }
 export async function savePost({ id, board, title, body, photos, topic = null }) {
   const c = await client();
@@ -481,7 +481,17 @@ export async function getBlog(id) {
   const c = await client();
   const { data, error } = await c.from("blogs").select(BLOG_COLS + ", profiles(nick, face)").eq("id", id).maybeSingle();
   if (error) throw error;
-  return data ? { ...data, nick: data.profiles?.nick || "(알 수 없음)", face: data.profiles?.face || null } : null;
+  if (!data) return null;
+  const [{ count }, { data: mine }] = await Promise.all([
+    c.from("blog_likes").select("blog_id", { count: "exact", head: true }).eq("blog_id", id),
+    c.from("blog_likes").select("blog_id").eq("blog_id", id).eq("user_id", user.id).maybeSingle(),
+  ]).catch(() => [{ count: 0 }, { data: null }]);
+  return { ...data, nick: data.profiles?.nick || "(알 수 없음)", face: data.profiles?.face || null, nLikes: count || 0, liked: !!mine };
+}
+export async function likeBlog(id, on) {
+  const c = await client();
+  const { error } = on ? await c.from("blog_likes").insert({ blog_id: id, user_id: user.id }) : await c.from("blog_likes").delete().eq("blog_id", id).eq("user_id", user.id);
+  if (error && error.code !== "23505") throw error;
 }
 export async function saveBlog({ id, title, body, photos, topic = null, tags = [], cat = null, is_public = true }) {
   const c = await client();
@@ -512,9 +522,9 @@ export async function bumpBlogView(id) {
 // ---------- 블로그 댓글 · 알림 ----------
 export async function blogComments(blogId) {
   const c = await client();
-  const { data, error } = await c.from("blog_comments").select("id, parent_id, body, created_at, user_id, profiles(nick)").eq("blog_id", blogId).order("created_at");
+  const { data, error } = await c.from("blog_comments").select("id, parent_id, body, created_at, user_id, profiles(nick, face)").eq("blog_id", blogId).order("created_at");
   if (error) throw error;
-  return (data || []).map((x) => ({ ...x, nick: x.profiles?.nick || "(알 수 없음)" }));
+  return (data || []).map((x) => ({ ...x, nick: x.profiles?.nick || "(알 수 없음)", face: x.profiles?.face || null }));
 }
 export async function addBlogComment(blogId, body, parentId = null) {
   const c = await client();
@@ -605,3 +615,62 @@ export const adminDismiss = (k, tid) => rpc("admin_dismiss", { k, tid });
 export const adminDeleteAll = (uid) => rpc("admin_delete_all", { uid });
 export const adminSetBan = (uid, on_) => rpc("admin_set_ban", { uid, on_ });
 export const isBanErr = (e) => /banned/.test(e?.message || "");
+
+// ---------- 엄마 얼굴 사진 (작게 줄여서 avatars 버킷의 내 폴더에) ----------
+export async function uploadAvatar(blob) {
+  const c = await client();
+  const path = `${user.id}/${Date.now()}.jpg`;
+  const { error } = await c.storage.from("avatars").upload(path, blob, { contentType: "image/jpeg", upsert: false });
+  if (error) throw error;
+  // 예전 사진은 지움 (남아도 문제는 없음)
+  try {
+    const { data: old } = await c.storage.from("avatars").list(user.id);
+    const gone = (old || []).map((x) => `${user.id}/${x.name}`).filter((x) => x !== path);
+    if (gone.length) await c.storage.from("avatars").remove(gone);
+  } catch { /* 다음에 */ }
+  return c.storage.from("avatars").getPublicUrl(path).data.publicUrl;
+}
+export async function removeAvatar() {
+  try {
+    const c = await client();
+    const { data: old } = await c.storage.from("avatars").list(user.id);
+    if (old?.length) await c.storage.from("avatars").remove(old.map((x) => `${user.id}/${x.name}`));
+  } catch { /* 다음에 */ }
+}
+
+// ---------- 기록(책·흘려듣기·메모…) 하나하나의 하트 · 댓글 ----------
+export async function recReacts(owner, ids) {
+  const out = new Map(ids.map((id) => [id, { n: 0, mine: false, c: 0 }]));
+  if (!ids.length) return out;
+  const c = await client();
+  const [{ data: ls, error }, { data: cs }] = await Promise.all([
+    c.from("rec_likes").select("rec_id, user_id").eq("owner", owner).in("rec_id", ids),
+    c.from("rec_comments").select("rec_id").eq("owner", owner).in("rec_id", ids),
+  ]);
+  if (error) throw error;
+  for (const l of ls || []) { const o = out.get(l.rec_id); if (o) { o.n++; if (l.user_id === user?.id) o.mine = true; } }
+  for (const x of cs || []) { const o = out.get(x.rec_id); if (o) o.c++; }
+  return out;
+}
+export async function likeRec(owner, recId, on) {
+  const c = await client();
+  const { error } = on ? await c.from("rec_likes").insert({ owner, rec_id: recId, user_id: user.id })
+    : await c.from("rec_likes").delete().eq("owner", owner).eq("rec_id", recId).eq("user_id", user.id);
+  if (error && error.code !== "23505") throw error;
+}
+export async function recComments(owner, recId) {
+  const c = await client();
+  const { data, error } = await c.from("rec_comments").select("id, body, created_at, user_id, profiles!rec_comments_user_id_fkey(nick, face)").eq("owner", owner).eq("rec_id", recId).order("created_at");
+  if (error) throw error;
+  return (data || []).map((x) => ({ ...x, nick: x.profiles?.nick || "(알 수 없음)", face: x.profiles?.face || null }));
+}
+export async function addRecComment(owner, recId, title, body) {
+  const c = await client();
+  const { error } = await c.from("rec_comments").insert({ owner, rec_id: recId, title: (title || "").slice(0, 200), body: body.slice(0, 300), user_id: user.id });
+  if (error) throw error;
+}
+export async function deleteRecComment(id) {
+  const c = await client();
+  const { error } = await c.from("rec_comments").delete().eq("id", id);
+  if (error) throw error;
+}

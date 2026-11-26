@@ -962,10 +962,10 @@ let selDay = localDay();
 function renderDayInline() {
   if (selDay > localDay()) selDay = localDay();
   const html = dayGroupsHtml(selDay);
-  const n = (html.match(/class="day-item/g) || []).length;
-  $("diTitle").innerHTML = `${prettyDay(selDay)}${n ? ` <small>· 기록 ${n}개</small>` : ""}`;
+  $("diTitle").textContent = prettyDay(selDay);
   $("diList").innerHTML = html || `<p class="di-empty">이 날은 아직 기록이 없어요</p>`;
   fillPhotoRows($("diList"));
+  fillReacts($("diList"));
 }
 $("diAdd").addEventListener("click", () => openDay(selDay));
 // 한글책·영어책 제목 줄의 "그날 전체 읽은 시간": 칸에서 나가면 자동 저장 (하루 1개, 비우면 지움)
@@ -992,6 +992,7 @@ document.addEventListener("focusout", (e) => {
 document.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.closest?.("[data-tot] input")) { e.preventDefault(); e.target.blur(); } });
 $("diList").addEventListener("click", (e) => {
   if (e.target.closest(".ph-thumb")) return;
+  const rxb = e.target.closest(".rx button"); if (rxb) { rxClick(rxb); return; }
   if (e.target.closest("[data-tot]")) return;
   const t = e.target.closest("[data-view],[data-del],[data-edit]"); if (!t) return;
   if (t.dataset.view) { openView(t.dataset.view); return; }
@@ -1024,7 +1025,7 @@ function dayGroupsHtml(day, sheet = false) { // sheet: "이 날 기록 더하기
         const chips = tj.map((j) => `<button type="button" class="t-chip" data-edit="${j.id}" aria-label="읽은 시간 고치기">⏱ ${fmtMin(j.minutes)}</button>`).join("");
         rows += `<div class="day-item link" data-view="${r.id}">
           ${r.cover ? `<img src="${esc(r.cover)}" alt="">` : `<span class="noc"></span>`}
-          <div class="grow"><b>${esc(r.title)}</b><small>${sessionText(s)}${chips}</small></div></div>`;
+          <div class="grow"><b>${esc(r.title)}</b><small>${sessionText(s)}${chips}</small>${sheet ? "" : rxSlot(r.id, r.title)}</div></div>`;
       }
     }
     {
@@ -1038,7 +1039,7 @@ function dayGroupsHtml(day, sheet = false) { // sheet: "이 날 기록 더하기
         const main = j.total ? `⏱ 전체 읽은 시간 ${mins}` : j.what || mins || c.name;
         const sub = j.total ? j.text || "" : j.what ? [mins, j.text || ""].filter(Boolean).join(" · ") : mins ? j.text || "" : "";
         rows += `<div class="day-item link" data-edit="${j.id}">${j.cover ? `<img src="${esc(j.cover)}" alt="">` : ""}
-          <div class="grow">${note ? richHtml(j.text, j.photos || [], "ph-row", "dn-text") : `<b>${esc(main)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}${j.photos?.length ? `<div class="ph-row" data-paths="${esc(j.photos.join("|"))}"></div>` : ""}`}</div>
+          <div class="grow">${note ? richHtml(j.text, j.photos || [], "ph-row", "dn-text") : `<b>${esc(main)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}${j.photos?.length ? `<div class="ph-row" data-paths="${esc(j.photos.join("|"))}"></div>` : ""}`}${sheet || c.key === "secret" ? "" : rxSlot(j.id, j.what || c.name)}</div>
           <button type="button" class="x" data-del="${j.id}" aria-label="지우기">✕</button></div>`;
       }
     }
@@ -1786,7 +1787,11 @@ function prefetchPeek(u) {
   return peekCache.get(u);
 }
 // 엄마 얼굴 (안 고른 사람은 별명 첫 글자)
+const AV_RE = /^https:\/\/[a-z0-9]+\.supabase\.co\/storage\/v1\/object\/public\/avatars\/[0-9A-Za-z-]+\/[0-9A-Za-z_.-]+$/;
+const facePhoto = (face) => (face && typeof face.p === "string" && AV_RE.test(face.p) ? face.p : "");
 function avatar(nick, face, cls = "av") {
+  const ph = facePhoto(face);
+  if (ph) return `<span class="${cls} av-ph"><img src="${esc(ph)}" alt="" loading="lazy"></span>`;
   if (validFace(face)) return `<span class="${cls}">${faceSvg(face)}</span>`;
   const n = String(nick || "?");
   const i = [...n].reduce((a, ch) => a + ch.codePointAt(0), 0) % FACE_COLORS.length;
@@ -1900,8 +1905,9 @@ for (const id of ["momResList", "momFound", "nbList"]) {
   $(id).addEventListener("click", (e) => { const b = e.target.closest("[data-u]"); if (b) openMom(b.dataset.u); });
 }
 // 앱을 다시 열지 않고 화면만 친구 책장으로 바꾸기 (구경하는 동안은 휴대폰에 아무것도 저장하지 않음)
-function enterPeek(data, kid, uid = null) {
+function enterPeek(data, kid, uid = null, who = null) {
   PEEK_UID = uid;
+  $("peekWho").innerHTML = who?.nick ? `${avatar(who.nick, who.face, "av xs")}<b>${esc(who.nick)}</b>님 책장 구경 중 · 보기만 할 수 있어요` : "👀 다른 집 책장 구경 중 · 보기만 할 수 있어요";
   fillMem(data, kid);
   PEEK = data; store = memStore;
   loadState();
@@ -2143,12 +2149,34 @@ document.querySelectorAll("[data-ico]").forEach((el) => { el.innerHTML = ico(el.
 // ---------- 엄마 별명 ----------
 let nickFirst = false, nFace = { f: 0, c: 0 };
 function paintFacePick() {
-  $("nFaceNow").innerHTML = faceSvg(nFace);
-  $("nFaces").innerHTML = Array.from({ length: FACE_COUNT }, (_, i) => `<button type="button" class="${i === nFace.f ? "on" : ""}" data-f="${i}" aria-label="표정 ${i + 1}">${faceSvg({ f: i, c: nFace.c })}</button>`).join("");
-  $("nCols").innerHTML = FACE_COLORS.map((x, i) => `<button type="button" class="${i === nFace.c ? "on" : ""}" data-c="${i}" style="background:${x}" aria-label="색 ${i + 1}"></button>`).join("");
+  $("nFaceNow").innerHTML = nFace.p ? `<img src="${esc(nFace.p)}" alt="내 사진">` : faceSvg(nFace);
+  $("nFaceNow").classList.toggle("ph", !!nFace.p);
+  $("nPhotoDel").hidden = !nFace.p; $("nPhotoBtn").setAttribute("aria-label", nFace.p ? "사진 바꾸기" : "사진 올리기");
+  $("nFaces").innerHTML = Array.from({ length: FACE_COUNT }, (_, i) => `<button type="button" class="${i === nFace.f && !nFace.p ? "on" : ""}" data-f="${i}" aria-label="표정 ${i + 1}">${faceSvg({ f: i, c: nFace.c })}</button>`).join("");
+  $("nCols").innerHTML = FACE_COLORS.map((x, i) => `<button type="button" class="${i === nFace.c && !nFace.p ? "on" : ""}" data-c="${i}" style="background:${x}" aria-label="색 ${i + 1}"></button>`).join("");
 }
-$("nFaces").addEventListener("click", (e) => { const b = e.target.closest("[data-f]"); if (b) { nFace.f = Number(b.dataset.f); paintFacePick(); } });
-$("nCols").addEventListener("click", (e) => { const b = e.target.closest("[data-c]"); if (b) { nFace.c = Number(b.dataset.c); paintFacePick(); } });
+$("nFaces").addEventListener("click", (e) => { const b = e.target.closest("[data-f]"); if (b) { nFace.f = Number(b.dataset.f); delete nFace.p; paintFacePick(); } });
+// 사진: 가운데를 정사각형으로 잘라 작게 줄여서 올림
+async function squareJpeg(file, size = 240) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = no; i.src = url; });
+    const s = Math.min(img.naturalWidth, img.naturalHeight), cv = document.createElement("canvas");
+    cv.width = cv.height = size;
+    cv.getContext("2d").drawImage(img, (img.naturalWidth - s) / 2, (img.naturalHeight - s) / 2, s, s, 0, 0, size, size);
+    return await new Promise((ok) => cv.toBlob(ok, "image/jpeg", 0.85));
+  } finally { URL.revokeObjectURL(url); }
+}
+$("nPhotoBtn").addEventListener("click", () => { if (!AUTH.user || AUTH.offline) { toast("사진은 인터넷에 연결돼 있을 때 올릴 수 있어요"); return; } $("nPhotoFile").click(); });
+$("nPhotoFile").addEventListener("change", async () => {
+  const f = $("nPhotoFile").files[0]; $("nPhotoFile").value = ""; if (!f) return;
+  $("nPhotoBtn").disabled = true; $("nPhotoBtn").classList.add("busy");
+  try { const blob = await squareJpeg(f); nFace.p = await sync.uploadAvatar(blob); }
+  catch { toast("사진을 올리지 못했어요. 다른 사진으로 해 보세요"); }
+  $("nPhotoBtn").disabled = false; $("nPhotoBtn").classList.remove("busy"); paintFacePick();
+});
+$("nPhotoDel").addEventListener("click", () => { delete nFace.p; paintFacePick(); });
+$("nCols").addEventListener("click", (e) => { const b = e.target.closest("[data-c]"); if (b) { nFace.c = Number(b.dataset.c); delete nFace.p; paintFacePick(); } });
 function openNick(first = false) {
   nickFirst = first;
   $("nTitle").textContent = first ? "엄마 별명을 정해 주세요" : "엄마 별명 바꾸기";
@@ -2166,7 +2194,9 @@ $("nSave").addEventListener("click", async () => {
   if (!/^[0-9A-Za-z가-힣_]{2,12}$/.test(v)) { $("nErr").textContent = "한글·영어·숫자로 2~12자, 띄어쓰기 없이 적어 주세요"; return; }
   $("nSave").disabled = true; $("nErr").textContent = "";
   try {
-    await sync.setNick(v, { f: nFace.f, c: nFace.c });
+    const hadPhoto = !!facePhoto(sync.myFace());
+    await sync.setNick(v, { f: nFace.f, c: nFace.c, ...(nFace.p ? { p: nFace.p } : {}) });
+    if (hadPhoto && !nFace.p) sync.removeAvatar();
     $("nickDialog").close("saved");
     toast(`반가워요, ${v}님!`);
     if (nickFirst && !kids.length) openKids(true);
@@ -2212,7 +2242,7 @@ $("postList").addEventListener("click", (e) => { const b = e.target.closest("[da
 async function openPost(id) {
   if (!$("postView").open) $("postView").showModal();
   $("pTitle").textContent = "불러오는 중…"; $("pMeta").textContent = ""; $("pBody").textContent = "";
-  $("pComments").innerHTML = ""; $("pActions").innerHTML = ""; $("pLike").hidden = true; $("pBoard").textContent = "";
+  $("pComments").innerHTML = ""; $("pActions").innerHTML = ""; $("pRx").hidden = true; $("pBoard").textContent = "";
   try {
     const p = await sync.getPost(id);
     if (!p) { $("postView").close(); toast("지워진 글이에요"); renderBoard(true); return; }
@@ -2237,9 +2267,8 @@ function paintPost() {
   fillTopicImgs($("pTopic"));
   $("pBody").innerHTML = richHtml(p.body, p.photos || [], "ph-row inl"); // 사진은 글 사이에 (예전 글은 맨 아래)
   fillPhotoRows($("pBody"));
-  $("pLike").hidden = false;
-  $("pLike").classList.toggle("on", p.liked);
-  $("pLike").innerHTML = `${ico("heart")} 좋아요 ${p.nLikes || ""}`;
+  $("pRx").hidden = false;
+  paintRx($("pLike"), $("pCmtGo"), p.nLikes, p.liked, p.comments.length);
   $("pActions").innerHTML = [
     adm ? actBtn("pin", "pin", p.pinned ? "공지 풀기" : "공지로 고정", p.pinned) : "",
     mine ? actBtn("edit", "pencil", "고치기") : "",
@@ -2254,7 +2283,7 @@ function paintPost() {
 function cmtTree(list, canDel, canReport = true) {
   const ids = new Set(list.map((c) => c.id));
   const top = list.filter((c) => !c.parent_id || !ids.has(c.parent_id));
-  const row = (c, root) => `<li${root !== c.id ? ` class="re"` : ""}><div>${root !== c.id ? `<span class="re-mark">↳</span>` : ""}<b>${esc(c.nick)}</b><small>${ago(c.created_at)}</small>
+  const row = (c, root) => `<li${root !== c.id ? ` class="re"` : ""}><div>${root !== c.id ? `<span class="re-mark">↳</span>` : ""}${avatar(c.nick, c.face, "av xs")}<b>${esc(c.nick)}</b><small>${ago(c.created_at)}</small>
       ${sync.myId() ? `<button type="button" class="re-btn" data-r="${root}" data-n="${esc(c.nick)}">답글</button>` : ""}${canDel(c) ? `<button type="button" class="x" data-c="${c.id}" aria-label="댓글 지우기">✕</button>` : canReport && sync.myId() ? `<button type="button" class="rp-btn" data-rp="${c.id}">신고</button>` : ""}</div><p>${esc(c.body)}</p></li>`;
   return top.map((c) => row(c, c.id) + list.filter((r) => r.parent_id === c.id).map((r) => row(r, c.id)).join("")).join("")
     || `<li class="muted">첫 댓글을 남겨 보세요</li>`;
@@ -2271,6 +2300,7 @@ function setReTo(k, x) {
 for (const k of ["p", "bv"]) $(k + "ReTo").addEventListener("click", (e) => { if (e.target.closest("[data-cancel]")) setReTo(k, null); });
 $("pClose").addEventListener("click", () => $("postView").close());
 $("postView").addEventListener("close", () => { if (!boardLoaded) renderBoard(); }); // 댓글·좋아요 수 새로 고침
+$("pCmtGo").addEventListener("click", () => { $("pCIn").scrollIntoView({ block: "center", behavior: "smooth" }); setTimeout(() => $("pCIn").focus(), 250); });
 $("pLike").addEventListener("click", async () => {
   const p = postNow; if (!p) return;
   const on = !p.liked;
@@ -2736,7 +2766,7 @@ async function blogAct(e, st, root) {
     for (const id of ["topicsPage", "postView", "blogView", "momPage"]) if ($(id).open) $(id).close();
     momNow = null;
     if (!data) { toast("지금은 볼 수 없는 책장이에요 (나만 보기로 바뀌었을 수 있어요)", 3500); return; }
-    enterPeek(data, b.dataset.k, st.uid);
+    enterPeek(data, b.dataset.k, st.uid, st);
   } else if (a === "follow") {
     const { uid, nick, face } = st, on = !follows.has(uid);
     if (!on && !confirm(`${nick}님을 이웃에서 뺄까요?`)) return;
@@ -2874,6 +2904,8 @@ function paintBlogPost() {
   $("bvActions").innerHTML = [mine ? actBtn("edit", "pencil", "고치기") : "", mine || sync.amAdmin() ? actBtn("del", "trash", "지우기") : "", !mine && !sync.amAdmin() && sync.myId() ? actBtn("report", "flag", "신고") : ""].join("");
   // 댓글은 공개 글에만
   $("bvCmtWrap").hidden = !b.is_public;
+  $("bvRx").hidden = !b.is_public || !sync.myId();
+  paintRx($("bvLike"), $("bvCmtGo"), b.nLikes, b.liked, b.nCmts);
   $("bvComments").innerHTML = ""; $("bvCnt").textContent = ""; setReTo("bv", null);
   if (b.is_public) loadBlogCmts();
 }
@@ -2884,6 +2916,7 @@ async function loadBlogCmts() {
     if (blogNow?.id !== b.id) return;
     const me = sync.myId(), owner = b.user_id === me, adm = sync.amAdmin();
     $("bvCnt").textContent = list.length || "";
+    b.nCmts = list.length; paintRx($("bvLike"), $("bvCmtGo"), b.nLikes, b.liked, b.nCmts);
     $("bvComments").innerHTML = cmtTree(list, (c) => c.user_id === me || owner || adm, !adm);
   } catch { $("bvComments").innerHTML = `<li class="muted">댓글을 불러오지 못했어요</li>`; }
 }
@@ -3223,8 +3256,8 @@ $("bellBtn").addEventListener("click", async () => {
   $("alertPage").showModal();
   await checkAlerts();
   $("alList").innerHTML = alerts.map((a) => `<li><button type="button" class="al-row${Date.parse(a.created_at) > seen ? " new" : ""}" data-src="${a.src}" data-ref="${esc(a.ref)}">
-      <span class="al-ic">${{ blog: "📝", guest: "📖", cheer: "👏" }[a.src] || "💬"}</span>
-      <span class="al-tx"><span><b>${esc(a.nick || "(알 수 없음)")}</b> 님이 ${a.src === "guest" ? (a.reply ? "방명록에 답글을" : "내 방명록에 글을") : a.src === "cheer" ? "책 기록에 응원을" : a.reply ? "내 댓글에 답글을" : `내 ${a.src === "blog" ? "블로그 글" : "글"}에 댓글을`} ${a.src === "cheer" ? "보냈어요" : "남겼어요"}</span>
+      <span class="al-ic">${{ blog: "📝", guest: "📖", cheer: "👏", rcmt: "🗨️" }[a.src] || "💬"}</span>
+      <span class="al-tx"><span><b>${esc(a.nick || "(알 수 없음)")}</b> 님이 ${a.src === "guest" ? (a.reply ? "방명록에 답글을" : "내 방명록에 글을") : a.src === "cheer" ? "책 기록에 응원을" : a.src === "rcmt" ? (a.reply ? "같이 댓글 단 기록에 댓글을" : "내 기록에 댓글을") : a.reply ? "내 댓글에 답글을" : `내 ${a.src === "blog" ? "블로그 글" : "글"}에 댓글을`} ${a.src === "cheer" ? "보냈어요" : "남겼어요"}</span>
         <small>${a.title ? `「${esc(a.title)}」 · ` : ""}${ago(a.created_at)}</small>${a.body ? `<em>${esc(a.body.length > 60 ? a.body.slice(0, 60) + "…" : a.body)}</em>` : ""}</span></button></li>`).join("")
     || `<li class="muted">최근 30일 동안 새 소식이 없어요</li>`;
   localStorage.setItem(seenKey(), String(Date.now()));
@@ -3240,6 +3273,7 @@ $("alList").addEventListener("click", (e) => {
     if (ref === sync.myId()) { go("blog"); renderMyBlog().then(() => myBlog && openGuest(myBlog)); }
     else loadBlog(ref).then((st) => openGuest(st)).catch(() => toast("불러오지 못했어요"));
   } else if (src === "cheer") { go("home"); openView(ref); }
+  else if (src === "rcmt") { const [owner, recId] = ref.split("/"); openRc(owner, recId, b.querySelector("small")?.textContent.match(/「(.+)」/)?.[1] || ""); }
   else openPost(ref);
 });
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") checkAlerts(); });
@@ -3415,6 +3449,85 @@ $("snuList").addEventListener("click", (e) => {
   $("sPages").textContent = ""; $("sDesc").textContent = ""; $("sMine").hidden = true;
   setImg($("sCover"), cover); paintSnu(i); $("scanSheet").showModal();
   paintRates("", t);
+});
+
+
+// ---------- 하트 · 댓글 (인스타처럼 간결한 기호) ----------
+function HEART_() { return `<svg class="rx-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.3s-7.6-4.5-9.4-9.1C1.4 8 3.5 4.4 7.1 4.4c2.1 0 3.7 1.1 4.9 2.9 1.2-1.8 2.8-2.9 4.9-2.9 3.6 0 5.7 3.6 4.5 6.8-1.8 4.6-9.4 9.1-9.4 9.1z"/></svg>`; }
+function BUBBLE_() { return `<svg class="rx-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.3 16.9A9 9 0 1 1 7.1 19.7L2.6 21.4Z"/></svg>`; }
+function paintRx(likeBtn, cmtBtn, n, liked, c) {
+  likeBtn.classList.toggle("on", !!liked);
+  likeBtn.innerHTML = `${HEART_()}${n ? `<span>${n}</span>` : ""}`;
+  likeBtn.setAttribute("aria-label", `좋아요${n ? ` ${n}` : ""}`);
+  if (cmtBtn) { cmtBtn.innerHTML = `${BUBBLE_()}${c ? `<span>${c}</span>` : ""}`; cmtBtn.setAttribute("aria-label", `댓글${c ? ` ${c}` : ""}`); }
+}
+// 포트폴리오 기록 하나하나: 구경 중이면 그 집, 아니면 내 것 (로그인했을 때만)
+function rxOwner() { return !sync.myId() || AUTH.offline ? null : PEEK ? PEEK_UID || null : sync.myId(); }
+function rxSlot(id, title) { return rxOwner() ? `<div class="rx" data-rx="${esc(id)}" data-t="${esc(String(title || "").slice(0, 200))}"><button type="button" class="rx-like">${HEART_()}</button><button type="button" class="rx-cmt">${BUBBLE_()}</button></div>` : ""; }
+var rxState = new Map(); // id → { n, mine, c }
+async function fillReacts(root) {
+  const owner = rxOwner(); if (!owner) return;
+  const els = [...root.querySelectorAll("[data-rx]")]; if (!els.length) return;
+  try {
+    const m = await sync.recReacts(owner, els.map((x) => x.dataset.rx));
+    for (const el of els) {
+      const v = m.get(el.dataset.rx); if (!v || !el.isConnected) continue;
+      rxState.set(el.dataset.rx, v);
+      paintRx(el.querySelector(".rx-like"), el.querySelector(".rx-cmt"), v.n, v.mine, v.c);
+    }
+  } catch { /* 하트 · 댓글 수는 다음에 */ }
+}
+async function rxClick(btn) {
+  const el = btn.closest("[data-rx]"), id = el.dataset.rx, owner = rxOwner(); if (!owner) return;
+  if (btn.classList.contains("rx-cmt")) { openRc(owner, id, el.dataset.t); return; }
+  if (!sync.myNick()) { toast("하트를 누르려면 엄마 별명을 먼저 정해 주세요"); openNick(false); return; }
+  const v = rxState.get(id) || { n: 0, mine: false, c: 0 }, on = !v.mine;
+  v.mine = on; v.n = Math.max(0, v.n + (on ? 1 : -1)); rxState.set(id, v);
+  paintRx(btn, el.querySelector(".rx-cmt"), v.n, v.mine, v.c);
+  try { await sync.likeRec(owner, id, on); }
+  catch { v.mine = !on; v.n = Math.max(0, v.n + (on ? -1 : 1)); paintRx(btn, el.querySelector(".rx-cmt"), v.n, v.mine, v.c); toast("인터넷 연결을 확인해 주세요"); }
+}
+// 기록 하나의 댓글 창
+let rcNow = null;
+async function openRc(owner, recId, title = "") {
+  rcNow = { owner, recId, title };
+  $("rcTitle").innerHTML = `${BUBBLE_()}<span>${esc(title || "댓글")}</span>`;
+  $("rcList").innerHTML = `<li class="muted">불러오는 중…</li>`;
+  $("rcNew").hidden = !sync.myId(); $("rcIn").value = "";
+  if (!$("rcDialog").open) $("rcDialog").showModal();
+  await paintRc();
+}
+async function paintRc() {
+  const r = rcNow; if (!r) return;
+  try {
+    const list = await sync.recComments(r.owner, r.recId);
+    if (rcNow !== r) return;
+    const me = sync.myId();
+    $("rcList").innerHTML = list.map((c) => `<li><div>${avatar(c.nick, c.face, "av xs")}<b>${esc(c.nick)}</b><small>${ago(c.created_at)}</small>${c.user_id === me || r.owner === me || sync.amAdmin() ? `<button type="button" class="x" data-c="${c.id}" aria-label="댓글 지우기">✕</button>` : ""}</div><p>${esc(c.body)}</p></li>`).join("")
+      || `<li class="muted">첫 댓글을 남겨 보세요</li>`;
+    const v = rxState.get(r.recId); if (v) { v.c = list.length; const el = document.querySelector(`#diList [data-rx="${CSS.escape(r.recId)}"]`); if (el) paintRx(el.querySelector(".rx-like"), el.querySelector(".rx-cmt"), v.n, v.mine, v.c); }
+  } catch { $("rcList").innerHTML = `<li class="muted">댓글을 불러오지 못했어요. 이 집이 책장을 나만 보기로 바꿨을 수 있어요</li>`; }
+}
+$("rcSend").addEventListener("click", async () => {
+  const r = rcNow, body = $("rcIn").value.trim(); if (!r || !body) return;
+  if (!sync.myNick()) { toast("댓글을 남기려면 엄마 별명을 먼저 정해 주세요"); openNick(false); return; }
+  $("rcSend").disabled = true;
+  try { await sync.addRecComment(r.owner, r.recId, r.title, body); $("rcIn").value = ""; await paintRc(); }
+  catch { toast("댓글을 남기지 못했어요. 인터넷 연결을 확인해 주세요"); }
+  $("rcSend").disabled = false;
+});
+$("rcList").addEventListener("click", async (e) => {
+  const x = e.target.closest("[data-c]"); if (!x || !confirm("이 댓글을 지울까요?")) return;
+  try { await sync.deleteRecComment(x.dataset.c); await paintRc(); } catch { toast("지우지 못했어요"); }
+});
+$("bvCmtGo").addEventListener("click", () => { $("bvCIn").scrollIntoView({ block: "center", behavior: "smooth" }); setTimeout(() => $("bvCIn").focus(), 250); });
+$("bvLike").addEventListener("click", async () => {
+  const b = blogNow; if (!b) return;
+  if (!sync.myNick()) { toast("하트를 누르려면 엄마 별명을 먼저 정해 주세요"); openNick(false); return; }
+  const on = !b.liked;
+  b.liked = on; b.nLikes = Math.max(0, (b.nLikes || 0) + (on ? 1 : -1)); paintRx($("bvLike"), $("bvCmtGo"), b.nLikes, b.liked, b.nCmts);
+  try { await sync.likeBlog(b.id, on); }
+  catch { b.liked = !on; b.nLikes = Math.max(0, b.nLikes + (on ? -1 : 1)); paintRx($("bvLike"), $("bvCmtGo"), b.nLikes, b.liked, b.nCmts); toast("인터넷 연결을 확인해 주세요"); }
 });
 
 // ---------- 신고 ----------
