@@ -1055,6 +1055,7 @@
       <p class="muted adm-sub">관리자에게만 보이는 화면이에요</p>
       <div class="adm-tiles" id="admTiles"></div>
       <button type="button" class="adm-rep" id="admRep" hidden></button>
+      <button type="button" class="adm-reg" id="admReg"><span data-ico="barcode"></span><span><b>책 등록 모드</b><small>도서관에서 바코드를 찍어 함께 쓰는 책 목록에 넣어요 (내 책장엔 안 남아요)</small></span></button>
       <input id="admQ" class="sub-input" type="search" placeholder="별명이나 이메일로 찾기" autocomplete="off" />
       <div class="adm-sort" id="admSort"><button type="button" data-s="recent" aria-pressed="true">최근 기록순</button><button type="button" data-s="joined" aria-pressed="false">가입순</button><button type="button" data-s="books" aria-pressed="false">책 많은 순</button></div>
       <ul class="adm-list" id="admList"></ul>
@@ -1076,6 +1077,28 @@
       <h4 class="r-sub">쓴 글 · 댓글 <span id="auCnt"></span></h4>
       <ul class="w-list" id="auList"></ul>
     </div>
+  </dialog>
+
+  <!-- 책 등록 모드 (관리자) -->
+  <dialog id="regDialog">
+    <form method="dialog" class="sheet reg-sheet" onsubmit="return false">
+      <div class="reg-head"><h3>책 등록</h3><small id="regCount"></small></div>
+      <div class="reg-book">
+        <img id="regCover" alt="" />
+        <div class="reg-fields">
+          <input id="regTitle" class="sub-input" placeholder="책 제목" maxlength="200" autocomplete="off" />
+          <input id="regAuthor" class="sub-input" placeholder="작가" maxlength="200" autocomplete="off" />
+          <label class="reg-pages"><span>전체</span><input id="regPages" type="number" inputmode="numeric" min="1" max="4999" placeholder="?" /><span>쪽</span></label>
+        </div>
+      </div>
+      <p class="muted reg-note" id="regNote"></p>
+      <p class="muted reg-isbn" id="regIsbn"></p>
+      <div class="row reg-acts">
+        <button type="button" class="btn ghost" id="regStop">그만</button>
+        <button type="button" class="btn ghost" id="regSkip">건너뛰기</button>
+        <button type="button" class="btn dark" id="regNext">등록하고 다음</button>
+      </div>
+    </form>
   </dialog>
 
   <!-- 처음 사용법 (6장) -->

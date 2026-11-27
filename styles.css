@@ -1527,3 +1527,22 @@ i.lk .ico { width: 13px; height: 13px; }
 .pt-btn:active { transform: scale(.95); }
 .v-shelf { margin: 0; }
 .v-shelf button { padding: 7px 10px; font-size: 13px; }
+/* 책 등록 모드 (관리자) */
+.adm-reg { width: 100%; border: 0; border-radius: 14px; padding: 12px; margin-bottom: 10px; background: var(--card); box-shadow: var(--raise-s); font: inherit; text-align: left; cursor: pointer; display: flex; gap: 12px; align-items: center; }
+.adm-reg .ico { width: 40px; height: 40px; padding: 9px; border-radius: 12px; background: var(--p-y); color: #1E2420; stroke-width: 1.8; flex: none; }
+.adm-reg b { display: block; font-size: 15px; }
+.adm-reg small { font-size: 12px; color: var(--muted); }
+.reg-head { display: flex; align-items: baseline; gap: 8px; }
+.reg-head h3 { margin: 0 0 10px; }
+.reg-head small { color: var(--forest); font-weight: 700; }
+.reg-book { display: flex; gap: 12px; align-items: flex-start; }
+.reg-book img { width: 72px; height: 100px; object-fit: cover; border-radius: 8px; background: var(--soft); flex: none; }
+.reg-fields { flex: 1; display: grid; gap: 8px; min-width: 0; }
+.reg-fields .sub-input { margin: 0; }
+.reg-pages { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.reg-pages input { width: 90px; text-align: center; font-size: 18px; font-weight: 700; padding: 8px; border-radius: 12px; border: 0; background: var(--card); box-shadow: var(--inset); }
+.reg-note { font-size: 13px; margin: 10px 0 2px; color: var(--forest); }
+.reg-isbn { font-size: 12px; margin: 0 0 8px; }
+.reg-acts { gap: 6px; }
+.reg-acts .btn { padding: 12px 12px; white-space: nowrap; flex: none; }
+.reg-acts #regNext { flex: 1; }

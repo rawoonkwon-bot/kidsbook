@@ -1553,7 +1553,7 @@ const scanner = new Scanner({
   onDetect: (info) => {
     beep();
     $("roi").classList.add("hit");
-    setTimeout(() => { closeScanner(); openSheet(info.isbn, info); }, 120);
+    setTimeout(() => { closeScanner(); regMode ? openReg(info.isbn) : openSheet(info.isbn, info); }, 120);
   },
 });
 async function openScanner() {
@@ -1582,7 +1582,7 @@ function closeScanner() {
   $("torchBtn").classList.remove("on");
 }
 $("fab").addEventListener("click", () => { returnDay = null; preferShelf = null; openScanner(); });
-$("closeScan").addEventListener("click", () => { closeScanner(); maybeReturn(); });
+$("closeScan").addEventListener("click", () => { closeScanner(); if (regMode) { regMode = false; return; } maybeReturn(); });
 $("scanManual").addEventListener("click", () => { closeScanner(); openManual(); });
 $("scanTitle").addEventListener("click", () => { closeScanner(); openTitle(); });
 // ---------- 바코드(ISBN) 없는 책: 제목으로 등록 ----------
@@ -1660,8 +1660,8 @@ function openManual() {
 $("manualDialog").addEventListener("close", () => {
   if ($("manualDialog").returnValue !== "ok") return;
   const isbn = toIsbn13($("manualIsbn").value);
-  if (!isbn) { toast("올바른 ISBN이 아니에요. 숫자를 다시 확인해 주세요."); return; }
-  openSheet(isbn, null);
+  if (!isbn) { toast("올바른 ISBN이 아니에요. 숫자를 다시 확인해 주세요."); if (regMode) openScanner(); return; }
+  regMode ? openReg(isbn) : openSheet(isbn, null);
 });
 
 // Enter를 누르면 '취소'가 아니라 주 버튼이 눌리도록: 취소·닫기 버튼은 제출 버튼에서 빼고 직접 닫음
@@ -3912,3 +3912,45 @@ $("tuTrack").addEventListener("touchend", (e) => { if (tuX == null) return; cons
 $("setTutorial").addEventListener("click", () => { $("settingsDialog").close("away"); openTutorial(); });
 // 방명록 비밀글 자물쇠: 누를 때 한 줄 안내
 $("gbSecret").addEventListener("change", (e) => toast(e.target.checked ? "비밀글: 주인만 볼 수 있어요" : "모두 볼 수 있는 글이에요"));
+
+// ---------- 책 등록 모드 (관리자): 도서관에서 바코드를 찍어 함께 쓰는 책 목록에만 넣음 (내 책장에는 기록 안 남음) ----------
+let regMode = false, regCount = 0, regIsbn = null;
+$("admReg").addEventListener("click", () => {
+  if (!sync.amAdmin() || PEEK) return;
+  $("adminPage").close(); regMode = true; regCount = 0; openScanner();
+});
+async function openReg(isbn) {
+  regIsbn = isbn;
+  $("regCount").textContent = regCount ? `오늘 ${regCount}권 등록` : "";
+  $("regIsbn").textContent = `ISBN ${isbn}`;
+  $("regTitle").value = ""; $("regAuthor").value = ""; $("regPages").value = "";
+  $("regNote").textContent = "책 정보를 찾는 중…";
+  setImg($("regCover"), "");
+  $("regDialog").showModal();
+  const [found, shared] = await Promise.all([lookupBook(isbn).then((x) => x.book).catch(() => null), sync.sharedBook(isbn).catch(() => null)]);
+  if (regIsbn !== isbn) return;
+  const b = found || shared;
+  if (b) {
+    $("regTitle").value = b.title || ""; $("regAuthor").value = (b.authors || []).join(", ");
+    $("regPages").value = b.pages || shared?.pages || "";
+    setImg($("regCover"), b.cover || shared?.cover || "");
+  }
+  const pages = b?.pages || shared?.pages;
+  $("regNote").textContent = shared && pages ? `이미 함께 쓰는 목록에 있는 책이에요 (${pages}쪽)` : pages ? "쪽수까지 찾았어요. 확인만 하고 등록하세요" : b ? "쪽수를 못 찾았어요. 책 마지막 쪽 번호를 적어 주세요" : "책 정보를 못 찾았어요. 제목과 쪽수를 적어 주세요";
+  if (!$("regTitle").value) $("regTitle").focus(); else if (!pages) $("regPages").focus();
+}
+$("regStop").addEventListener("click", () => { $("regDialog").close("stop"); regMode = false; if (regCount) toast(`${regCount}권을 등록했어요`); });
+$("regSkip").addEventListener("click", () => { $("regDialog").close("skip"); openScanner(); });
+$("regNext").addEventListener("click", async () => {
+  const title = $("regTitle").value.trim(), pages = parseInt($("regPages").value, 10) || null;
+  if (!title) { toast("제목을 적어 주세요"); $("regTitle").focus(); return; }
+  if (pages && !(pages > 0 && pages < 5000)) { toast("쪽수를 다시 확인해 주세요"); return; }
+  const b = { isbn: regIsbn, title, authors: $("regAuthor").value.trim(), publisher: "", cover: $("regCover").getAttribute("src") || "", pages };
+  try {
+    await sync.shareBook(b);
+    if (pages) await sync.sharePages(b);
+  } catch { toast("저장하지 못했어요. 인터넷 연결을 확인해 주세요"); return; }
+  regCount++; toast(`등록했어요 · ${title}`);
+  $("regDialog").close("next"); openScanner();
+});
+$("regDialog").addEventListener("cancel", () => { regMode = false; });
