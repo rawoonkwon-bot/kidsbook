@@ -1294,6 +1294,7 @@ function openEntry(cat, entry = null, total = false) {
   $("eBook").hidden = !eMode; $("eBook").dataset.mode = eMode || "";
   $("eFindTxt").textContent = eMode === "media" ? "영상 검색" : "문제집 검색";
   paintECover();
+  paintERecent(cat, !!eMode && !entry && !entryTotal, eMode === "media" ? "최근 본 영상" : "최근 푼 문제집");
   $("eWhatWrap").hidden = !c.what; $("eWhatLabel").textContent = c.what || ""; $("eWhat").placeholder = c.whatPh || ""; $("eWhat").value = "";
   $("eAmountWrap").hidden = !c.amount; $("eAmountLabel").textContent = (c.amount || "").replace("몇 분", "얼마나"); $("eUnit").textContent = c.unit || ""; $("eAmount").value = ""; $("eHour").value = "";
   if (entryTotal) { $("eWhatWrap").hidden = true; $("eAmountLabel").textContent = `오늘 ${c.name}을 모두 얼마나 읽었나요?`; }
@@ -1369,6 +1370,21 @@ async function shrinkPhoto(file) {
   return new Promise((res, rej) => cv.toBlob((b) => (b ? res(b) : rej(new Error("toBlob"))), "image/jpeg", 0.82));
 }
 let eCover = "";
+// 흘려듣기·수학: 이 아이가 최근에 본 영상 / 푼 문제집을 버튼으로 보여 주고, 누르면 이름·표지를 채움
+let eRecentList = [];
+function paintERecent(cat, show, label) {
+  const seen = new Set();
+  eRecentList = show ? journal.filter((j) => j.cat === cat && j.what).sort((a, b) => b.day.localeCompare(a.day))
+    .filter((j) => (seen.has(j.what) ? false : seen.add(j.what))).slice(0, 6).map((j) => ({ what: j.what, cover: j.cover || "" })) : [];
+  $("eRecent").hidden = !eRecentList.length;
+  $("eRecent").innerHTML = eRecentList.length ? `<small>${label}</small><div class="er-list">` + eRecentList.map((x, i) => `<button type="button" data-r="${i}">${x.cover ? `<img src="${esc(x.cover)}" alt="" loading="lazy">` : ""}<span>${esc(x.what)}</span></button>`).join("") + `</div>` : "";
+}
+$("eRecent").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-r]"); if (!b) return;
+  const x = eRecentList[Number(b.dataset.r)]; if (!x) return;
+  $("eWhat").value = x.what; eCover = x.cover; paintECover();
+  [...$("eRecent").querySelectorAll("[data-r]")].forEach((y) => y.classList.toggle("on", y === b));
+});
 function paintECover() { $("eBookImg").hidden = !eCover; if (eCover) $("eBookImg").src = eCover; }
 $("eFind").addEventListener("click", () => openTitle($("eBook").dataset.mode || "workbook", (b) => { $("eWhat").value = b.title; eCover = b.cover || ""; paintECover(); }));
 $("eWhat").addEventListener("input", () => { if (eCover) { eCover = ""; paintECover(); } }); // 이름을 고치면 표지는 뺌
