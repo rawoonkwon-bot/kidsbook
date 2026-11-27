@@ -36,35 +36,12 @@ export function warmUpDetector() {
   return detectorPromise;
 }
 
-// 밝기 보정: 회색으로 바꾸고 가장 어두운 곳~가장 밝은 곳을 0~255로 넓힘 (어둡거나 뿌연 바코드의 대비를 살림)
-// 돌려주는 값: 어두움(dark) · 반사(glare) 판단
-function stretch(img) {
-  const d = img.data, n = d.length / 4, hist = new Uint32Array(256);
-  for (let i = 0; i < d.length; i += 4) {
-    const g = (d[i] * 77 + d[i + 1] * 150 + d[i + 2] * 29) >> 8;
-    d[i] = g; hist[g]++;
-  }
-  let lo = 0, hi = 255, acc = 0, sum = 0;
-  for (let v = 0; v < 256; v++) sum += v * hist[v];
-  for (; lo < 255; lo++) { acc += hist[lo]; if (acc > n * 0.02) break; }
-  acc = 0;
-  for (; hi > 0; hi--) { acc += hist[hi]; if (acc > n * 0.02) break; }
-  let bright = 0; for (let v = 250; v < 256; v++) bright += hist[v];
-  const range = Math.max(1, hi - lo);
-  for (let i = 0; i < d.length; i += 4) {
-    const v = Math.max(0, Math.min(255, ((d[i] - lo) * 255) / range)) | 0;
-    d[i] = d[i + 1] = d[i + 2] = v;
-  }
-  return { dark: sum / n < 70 || hi < 110, glare: bright / n > 0.12 };
-}
-
 export class Scanner {
   constructor({ video, roiEl, onDetect, onStatus }) {
     this.video = video;
     this.roiEl = roiEl;
     this.onDetect = onDetect;
     this.onStatus = onStatus || (() => {});
-    this.onInfo = arguments[0].onInfo || (() => {});
     this.canvas = document.createElement("canvas");
     this.ctx = this.canvas.getContext("2d", { willReadFrequently: true });
     this.running = false;
@@ -74,18 +51,7 @@ export class Scanner {
     this.frames = 0;
   }
 
-  // 카메라를 다시 켰는데 화면이 멈춰 있으면(아이폰에서 가끔) 1.5초 뒤 카메라를 새로 켬
-  watch(retry) {
-    clearTimeout(this.watchTimer);
-    const f0 = this.frames, t0 = this.video.currentTime;
-    this.watchTimer = setTimeout(() => {
-      if (!this.running) return;
-      const stuck = this.frames === f0 || this.video.currentTime === t0 || this.video.readyState < 2;
-      if (stuck && retry) { this.running = false; this.release(); this.start(false).catch(() => {}); }
-    }, 1500);
-  }
-
-  async start(retry = true) {
+  async start() {
     const { detector, engine, native } = await warmUpDetector();
     this.detector = detector;
     this.native = native;
@@ -100,9 +66,8 @@ export class Scanner {
       this.running = true;
       this.startedAt = performance.now();
       this.frames = 0;
-      this.lastCode = null; this.light = null; this.hintAt = 0; this.seen = "";
+      this.lastCode = null;
       this.loop();
-      this.watch(retry);
       return;
     }
     this.release();
@@ -132,9 +97,8 @@ export class Scanner {
     this.running = true;
     this.startedAt = performance.now();
     this.frames = 0;
-    this.lastCode = null; this.light = null; this.hintAt = 0; this.seen = "";
+    this.lastCode = null;
     this.loop();
-    this.watch(retry);
   }
 
   setZoom(z) {
@@ -150,7 +114,6 @@ export class Scanner {
   // 스캔 화면을 닫을 때: 카메라는 잠시 꺼 두기만 하고(허락 유지), 1분 동안 안 쓰면 완전히 끔
   stop() {
     this.running = false;
-    clearTimeout(this.watchTimer);
     if (this.track) {
       if (this.caps?.torch) this.track.applyConstraints({ advanced: [{ torch: false }] }).catch(() => {});
       this.track.enabled = false;
@@ -177,8 +140,8 @@ export class Scanner {
     const scale = Math.max(vr.width / vw, vr.height / vh);
     const ox = (vr.width - vw * scale) / 2;
     const oy = (vr.height - vh * scale) / 2;
-    // 손떨림 · 영어책 옆 가격 바코드 대비 좌우 30%, 상하 25% 여유
-    const padX = rr.width * 0.3, padY = rr.height * 0.25;
+    // 손떨림 대비 상하좌우 여유 15%
+    const padX = rr.width * 0.15, padY = rr.height * 0.15;
     let x = (rr.left - vr.left - padX - ox) / scale;
     let y = (rr.top - vr.top - padY - oy) / scale;
     let w = (rr.width + padX * 2) / scale;
@@ -205,21 +168,12 @@ export class Scanner {
     this.busy = true;
     try {
       const { x, y, w, h } = this.cropRect();
-      // 세 가지 방식을 번갈아 해석
-      //  0: 큰 그림(멀리 있는 작은 바코드)  1: 작은 그림(가까이서 살짝 흐린 바코드)
-      //  2: 밝기 보정 그림(어두운 곳 · 형광등 반사로 대비가 낮은 바코드)
-      const mode = this.frames % 3;
-      const s = Math.min(1, (mode === 1 ? 640 : mode === 2 ? 960 : MAX_CROP_W) / w);
+      const s = Math.min(1, MAX_CROP_W / w);
       const cw = Math.round(w * s), ch = Math.round(h * s);
       if (this.canvas.width !== cw) this.canvas.width = cw;
       if (this.canvas.height !== ch) this.canvas.height = ch;
       this.ctx.drawImage(this.video, x, y, w, h, 0, 0, cw, ch);
-      let src;
-      if (mode === 2) {
-        const img = this.ctx.getImageData(0, 0, cw, ch);
-        this.light = stretch(img);
-        src = img;
-      } else src = this.native ? this.canvas : this.ctx.getImageData(0, 0, cw, ch);
+      const src = this.native ? this.canvas : this.ctx.getImageData(0, 0, cw, ch);
       const results = await this.detector.detect(src);
       this.frames++;
       for (const r of results) {
@@ -229,18 +183,7 @@ export class Scanner {
           this.onDetect({ isbn, raw: r.rawValue, ms: performance.now() - this.startedAt, frames: this.frames, engine: this.engine });
           return;
         }
-        if (r.rawValue) { this.seen = r.rawValue; this.onStatus("책 바코드(978/979로 시작)를 비춰 주세요"); }
-      }
-      if (performance.now() - (this.infoAt || 0) > 500) {
-        this.infoAt = performance.now();
-        this.onInfo({ frames: this.frames, light: this.light, seen: this.seen, size: `${cw}×${ch}`, video: `${this.video.videoWidth}×${this.video.videoHeight}` });
-      }
-      const waited = performance.now() - this.startedAt;
-      if (waited > 2500 && this.light && performance.now() - (this.hintAt || 0) > 2000) {
-        this.hintAt = performance.now();
-        if (this.light.dark) this.onStatus("조금 어두워요 · 밝은 곳에서 비춰 주세요");
-        else if (this.light.glare) this.onStatus("빛이 반사돼요 · 책을 살짝 기울여 주세요");
-        else if (waited > 5000) this.onStatus("한 뼘쯤 떨어져서 바코드를 네모에 맞춰요");
+        if (r.rawValue) this.onStatus("책 바코드(978/979로 시작)를 비춰 주세요");
       }
     } catch (e) {
       console.warn(e);

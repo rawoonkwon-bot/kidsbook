@@ -1515,7 +1515,7 @@ const scanner = new Scanner({
 async function openScanner() {
   $("scanner").hidden = false;
   $("roi").classList.remove("hit");
-  $("scanHint").textContent = "한 뼘쯤 떨어져서 바코드를 네모에 맞춰요";
+  $("scanHint").textContent = "바코드를 네모 안에 맞춰 주세요";
   $("engine").textContent = "카메라 준비 중…";
   try {
     await scanner.start();
