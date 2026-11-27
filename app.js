@@ -1868,7 +1868,7 @@ const agoDay = (iso) => {
   const n = dayDiff(localDay(new Date(iso)), localDay());
   return n <= 0 ? "오늘 기록" : n === 1 ? "어제 기록" : n < 30 ? `${n}일 전 기록` : "한 달 넘게 쉬는 중";
 };
-const momRow = (m, nbMark = true) => `<li><button type="button" class="mom-tile" data-u="${esc(m.user_id)}">${avatar(m.nick, m.face)}<b>${esc(m.nick)}</b>${m.tag ? `<small>${esc(m.tag)}</small>` : m.updated_at ? `<small>${agoDay(m.updated_at).replace(" 기록", "")}</small>` : ""}${nbMark && follows.has(m.user_id) ? `<em>이웃</em>` : ""}</button></li>`;
+const momRow = (m, nbMark = true) => `<li><button type="button" class="nb-face${nbMark && follows.has(m.user_id) ? " nb" : ""}" data-u="${esc(m.user_id)}" title="${esc(m.nick)}">${avatar(m.nick, m.face, "av nb-av")}<small>${esc(m.nick)}</small>${m.tag ? `<small class="nb-tag">${esc(m.tag)}</small>` : ""}</button></li>`;
 let follows = new Map(), followsLoaded = false, momOffset = 0;
 async function renderBrowse() {
   $("browseWrap").hidden = !!(PEEK || !AUTH.user || AUTH.offline);
