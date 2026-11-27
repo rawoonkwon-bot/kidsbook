@@ -1546,3 +1546,12 @@ i.lk .ico { width: 13px; height: 13px; }
 .reg-acts { gap: 6px; }
 .reg-acts .btn { padding: 12px 12px; white-space: nowrap; flex: none; }
 .reg-acts #regNext { flex: 1; }
+/* 사진 넣기: 글씨 없이 카메라 상자만 */
+.rt-ic { width: 38px; height: 38px; border: 0; padding: 0; background: none; cursor: pointer; display: inline-grid; place-items: center; flex: none; }
+.rt-ic .ico { width: 38px; height: 38px; padding: 8px; border-radius: 12px; background: var(--pt); color: #1E2420; stroke-width: 1.8; }
+.rt-ic:disabled { opacity: .45; }
+.rt-ic:active { transform: scale(.94); }
+.td-ph { display: flex; align-items: center; gap: 8px; }
+.td-ph small { color: var(--muted); font-size: 13px; }
+#beTopicBtn { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px 4px 4px; }
+#beTopicBtn .ico { width: 30px; height: 30px; padding: 6px; border-radius: 10px; margin: 0; vertical-align: 0; }

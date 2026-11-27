@@ -915,7 +915,7 @@ const DEFAULT_CATS = [
   { key: "listen", icon: "headphones", name: "흘려듣기", kind: "time" },
   { key: "focus", icon: "ear", name: "집중듣기", kind: "focus" },
   { key: "memo", icon: "pencil", name: "메모", kind: "note" },
-  { key: "secret", icon: "lock", name: "나만보기", kind: "note" },
+  { key: "secret", icon: "lock", name: "비공개 메모", kind: "note" },
 ];
 const LEGACY_CATS = [
   { key: "math", icon: "math-symbols", name: "수학", kind: "time" },
@@ -954,10 +954,15 @@ for (const c of LEGACY_CATS) {
     store.setItem(CATS_KEY, JSON.stringify(catList));
   }
 }
-// 새 기본 카테고리 '나만보기'(비밀 메모)가 없으면 메모 다음에 넣어 둠
+// 새 기본 카테고리 '비공개 메모'가 없으면 메모 다음에 넣어 둠
 if (!catList.some((c) => c.key === "secret")) {
   const at = catList.findIndex((c) => c.key === "memo");
-  catList.splice(at < 0 ? catList.length : at + 1, 0, { key: "secret", icon: "lock", name: "나만보기", kind: "note" });
+  catList.splice(at < 0 ? catList.length : at + 1, 0, { key: "secret", icon: "lock", name: "비공개 메모", kind: "note" });
+  store.setItem(CATS_KEY, JSON.stringify(catList));
+}
+// 예전 이름 '나만보기'는 '비공개 메모'로 (엄마가 직접 바꾼 이름은 그대로)
+if (catList.some((c) => c.key === "secret" && c.name === "나만보기")) {
+  catList = catList.map((c) => (c.key === "secret" && c.name === "나만보기" ? { ...c, name: "비공개 메모" } : c));
   store.setItem(CATS_KEY, JSON.stringify(catList));
 }
 // 예전 이모지 아이콘은 선 아이콘 이름으로 바꿔 둠
@@ -1306,11 +1311,11 @@ function openEntry(cat, entry = null, total = false) {
 // 일기 사진: 최대 10장, 올리기 전에 작게 줄임(긴 쪽 1280px)
 const MAX_PHOTOS = 10; // 한 글에 사진 최대 장수
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024; // 한 장 최대 5MB (올리기 전에 긴 쪽 1280px로 줄여서 보통 0.5MB 아래)
-// 메모: 사진이 글 사이에 들어감 (도구줄의 📷 사진)
+// 메모: 사진이 글 사이에 들어감 (도구줄의 카메라 버튼)
 const eRich = makeRich($("eRich"), { placeholder: "오늘 있었던 일을 적어 보세요", max: MAX_PHOTOS, onChange: (gone) => { if (gone?.file) URL.revokeObjectURL(gone.url); paintPhotos(); } });
 function paintPhotos() {
   const n = eRich.photos().length;
-  $("ePhotoCount").textContent = `사진 ${n}/${MAX_PHOTOS}`;
+  $("ePhotoCount").textContent = `${n}/${MAX_PHOTOS}`;
   $("ePhotoAdd").disabled = n >= MAX_PHOTOS;
 }
 const pickImages = (input) => [...input.files].filter((f) => f.type.startsWith("image/") || /\.(heic|heif)$/i.test(f.name));
@@ -2238,7 +2243,7 @@ function loadState() {
   allRecords = readJSON(REC_KEY, []).map(migrate); viewRecords();
   allJournal = readJSON(JOURNAL_KEY, []); viewJournal();
   const cl = readJSON(CATS_KEY, null);
-  catList = (Array.isArray(cl) ? cl : [...DEFAULT_CATS]).map((c) => ({ ...c, icon: toIcon(c.icon) }));
+  catList = (Array.isArray(cl) ? cl : [...DEFAULT_CATS]).map((c) => ({ ...c, icon: toIcon(c.icon), ...(c.key === "secret" && c.name === "나만보기" ? { name: "비공개 메모" } : {}) }));
   refreshCats();
   $("monthFilter").value = "all";
 }
@@ -2448,7 +2453,7 @@ let writing = null;
 const pRich = makeRich($("peRich"), { placeholder: "내용을 적어 주세요", max: MAX_PHOTOS, onChange: (gone) => { if (gone?.file) URL.revokeObjectURL(gone.url); paintWPhotos(); } });
 function paintWPhotos() {
   const n = pRich.photos().length;
-  $("pePhotoCount").textContent = `사진 ${n}/${MAX_PHOTOS}`;
+  $("pePhotoCount").textContent = `${n}/${MAX_PHOTOS}`;
   $("pePhotoAdd").disabled = n >= MAX_PHOTOS;
 }
 function openWrite(p = null) {
@@ -3090,7 +3095,7 @@ const MAX_TAGS = 10;
 const cleanTag = (t) => String(t || "").replace(/^#+/, "").replace(/[\s,#]+/g, "").slice(0, 20);
 function paintBPhotos() {
   const n = bRich.photos().length;
-  $("bePhotoCount").textContent = `사진 ${n}/${MAX_PHOTOS}`;
+  $("bePhotoCount").textContent = `${n}/${MAX_PHOTOS}`;
   $("bePhotoAdd").disabled = n >= MAX_PHOTOS;
 }
 function paintBTags() {

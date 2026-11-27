@@ -562,7 +562,7 @@
         <textarea id="eText" rows="4"></textarea>
       </label>
       <div class="rt-box" id="eRichWrap" hidden>
-        <div class="rt-bar"><button type="button" class="rt-btn" id="ePhotoAdd"><span data-ico="camera"></span> 사진</button><small id="ePhotoCount">사진 0/10</small></div>
+        <div class="rt-bar"><button type="button" class="rt-ic" id="ePhotoAdd" aria-label="사진 넣기" title="사진 넣기"><span data-ico="camera"></span></button><small id="ePhotoCount">0/10</small></div>
         <div class="rt" id="eRich"></div>
         <input type="file" id="ePhotoFile" accept="image/*" multiple hidden />
       </div>
@@ -878,7 +878,7 @@
       </div>
       <input id="peTitle" class="title-input" maxlength="100" placeholder="제목" />
       <div class="rt-box">
-        <div class="rt-bar"><button type="button" class="rt-btn" id="pePhotoAdd"><span data-ico="camera"></span> 사진</button><small id="pePhotoCount">사진 0/10</small></div>
+        <div class="rt-bar"><button type="button" class="rt-ic" id="pePhotoAdd" aria-label="사진 넣기" title="사진 넣기"><span data-ico="camera"></span></button><small id="pePhotoCount">0/10</small></div>
         <div class="rt" id="peRich"></div>
         <input type="file" id="pePhotoFile" accept="image/*" multiple hidden />
       </div>
@@ -908,7 +908,7 @@
         <input id="tdTitle" class="title-input" maxlength="80" placeholder="제목" />
         <div class="td-photo">
           <div class="td-cover" id="tdCover"></div>
-          <div><button type="button" class="btn ghost" id="tdPhotoBtn">사진 넣기 (선택)</button><p class="td-help">포스터나 직접 찍은 사진을 넣으면 표지로 보여요</p></div>
+          <div class="td-ph"><button type="button" class="rt-ic" id="tdPhotoBtn" aria-label="표지 사진 넣기" title="표지 사진 넣기"><span data-ico="camera"></span></button><small>표지 사진 (선택)</small></div>
           <input type="file" id="tdPhoto" accept="image/*" hidden />
         </div>
         <button type="button" class="btn dark" id="tdUse">이 글감 붙이기</button>
@@ -990,7 +990,7 @@
       <label class="be-cat" id="beCatRow" hidden><span>카테고리</span><select id="beCat"></select></label>
       <input id="beTitle" class="title-input" maxlength="100" placeholder="제목" />
       <div class="rt-box">
-        <div class="rt-bar"><button type="button" class="rt-btn" id="bePhotoAdd"><span data-ico="camera"></span> 사진</button><button type="button" class="rt-btn" id="beTopicBtn"><span data-ico="book"></span> 글감</button><small id="bePhotoCount">사진 0/10</small>
+        <div class="rt-bar"><button type="button" class="rt-ic" id="bePhotoAdd" aria-label="사진 넣기" title="사진 넣기"><span data-ico="camera"></span></button><button type="button" class="rt-btn" id="beTopicBtn"><span data-ico="book"></span> 글감</button><small id="bePhotoCount">0/10</small>
           <div class="rt-fmt" id="beFmt"><span class="rt-sz" role="group" aria-label="글씨 크기"><button type="button" data-s="1" aria-label="작은 글씨">가</button><button type="button" data-s="2" aria-label="보통 글씨">가</button><button type="button" data-s="3" aria-label="큰 글씨">가</button></span><span class="rt-cl" role="group" aria-label="글씨 색"><button type="button" data-c="0" class="fc-0" aria-label="기본 색"></button><button type="button" data-c="1" class="fc-1" aria-label="주황"></button><button type="button" data-c="2" class="fc-2" aria-label="초록"></button><button type="button" data-c="3" class="fc-3" aria-label="파랑"></button><button type="button" data-c="4" class="fc-4" aria-label="금색"></button></span></div></div>
         <div id="beTopic" class="rt-topic"></div>
         <div class="rt" id="beRich"></div>
