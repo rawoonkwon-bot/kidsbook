@@ -235,7 +235,7 @@ function render() {
 
   renderTbCard();
   // 요즘 읽는 중
-  const reading = records.filter((r) => !r.done && r.sessions.some((s) => s.to)).sort((a, b) => lastDay(b).localeCompare(lastDay(a)));
+  const reading = records.filter((r) => !r.done && !r.stopped && r.sessions.some((s) => s.to)).sort((a, b) => lastDay(b).localeCompare(lastDay(a)));
   $("readingHead").textContent = `📖 요즘 읽는 중 (${reading.length})`;
   $("reading").innerHTML = reading.map((r) => `
     <button type="button" class="read-card" data-id="${r.id}">
@@ -589,6 +589,7 @@ function saveRecord() {
     if (rec.reread) { r.round = roundOf(r) + 1; r.done = false; delete r.doneAt; delete r.doneDay; }
     if (roundOf(r) > 1) session.round = roundOf(r);
     r.sessions.push(session);
+    delete r.stopped; // 그만 읽었던 책도 다시 기록하면 읽는 중으로
     r.shelf = chosenShelf;
     if (total) r.totalPages = total;
     if ($("rHome").checked) r.home = true; else delete r.home;
@@ -1148,16 +1149,19 @@ function fillDay(day) {
   let html = "";
   if (dayPanel) {
     const c = CAT[dayPanel];
-    const ongoing = records.filter((r) => shelfOf(r) === dayPanel && !r.done);
+    // 읽고 있는 책: 최근에 읽은 책부터, 5권 넘으면 나머지는 「더 보기」로 접어 둠 (그만 읽은 책은 빼기)
+    const ongoing = records.filter((r) => shelfOf(r) === dayPanel && !r.done && !r.stopped)
+      .sort((a, b) => (lastDay(b) || "").localeCompare(lastDay(a) || ""));
+    const ONG_SHOW = 5;
     html += `<div class="day-actions">
         <button type="button" class="btn lime" data-act="scan">${ico("barcode")} 책 스캔</button>
         <button type="button" class="btn ghost ic-btn" data-act="title" style="background:var(--soft)">${ico("search")} 책 검색</button>
         ${c.hybrid ? `<button type="button" class="btn ghost" data-act="entry" style="background:var(--soft)">${ico("pencil")} 직접 적기</button>` : ""}
       </div>`;
     html += ongoing.length ? `<small>읽고 있는 ${c.name} (누르면 이 날 읽은 쪽수를 기록해요)</small>` +
-      ongoing.map((r) => `<div class="day-item link" data-more="${r.id}">
+      ongoing.map((r, i) => `${i === ONG_SHOW ? `<button type="button" class="ong-more" data-moreopen>더 보기 (${ongoing.length - ONG_SHOW}권)</button><div class="ong-rest" hidden>` : ""}<div class="day-item link" data-more="${r.id}">
         ${r.cover ? `<img src="${esc(r.cover)}" alt="">` : `<span>${c.svg}</span>`}
-        <div class="grow"><b>${esc(r.title)}</b><small>${progressText(r) || "아직 쪽수 기록 없음"}</small></div><span>${ico("plus")}</span></div>`).join("")
+        <div class="grow"><b>${esc(r.title)}</b><small>${progressText(r) || "아직 쪽수 기록 없음"}</small></div><span class="ong-acts">${ico("plus")}<button type="button" class="x" data-stop="${r.id}" aria-label="${esc(r.title)} 그만 읽기">✕</button></span></div>`).join("") + (ongoing.length > ONG_SHOW ? "</div>" : "")
       : `<small>읽고 있는 ${c.name} 책이 없어요. 책 스캔으로 새 책을 기록해 보세요.</small>`;
   } else {
     html = dayGroupsHtml(day, true);
@@ -1230,8 +1234,15 @@ $("dayCats").addEventListener("click", (e) => {
 $("dayList").addEventListener("click", (e) => {
   if (e.target.closest(".ph-thumb")) return; // 사진은 크게 보기
   if (e.target.closest("[data-tot]")) return;
-  const t = e.target.closest("[data-act],[data-more],[data-view],[data-del],[data-edit]"); if (!t) return;
+  const t = e.target.closest("[data-stop],[data-moreopen],[data-act],[data-more],[data-view],[data-del],[data-edit]"); if (!t) return;
   const day = openDayKey;
+  if (t.dataset.moreopen != null) { t.nextElementSibling.hidden = false; t.remove(); return; }
+  if (t.dataset.stop) {
+    if (PEEK) return;
+    const r = records.find((x) => x.id === t.dataset.stop); if (!r) return;
+    if (!confirm(`「${r.title}」을 읽고 있는 책에서 뺄까요?\n지금까지 읽은 기록은 책장에 그대로 남아요.`)) return;
+    r.stopped = true; saveRecords(); render(); fillDay(day); toast("읽고 있는 책에서 뺐어요"); return;
+  }
   if (t.dataset.edit) {
     if (PEEK) return; // 구경 중에는 보기만
     const j = journal.find((x) => x.id === t.dataset.edit); if (!j || !CAT[j.cat]) return;
