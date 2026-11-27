@@ -1611,16 +1611,18 @@ let tMode = "book", tPick = null, tFoundList = [], tTimer = null, tSeq = 0;
 function openTitle(mode = "book", onPick = null) {
   tMode = mode; tPick = onPick;
   $("tHead").textContent = mode === "workbook" ? "문제집 검색" : mode === "media" ? "영상 검색" : "책 검색";
-  $("tIn").placeholder = mode === "workbook" ? "문제집 이름 (예: 디딤돌 초등수학)" : mode === "media" ? "영화·TV 이름 (예: 주토피아)" : "책 제목을 입력해 주세요";
+  $("tIn").placeholder = mode === "workbook" ? "문제집 이름 (예: 디딤돌 초등수학)" : mode === "media" ? "영화·TV 이름 또는 유튜브 주소" : "책 제목을 입력해 주세요";
   $("tNew").textContent = mode === "book" ? "제목으로 직접 기록" : "이 이름으로 적기";
   $("tTmdb").hidden = mode !== "media";
   $("tIn").value = ""; $("tMine").innerHTML = ""; $("tFound").innerHTML = ""; tFoundList = [];
+  if (mode === "media") paintYtRecent();
   $("titleDialog").showModal();
   setTimeout(() => $("tIn").focus(), 50);
 }
 async function tSearch() {
   const q = $("tIn").value.trim(), my = ++tSeq;
   if (q.length < (tMode === "media" ? 1 : 2)) { $("tFound").innerHTML = ""; return; }
+  if (tMode === "media" && isYtUrl(q)) return ytLookup(q, my);
   $("tFound").innerHTML = `<small>찾는 중…</small>`;
   try {
     const r = await fetch(`/api/${tMode === "media" ? "media" : "search"}?q=${encodeURIComponent(q)}`);
@@ -1635,6 +1637,7 @@ async function tSearch() {
   } catch { if (my === tSeq) $("tFound").innerHTML = `<small>찾지 못했어요. 인터넷 연결을 확인해 주세요.</small>`; }
 }
 $("tIn").addEventListener("input", () => {
+  if (tMode === "media") { $("tMine").hidden = !!$("tIn").value.trim(); if (isYtUrl($("tIn").value)) { clearTimeout(tTimer); tSearch(); return; } }
   const q = normTitle($("tIn").value);
   const hits = tMode !== "book" || q.length < 2 ? [] : records.filter((r) => normTitle(r.title).includes(q)).slice(0, 5);
   $("tMine").innerHTML = hits.length ? `<small>내 책장에 있는 책이면 눌러 주세요</small>` + hits.map((r) => `<button type="button" class="find-item" data-id="${r.id}">
@@ -1644,6 +1647,8 @@ $("tIn").addEventListener("input", () => {
 });
 $("tIn").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); clearTimeout(tTimer); tSearch(); } });
 $("tMine").addEventListener("click", (e) => {
+  const y = e.target.closest("[data-yt]");
+  if (y) { const it = ytRecent()[Number(y.dataset.yt)]; if (it) { ytRemember(it); $("titleDialog").close("pick"); tPick?.({ title: it.what, cover: it.cover }); } return; }
   const b = e.target.closest("[data-id]"); if (!b) return;
   const r = records.find((x) => x.id === b.dataset.id); if (!r) return;
   $("titleDialog").close("pick");
@@ -1652,7 +1657,7 @@ $("tMine").addEventListener("click", (e) => {
 $("tFound").addEventListener("click", (e) => {
   const t = e.target.closest("[data-f]"); if (!t) return;
   const b = tFoundList[Number(t.dataset.f)]; if (!b) return;
-  if (tMode !== "book") { $("titleDialog").close("pick"); tPick?.(b); return; }
+  if (tMode !== "book") { if (b.yt) ytRemember(b); $("titleDialog").close("pick"); tPick?.(b.yt ? { title: b.what, cover: b.cover } : b); return; }
   $("titleDialog").close("pick");
   openRecord({ self: true, book: { title: b.title, authors: b.authors || [], publisher: b.publisher || "", cover: b.cover || "", pages: b.pages || null } });
 });
@@ -3973,3 +3978,33 @@ $("regNext").addEventListener("click", async () => {
   $("regDialog").close("next"); openScanner();
 });
 $("regDialog").addEventListener("cancel", () => { regMode = false; });
+
+// ---------- 흘려듣기: 유튜브 주소 붙여넣기 (검색 열쇠 없이 제목·채널·썸네일) + 최근 본 유튜브 ----------
+const YT_KEY = "kbc:ytRecent";
+const isYtUrl = (s) => /^\s*(https?:\/\/)?([\w-]+\.)?(youtube\.com|youtu\.be)\//i.test(s || "");
+const ytRecent = () => { try { return JSON.parse(localStorage.getItem(YT_KEY) || "[]"); } catch { return []; } };
+function ytRemember(it) {
+  const list = [it, ...ytRecent().filter((x) => x.what !== it.what)].slice(0, 8);
+  try { localStorage.setItem(YT_KEY, JSON.stringify(list.map(({ what, cover, channel }) => ({ what, cover, channel })))); } catch {}
+}
+function paintYtRecent() {
+  const list = ytRecent();
+  $("tMine").hidden = false;
+  $("tMine").innerHTML = list.length ? `<small>최근 본 유튜브 · 눌러서 바로 골라요</small>` + list.map((it, i) => `<button type="button" class="find-item yt" data-yt="${i}">
+      ${it.cover ? `<img src="${esc(it.cover)}" alt="" loading="lazy">` : `<span class="noimg"></span>`}
+      <span><b>${esc(it.what)}</b><small>유튜브${it.channel ? ` · ${esc(it.channel)}` : ""}</small></span></button>`).join("") : "";
+}
+async function ytLookup(q, my) {
+  $("tFound").innerHTML = `<small>유튜브 영상 정보를 가져오는 중…</small>`;
+  try {
+    const r = await fetch(`/api/yt?url=${encodeURIComponent(q.trim())}`);
+    const d = r.ok ? await r.json() : null;
+    if (my !== tSeq) return;
+    if (!d || !d.title) { $("tFound").innerHTML = `<small>영상 정보를 찾지 못했어요. 주소를 다시 확인하거나 아래 버튼으로 이름을 적어 주세요.</small>`; return; }
+    const what = d.kind === "channel" ? d.channel : d.channel ? `${d.channel} · ${d.title}` : d.title;
+    tFoundList = [{ yt: true, what, title: d.title, channel: d.channel, cover: d.cover || "" }];
+    $("tFound").innerHTML = `<small>유튜브 · 눌러서 골라요</small><button type="button" class="find-item yt" data-f="0">
+        ${d.cover ? `<img src="${esc(d.cover)}" alt="" loading="lazy">` : `<span class="noimg"></span>`}
+        <span><b>${esc(d.kind === "channel" ? d.channel : d.title)}</b><small>유튜브${d.kind === "channel" ? " 채널" : d.channel ? ` · ${esc(d.channel)}` : ""}</small></span></button>`;
+  } catch { if (my === tSeq) $("tFound").innerHTML = `<small>찾지 못했어요. 인터넷 연결을 확인해 주세요.</small>`; }
+}

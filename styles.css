@@ -1555,3 +1555,4 @@ i.lk .ico { width: 13px; height: 13px; }
 .td-ph small { color: var(--muted); font-size: 13px; }
 #beTopicBtn { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px 4px 4px; }
 #beTopicBtn .ico { width: 30px; height: 30px; padding: 6px; border-radius: 10px; margin: 0; vertical-align: 0; }
+.find-item.yt img { width: 80px; height: 45px; border-radius: 6px; }
