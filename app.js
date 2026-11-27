@@ -133,7 +133,14 @@ function progressText(r) {
   return nth + (r.totalPages ? `진도율 ${pct(r)}% (${to} / ${r.totalPages}쪽)` : `${to}쪽까지 읽었어요`);
 }
 const hasHangul = (t) => /[가-힣]/.test(t || "");
-const shelfOf = (r) => r.shelf || (hasHangul(r.title) ? "ko" : "en");
+// 한글책/영어책 판단: 괄호 안 (책+오디오CD) 같은 서점 설명은 빼고, 한글 글자(×2)와 영어 글자 수를 비교
+const isKoTitle = (t) => {
+  t = t || "";
+  const core = t.replace(/\([^)]*\)|\[[^\]]*\]|\{[^}]*\}|〈[^〉]*〉|<[^>]*>/g, " ").trim() || t;
+  const ko = (core.match(/[가-힣]/g) || []).length, en = (core.match(/[A-Za-z]/g) || []).length;
+  return ko * 2 >= en && ko > 0;
+};
+const shelfOf = (r) => r.shelf || (isKoTitle(r.title) ? "ko" : "en");
 const stampList = (sh) => readRecs().filter((r) => !sh || shelfOf(r) === sh).flatMap((r) => (r.finishes || []).map((f) => ({ r, at: f.at || 0, round: f.round }))).sort((a, b) => a.at - b.at);
 
 // ---------- UI 유틸 ----------
@@ -319,7 +326,7 @@ async function openSheet(isbn, scanInfo, opts = {}) {
   if (!ex0) lookupQuick(isbn).then((qb) => {
     if (!qb || fullDone || !sheet || sheet.isbn !== isbn || sheet.book) return;
     sheet.book = qb; sheet.partial = true;
-    $("sCat").textContent = qb.category || (hasHangul(qb.title) ? "한글책" : "영어책");
+    $("sCat").textContent = qb.category || (isKoTitle(qb.title) ? "한글책" : "영어책");
     $("sTitle").textContent = qb.title;
     $("sAuthor").textContent = `〈작가〉 ${(qb.authors || []).join(", ") || "모름"}`;
     $("sPages").textContent = qb.pages ? `〈페이지〉 ${qb.pages} pages` : "〈페이지〉 찾는 중…";
@@ -359,7 +366,7 @@ async function openSheet(isbn, scanInfo, opts = {}) {
   }
   const b = book || {};
   if (opts.us == null) usChip(usHit(isbn, ex0?.title || b.title, ex0?.authors || b.authors));
-  $("sCat").textContent = b.category || ex0?.category || (hasHangul(b.title || ex0?.title) ? "한글책" : "영어책");
+  $("sCat").textContent = b.category || ex0?.category || (isKoTitle(b.title || ex0?.title) ? "한글책" : "영어책");
   $("sTitle").textContent = ex0?.title || b.title;
   $("sAuthor").textContent = `〈작가〉 ${ex0?.authors || (b.authors || []).join(", ") || "모름"}`;
   const pages = ex0?.totalPages || b.pages;
@@ -418,7 +425,7 @@ $("shelfPick").addEventListener("click", (e) => { const b = e.target.closest("bu
 $("rTitle").addEventListener("input", () => {
   const v = $("rTitle").value.trim();
   if (shelfManual || chosenShelf === "focus" || !/[A-Za-z가-힣]/.test(v)) return;
-  const s = hasHangul(v) ? "ko" : "en";
+  const s = isKoTitle(v) ? "ko" : "en";
   if (s !== chosenShelf) { chosenShelf = s; paintShelf(); }
 });
 
@@ -491,7 +498,7 @@ function openRecord({ existing = null, isbn = null, book = null, self = false, r
   $("rDescHead").hidden = !desc;
 
   // 책장 미리 고르기: 집중듣기 칸에서 왔으면 집중듣기, 아니면 제목 글자(한글/영어)가 먼저, 제목이 없을 때만 포트폴리오 칸 → ISBN 앞자리
-  const byTitle = title ? (hasHangul(title) ? "ko" : "en") : null;
+  const byTitle = title ? (isKoTitle(title) ? "ko" : "en") : null;
   shelfManual = false;
   chosenShelf = existing ? shelfOf(existing) : (!notFocus && preferShelf === "focus") ? "focus"
     : byTitle || (preferShelf && preferShelf !== "focus" ? preferShelf : null) || (rec.isbn?.startsWith("97911") || rec.isbn?.startsWith("97889") ? "ko" : "en");
@@ -819,6 +826,9 @@ function fillView(r) {
   const bt = bookTimes(r); // 따로 적은 읽은 시간
   if (bt.length) $("vSessions").innerHTML += `<li class="round-h"><b>${ico("clock")} 읽은 시간</b><span>모두 ${fmtMin(bookMins(r))}</span></li>` + bt.map((x) => `<li><span>${prettyDay(x.day)}</span><b>${fmtMin(x.minutes)}</b></li>`).join("");
   $("vHome").checked = !!r.home; $("vHome").disabled = !!PEEK;
+  // 다른 집 책장 구경 중에는 우리 집 책장 체크·책장 바꾸기를 안 보여 줌
+  $("vHome").closest("label").hidden = !!PEEK;
+  $("vShelf").closest("dd").hidden = !!PEEK; $("vShelf").closest("dd").previousElementSibling.hidden = !!PEEK;
   $("vTimes").innerHTML = timesRead(r) ? `${tallySvg(timesRead(r))}<span>${timesRead(r)}번 ${isFo(r) ? "들었어요" : "읽었어요"}</span>` : "";
   $("vMore").hidden = false;
   $("vTime").hidden = true; // 읽은 시간은 책마다 적지 않고 포트폴리오에서 그날 한글책·영어책 전체로 적어요

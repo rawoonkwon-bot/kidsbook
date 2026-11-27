@@ -642,7 +642,7 @@ body.peek #dayCats, body.peek .day-sub, body.peek .day-actions, body.peek .day-i
 .tally { display: block; }
 .v-times { display: flex; align-items: center; gap: 8px; margin: 6px 0 2px; font-size: 14px; font-weight: 700; color: var(--forest); }
 .v-times:empty { display: none; }
-.v-times .tally { height: 20px; width: auto; }
+.v-times .tally { width: 22px; height: auto; }
 .sessions li.round-h { display: flex; justify-content: space-between; gap: 8px; background: var(--sage-l); border-radius: 10px; padding: 6px 10px; margin-top: 8px; font-size: 13px; color: var(--forest-d); list-style: none; }
 .s-mine.link { cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 
