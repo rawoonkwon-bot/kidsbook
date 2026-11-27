@@ -1475,7 +1475,7 @@ function renderStats() {
     <div class="vbar" title="${m} ${mp[m]}쪽">${mp[m] ? `<b>${mp[m]}</b>` : ""}<i style="height:${(mp[m] / mmax) * 82}%"></i><small>${Number(m.slice(5))}월</small></div>`).join("");
 }
 
-// ---------- 소식: 수학 공부 시간 (일평균 · 월평균 · 달마다) ----------
+// ---------- 소식: 수학 공부 시간 (이번 주 평균 · 이번 달 평균 · 이번 달 총 시간 · 달마다) ----------
 const isMath = (j) => j.cat === "math" || /수학/.test(CAT[j.cat]?.name || "");
 function renderMath() {
   const ms = journal.filter((j) => isMath(j) && j.minutes);
@@ -1485,16 +1485,20 @@ function renderMath() {
   const now = new Date(), thisM = localDay().slice(0, 7);
   const byDay = {}, byMonth = {};
   for (const j of ms) { byDay[j.day] = (byDay[j.day] || 0) + j.minutes; const m = j.day.slice(0, 7); byMonth[m] = (byMonth[m] || 0) + j.minutes; }
-  // 일평균: 이번 달 1일부터 오늘까지 모든 날로 나눔 / 월평균: 기록이 있는 달 기준
-  const daysThis = Object.keys(byDay).filter((d) => d.startsWith(thisM));
+  // 이번 주 평균: 이번 주 월요일~오늘의 하루 평균 / 이번 달 평균: 이번 달 1일~오늘의 하루 평균 / 이번 달 총 시간
+  const today = localDay();
+  const mon = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((now.getDay() + 6) % 7));
+  const weekFrom = localDay(mon), weekDays = (now.getDay() + 6) % 7 + 1;
+  const wkDays = Object.keys(byDay).filter((d) => d >= weekFrom && d <= today);
+  const totWeek = wkDays.reduce((a, d) => a + byDay[d], 0);
+  const weekAvg = totWeek ? Math.round(totWeek / weekDays) : 0;
   const totThis = byMonth[thisM] || 0, passed = now.getDate();
+  const daysThis = Object.keys(byDay).filter((d) => d.startsWith(thisM));
   const dayAvg = totThis ? Math.round(totThis / passed) : 0;
-  const mKeys = Object.keys(byMonth);
-  const monAvg = mKeys.length ? Math.round(mKeys.reduce((a, m) => a + byMonth[m], 0) / mKeys.length) : 0;
   $("mathTotals").innerHTML = [
-    ["하루 평균", dayAvg ? fmtMin(dayAvg) : "-", daysThis.length ? `${passed}일 중 ${daysThis.length}일 공부` : "이번 달 기록 없음"],
-    ["한 달 평균", monAvg ? fmtMin(monAvg) : "-", mKeys.length ? `${mKeys.length}달 기록` : "기록 없음"],
-    [`${now.getMonth() + 1}월 모두`, totThis ? fmtMin(totThis) : "-", ""],
+    ["이번 주 평균", weekAvg ? fmtMin(weekAvg) : "-", wkDays.length ? `하루 기준 · ${weekDays}일 중 ${wkDays.length}일` : "이번 주 기록 없음"],
+    ["이번 달 평균", dayAvg ? fmtMin(dayAvg) : "-", daysThis.length ? `하루 기준 · ${passed}일 중 ${daysThis.length}일` : "이번 달 기록 없음"],
+    [`${now.getMonth() + 1}월 총 시간`, totThis ? fmtMin(totThis) : "-", daysThis.length ? `${daysThis.length}일 공부` : "이번 달 기록 없음"],
   ].map(([n, v, s]) => `<div><small>${n}</small><b>${v}</b>${s ? `<em>${s}</em>` : ""}</div>`).join("");
   const months = Array.from({ length: 6 }, (_, i) => localDay(new Date(now.getFullYear(), now.getMonth() - 5 + i, 1)).slice(0, 7));
   const mmax = Math.max(1, ...months.map((m) => byMonth[m] || 0));
