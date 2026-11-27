@@ -369,14 +369,14 @@ async function openSheet(isbn, scanInfo, opts = {}) {
   if (existing) {
     $("sMine").hidden = false;
     const fo = isFo(existing); // 집중듣기 책은 "듣기"로
-    $("sMine").textContent = existing.done ? `${fo ? "🎧" : "📚"} ${timesRead(existing)}번 다 ${fo ? "들은" : "읽은"} 책이에요 · 기록 보기 ›` : `${fo ? "🎧 듣고" : "📚 읽고"} 있는 책이에요 · ${progressText(existing) || "쪽수 기록 없음"}`;
+    $("sMine").textContent = existing.done ? `${timesRead(existing)}번 다 ${fo ? "들은" : "읽은"} 책이에요 · 기록 보기 ›` : `${fo ? "듣고" : "읽고"} 있는 책이에요 · ${progressText(existing) || "쪽수 기록 없음"}`;
     $("sMine").classList.toggle("link", !!existing.done);
-    $("sOk").textContent = existing.done ? `🔁 다시 ${fo ? "듣기" : "읽기"} (${roundOf(existing) + 1}번째)` : "이어서 기록하기";
+    $("sOk").textContent = existing.done ? `다시 ${fo ? "듣기" : "읽기"} (${roundOf(existing) + 1}번째)` : "이어서 기록하기";
   } else if (foRec) { // 집중듣기만 한 책: 들은 기록은 따로 두고, 읽은 책으로 새로 기록
     $("sMine").hidden = false;
-    $("sMine").textContent = foRec.done ? `🎧 ${timesRead(foRec)}번 다 들은 책이에요 · 들은 기록 보기 ›` : `🎧 듣고 있는 책이에요 · 들은 기록 보기 ›`;
+    $("sMine").textContent = foRec.done ? `${timesRead(foRec)}번 다 들은 책이에요 · 들은 기록 보기 ›` : `듣고 있는 책이에요 · 들은 기록 보기 ›`;
     $("sMine").classList.add("link");
-    $("sOk").textContent = "📖 읽은 책으로 기록하기";
+    $("sOk").textContent = "읽은 책으로 기록하기";
   }
 }
 $("sDesc").addEventListener("click", () => $("sDesc").classList.toggle("open"));
@@ -419,7 +419,7 @@ function paintDate() {
   const which = rDay === t ? "today" : rDay === y ? "yesterday" : "pick";
   [...$("dateChips").querySelectorAll("button")].forEach((b) => b.classList.toggle("on", b.dataset.d === which));
   const [, m, d] = rDay.split("-").map(Number);
-  $("datePickBtn").textContent = which === "pick" ? `📅 ${m}월 ${d}일` : "📅 날짜 고르기";
+  $("datePickBtn").textContent = which === "pick" ? `${m}월 ${d}일` : "날짜 고르기";
   $("dateSay").textContent = `${prettyDay(rDay)}에 읽었어요`;
   $("rDate").max = t; $("rDate").value = rDay;
 }
@@ -488,7 +488,7 @@ function openRecord({ existing = null, isbn = null, book = null, self = false, r
 
   const prev = existing && !reread ? readTo(existing) : 0;
   $("soFar").hidden = !prev && !reread;
-  $("soFar").textContent = reread ? `🔁 ${roundOf(existing) + 1}번째 ${isFo(existing) ? "듣기" : "읽기"}를 시작해요! 1쪽부터 다시 기록해요`
+  $("soFar").textContent = reread ? `${roundOf(existing) + 1}번째 ${isFo(existing) ? "듣기" : "읽기"}를 시작해요! 1쪽부터 다시 기록해요`
     : prev ? `지난번까지 ${prev}쪽 읽었어요 → 오늘은 ${prev + 1}쪽부터` : "";
   $("rTotal").value = total || "";
   $("rFrom").value = prev + 1; // 다음 기록은 지난번 다음 쪽부터 (고칠 수 있어요)
@@ -730,8 +730,8 @@ function paintReward() {
   const k = kidNow(), rw = k?.[rewardKey(stampSh)] || "";
   $("rewardEdit").hidden = true;
   $("reward").innerHTML = rw
-    ? `<span class="gift">🎁</span><span><small>${STAMPS_PER_BOARD}개 모으면</small><b>${esc(rw)}</b></span>${PEEK ? "" : `<button type="button" class="link-btn" data-rw>바꾸기</button>`}`
-    : PEEK ? "" : `<button type="button" class="reward-add" data-rw>🎁 ${STAMPS_PER_BOARD}개 모으면 받을 선물을 정해 주세요 ›</button>`;
+    ? `<span class="gift">${ico("gift")}</span><span><small>${STAMPS_PER_BOARD}개 모으면</small><b>${esc(rw)}</b></span>${PEEK ? "" : `<button type="button" class="link-btn" data-rw>바꾸기</button>`}`
+    : PEEK ? "" : `<button type="button" class="reward-add" data-rw>${ico("gift")} ${STAMPS_PER_BOARD}개 모으면 받을 선물을 정해 주세요 ›</button>`;
   $("reward").hidden = !$("reward").innerHTML;
 }
 $("reward").addEventListener("click", (e) => {
@@ -763,7 +763,7 @@ function openCert(board) {
     <p class="cert-no">${shWord(stampSh)} ${board + 1}번째 스탬프판</p>
     <p class="cert-name"><b>${esc(k?.nick || "")}</b>${k && gradeOf(k) ? ` <small>${gradeOf(k)}</small>` : ""}</p>
     <p class="cert-body">위 어린이는 ${d(list[0])}부터 ${d(list.at(-1))}까지<br>${shWord(stampSh)} <b>${STAMPS_PER_BOARD}권</b>을 끝까지 읽었기에<br>이 졸업장을 드립니다.</p>
-    ${k?.[rewardKey(stampSh)] ? `<p class="cert-reward">🎁 약속한 선물: <b>${esc(k[rewardKey(stampSh)])}</b></p>` : ""}
+    ${k?.[rewardKey(stampSh)] ? `<p class="cert-reward">${ico("gift")} 약속한 선물: <b>${esc(k[rewardKey(stampSh)])}</b></p>` : ""}
     <ol class="cert-books">${list.map((x) => `<li>${esc(x.r.title)}${x.round > 1 ? ` <small>(${x.round}번째)</small>` : ""}</li>`).join("")}</ol>
     <p class="cert-date">${d(list.at(-1))}</p>`;
   $("certPage").showModal();
@@ -805,12 +805,12 @@ function fillView(r) {
     return head + ss.map((s) => `<li><span>${prettyDay(s.day)}</span><b>${sessionText(s)}</b></li>`).join("");
   }).join("");
   const bt = bookTimes(r); // 따로 적은 읽은 시간
-  if (bt.length) $("vSessions").innerHTML += `<li class="round-h"><b>⏱ 읽은 시간</b><span>모두 ${fmtMin(bookMins(r))}</span></li>` + bt.map((x) => `<li><span>${prettyDay(x.day)}</span><b>${fmtMin(x.minutes)}</b></li>`).join("");
+  if (bt.length) $("vSessions").innerHTML += `<li class="round-h"><b>${ico("clock")} 읽은 시간</b><span>모두 ${fmtMin(bookMins(r))}</span></li>` + bt.map((x) => `<li><span>${prettyDay(x.day)}</span><b>${fmtMin(x.minutes)}</b></li>`).join("");
   $("vHome").checked = !!r.home; $("vHome").disabled = !!PEEK;
   $("vTimes").innerHTML = timesRead(r) ? `${tallySvg(timesRead(r))}<span>${timesRead(r)}번 ${isFo(r) ? "들었어요" : "읽었어요"}</span>` : "";
   $("vMore").hidden = false;
   $("vTime").hidden = true; // 읽은 시간은 책마다 적지 않고 포트폴리오에서 그날 한글책·영어책 전체로 적어요
-  $("vMore").textContent = r.done ? `🔁 다시 ${isFo(r) ? "듣기" : "읽기"} (${rounds + 1}번째)` : "➕ 이어서 기록하기";
+  $("vMore").textContent = r.done ? `다시 ${isFo(r) ? "듣기" : "읽기"} (${rounds + 1}번째)` : "이어서 기록하기";
   $("vSessH").textContent = isFo(r) ? "🎧 들은 기록" : "📖 읽은 기록";
   $("vActivity").hidden = isFo(r) || !(r.done && !(r.bonusRounds || []).includes(rounds));
   $("vScore").innerHTML = r.score ? `${starsHtml(r.score)} ${r.score}점` : "주지 않았어요";
@@ -904,7 +904,7 @@ function decorate(c) {
   // 한글책·영어책·흘려듣기: 그날 전체 시간은 포트폴리오 제목 줄에서 바로 적음 (흘려듣기 창에는 시간 칸 없음)
   if (c.kind === "book" || c.key === "listen") d.tot = true;
   if (c.key === "listen") d.amount = null;
-  if (c.kind === "note") Object.assign(d, { text: c.key === "memo" ? "메모 · 일기" : c.key === "secret" ? "🔒 나만 보는 비밀 메모" : "내용", textPh: c.key === "secret" ? "여기 쓴 글과 사진은 나만 볼 수 있어요. 친구들은 책장을 구경해도 못 봐요." : "오늘 있었던 일, 느낀 점, 칭찬할 점을 일기처럼 자유롭게 적어요" });
+  if (c.kind === "note") Object.assign(d, { text: c.key === "memo" ? "메모 · 일기" : c.key === "secret" ? "나만 보는 비밀 메모" : "내용", textPh: c.key === "secret" ? "여기 쓴 글과 사진은 나만 볼 수 있어요. 친구들은 책장을 구경해도 못 봐요." : "오늘 있었던 일, 느낀 점, 칭찬할 점을 일기처럼 자유롭게 적어요" });
   return d;
 }
 let catList = readJSON(CATS_KEY, null);
@@ -1058,7 +1058,7 @@ function dayGroupsHtml(day, sheet = false) { // sheet: "이 날 기록 더하기
         n++;
         // 한글책·영어책: 그날 따로 적은 읽은 시간은 책 줄에 같이 (집중듣기처럼 한 줄로)
         const tj = c.book ? journalOn(day, c.key).filter((j) => j.book === r.id && j.minutes) : [];
-        const chips = tj.map((j) => `<button type="button" class="t-chip" data-edit="${j.id}" aria-label="읽은 시간 고치기">⏱ ${fmtMin(j.minutes)}</button>`).join("");
+        const chips = tj.map((j) => `<button type="button" class="t-chip" data-edit="${j.id}" aria-label="읽은 시간 고치기">${ico("clock")} ${fmtMin(j.minutes)}</button>`).join("");
         rows += `<div class="day-item link" data-view="${r.id}">
           ${r.cover ? `<img src="${esc(r.cover)}" alt="">` : `<span class="noc"></span>`}
           <div class="grow"><b>${esc(r.title)}</b><small>${sessionText(s)}${chips}</small></div></div>`;
@@ -1072,7 +1072,7 @@ function dayGroupsHtml(day, sheet = false) { // sheet: "이 날 기록 더하기
         // 박스 제목에 종류 이름·아이콘이 있으니, 기록에는 내용만
         const mins = j.minutes ? fmtMin(j.minutes) : "";
         const note = c.kind === "note" && !j.what;
-        const main = j.total ? `⏱ 전체 읽은 시간 ${mins}` : j.what || mins || c.name;
+        const main = j.total ? `전체 읽은 시간 ${mins}` : j.what || mins || c.name;
         const sub = j.total ? j.text || "" : j.what ? [mins, j.text || ""].filter(Boolean).join(" · ") : mins ? j.text || "" : "";
         rows += `<div class="day-item link" data-edit="${j.id}">${j.cover ? `<img src="${esc(j.cover)}" alt="">` : ""}
           <div class="grow">${note ? richHtml(j.text, j.photos || [], "ph-row", "dn-text") : `<b>${esc(main)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}${j.photos?.length ? `<div class="ph-row" data-paths="${esc(j.photos.join("|"))}"></div>` : ""}`}</div>
@@ -1112,14 +1112,14 @@ function fillDay(day) {
     const c = CAT[dayPanel];
     const ongoing = records.filter((r) => shelfOf(r) === dayPanel && !r.done);
     html += `<div class="day-actions">
-        <button type="button" class="btn lime" data-act="scan">📷 책 스캔</button>
+        <button type="button" class="btn lime" data-act="scan">${ico("barcode")} 책 스캔</button>
         <button type="button" class="btn ghost ic-btn" data-act="title" style="background:var(--soft)">${ico("search")} 책 검색</button>
-        ${c.hybrid ? `<button type="button" class="btn ghost" data-act="entry" style="background:var(--soft)">✏️ 직접 적기</button>` : ""}
+        ${c.hybrid ? `<button type="button" class="btn ghost" data-act="entry" style="background:var(--soft)">${ico("pencil")} 직접 적기</button>` : ""}
       </div>`;
     html += ongoing.length ? `<small>읽고 있는 ${c.name} (누르면 이 날 읽은 쪽수를 기록해요)</small>` +
       ongoing.map((r) => `<div class="day-item link" data-more="${r.id}">
         ${r.cover ? `<img src="${esc(r.cover)}" alt="">` : `<span>${c.svg}</span>`}
-        <div class="grow"><b>${esc(r.title)}</b><small>${progressText(r) || "아직 쪽수 기록 없음"}</small></div><span>➕</span></div>`).join("")
+        <div class="grow"><b>${esc(r.title)}</b><small>${progressText(r) || "아직 쪽수 기록 없음"}</small></div><span>${ico("plus")}</span></div>`).join("")
       : `<small>읽고 있는 ${c.name} 책이 없어요. 책 스캔으로 새 책을 기록해 보세요.</small>`;
   } else {
     html = dayGroupsHtml(day, true);
@@ -1683,7 +1683,7 @@ function openKids(first) {
   kidsFirst = first;
   kidDraft = kids.map((k) => ({ id: k.id, nick: k.nick, g: gradeIdx(k) }));
   if (!kidDraft.length) kidDraft.push({ id: uid(), nick: "", g: -1 });
-  $("kTitle").textContent = first ? "반가워요! 자녀를 등록해 주세요 🍌" : "자녀 관리";
+  $("kTitle").textContent = first ? "반가워요! 자녀를 등록해 주세요" : "자녀 관리";
   $("kCancel").hidden = first;
   paintKids();
   $("kidsDialog").showModal();
@@ -1918,7 +1918,7 @@ $("gradePick").addEventListener("click", async (e) => {
   closeMomRes();
   momMode = "grade"; momGrade = g; momOffset2 = 0;
   $("chipGrade").classList.add("on"); $("chipGradeTx").textContent = ` · ${GRADES[g]}`;
-  showMomRes(`🎒 ${GRADES[g]} 아이가 있는 집`);
+  showMomRes(`${GRADES[g]} 아이가 있는 집`);
   try { addRes(await sync.momsByGrade(g, schoolYear(), 0), g); } catch { $("momResList").innerHTML = `<li class="muted">불러오지 못했어요. 인터넷 연결을 확인해 주세요.</li>`; }
 });
 function addRes({ list, more }, g) {
@@ -1940,7 +1940,7 @@ $("chipSame").addEventListener("click", async () => {
   closeMomRes();
   momMode = "same"; $("chipSame").setAttribute("aria-pressed", "true");
   const k = kidNow();
-  showMomRes(`📚 ${k ? k.nick + " 책장과" : "우리 책장과"} 같은 책을 읽은 친구`);
+  showMomRes(`${k ? k.nick + " 책장과" : "우리 책장과"} 같은 책을 읽은 친구`);
   const isbns = [...new Set(records.map((r) => r.isbn).filter((i) => i && /^\d{10,13}$/.test(i)))].slice(0, 500);
   if (!isbns.length) { $("momResList").innerHTML = `<li class="muted">책을 먼저 기록하면 같은 책을 읽은 친구를 찾아 드려요.</li>`; return; }
   try {
@@ -2693,7 +2693,7 @@ function paintBlog(root, st) {
   const shown = st.cat ? st.list.filter((b) => catOf(st, b) === st.cat) : st.list;
   root.innerHTML = `<div class="bl-wrap"><aside class="bl-side">
     <div class="bl-head">${avatar(st.nick, st.face, "av big")}<div class="grow"><h2>${esc(st.nick)}님의 블로그</h2><p>글 ${st.list.length}</p></div>
-      ${st.me ? `<button type="button" class="follow-btn" data-act="write">✏️ 글쓰기</button>` : `<button type="button" class="follow-btn${nb ? " on" : ""}" data-act="follow">${nb ? "이웃 ✓" : "＋ 이웃 추가"}</button>`}</div>
+      ${st.me ? `<button type="button" class="pt-btn" data-act="write" aria-label="글쓰기" title="글쓰기">${ico("pencil")}</button>` : `<button type="button" class="follow-btn${nb ? " on" : ""}" data-act="follow">${nb ? "이웃 ✓" : "＋ 이웃 추가"}</button>`}</div>
     <section class="gb-sec">${gbPreview(st)}</section>
     ${st.me ? "" : `<section><h3 class="sec-title">아이 책장</h3><div class="browse">${kl.length
       ? kl.map((k) => `<button type="button" class="kid" data-act="kid" data-k="${esc(k.id)}">${esc(k.nick)}${gradeOf(k) ? ` <small class="grade">${gradeOf(k)}</small>` : ""}</button>`).join("")
@@ -2708,9 +2708,9 @@ function paintBlog(root, st) {
         <span class="pop-im">${blogThumb(b, "pop-img")}</span><b>${esc(b.title)}</b><small>조회 ${b.views}</small></button>`).join("")}</div></section>` : ""}
     <section><div class="pop-head"><h3 class="sec-title">${st.cat ? esc(st.cat === NOCAT ? "미분류" : st.cats.find((c) => c.id === st.cat)?.name || "전체글") : "전체글"}${st.cat ? ` <small class="muted">${shown.length}</small>` : ""}</h3>${st.list.length ? `<span class="bl-view"><button type="button" data-act="view" data-v="list" class="${st.view === "list" ? "on" : ""}">목록</button><button type="button" data-act="view" data-v="grid" class="${st.view === "grid" ? "on" : ""}">사진</button></span>` : ""}</div>
       ${!shown.length ? `<p class="muted bl-msg">${st.me ? (st.cat ? "이 카테고리에는 아직 글이 없어요." : "아직 쓴 글이 없어요. 위의 글쓰기를 눌러 첫 글을 남겨 보세요!") : "아직 공개한 글이 없어요."}</p>`
-      : st.view === "grid" ? `<div class="tp-grid">${shown.map((b) => `<button type="button" class="tp-item" data-act="post" data-id="${b.id}">${blogThumb(b, "tp-cover")}<span>${b.is_public ? "" : "🔒 "}${esc(b.title)}</span></button>`).join("")}</div>`
+      : st.view === "grid" ? `<div class="tp-grid">${shown.map((b) => `<button type="button" class="tp-item" data-act="post" data-id="${b.id}">${blogThumb(b, "tp-cover")}<span>${b.is_public ? "" : `<i class="lk">${ico("lock")}</i>`}${esc(b.title)}</span></button>`).join("")}</div>`
       : `<ul class="bl-list">${shown.map((b) => `<li><button type="button" class="bl-row" data-act="post" data-id="${b.id}">${blogThumb(b, "bl-th")}<span class="grow"><b>${esc(b.title)}</b><em class="bl-pv">${esc(plainText(b.body || "").replace(/\s+/g, " ").slice(0, 140))}</em>
-          <small>${!st.cat && catOf(st, b) !== NOCAT ? `${esc(st.cats.find((c) => c.id === b.cat).name)} · ` : ""}${ago(b.created_at)}${b.tags?.length ? ` · #${esc(b.tags[0])}` : ""} · ${b.is_public ? `조회 ${b.views || 0}` : "🔒 나만 보기"}</small></span></button></li>`).join("")}</ul>`}
+          <small>${!st.cat && catOf(st, b) !== NOCAT ? `${esc(st.cats.find((c) => c.id === b.cat).name)} · ` : ""}${ago(b.created_at)}${b.tags?.length ? ` · #${esc(b.tags[0])}` : ""} · ${b.is_public ? `조회 ${b.views || 0}` : `<i class="lk">${ico("lock")}</i>나만 보기`}</small></span></button></li>`).join("")}</ul>`}
     </section></div></div>`;
   fillTopicImgs(root);
   if (!st.gb) loadGuest(st).then(() => { const s = root.querySelector(".gb-sec"); if (s) s.innerHTML = gbPreview(st); });
@@ -2727,7 +2727,7 @@ function gbPreview(st) {
   const head = `<div class="pop-head"><h3 class="sec-title">방명록 ${st.gb ? `<small class="muted">${top.length}</small>` : ""}</h3><button type="button" class="link-btn" data-act="guest">${st.me ? "전체보기 ›" : `${ico("pencil")} 남기기`}</button></div>`;
   if (!st.gb) return head + `<p class="muted bl-msg sm">불러오는 중…</p>`;
   if (!top.length) return head + `<p class="muted bl-msg sm">${st.me ? "아직 방명록이 없어요. 이웃이 인사를 남기면 여기에 보여요." : "첫 인사를 남겨 보세요 😊"}</p>`;
-  return head + `<ul class="gb-mini">${top.slice(0, 2).map((g) => `<li><button type="button" data-act="guest">${avatar(g.nick, g.face, "av sm")}<span><b>${esc(g.nick)}</b>${g.secret ? " 🔒" : ""}<em>${esc(g.body.length > 50 ? g.body.slice(0, 50) + "…" : g.body)}</em></span></button></li>`).join("")}</ul>`;
+  return head + `<ul class="gb-mini">${top.slice(0, 2).map((g) => `<li><button type="button" data-act="guest">${avatar(g.nick, g.face, "av sm")}<span><b>${esc(g.nick)}</b>${g.secret ? `<i class="lk">${ico("lock")}</i>` : ""}<em>${esc(g.body.length > 50 ? g.body.slice(0, 50) + "…" : g.body)}</em></span></button></li>`).join("")}</ul>`;
 }
 let gbNow = null, gbReply = null;
 async function openGuest(st) {
@@ -2742,7 +2742,7 @@ function paintGuest() {
   if (!st.gb) { $("gbList").innerHTML = `<li class="muted">불러오는 중…</li>`; return; }
   const me = sync.myId(), all = st.gb, top = all.filter((g) => !g.parent_id);
   const row = (g, sub) => `<li class="gb-item${sub ? " sub" : ""}">
-      <div class="gb-top"><button type="button" class="who" data-u="${esc(g.user_id)}">${avatar(g.nick, g.face, "av sm")}<b>${esc(g.nick)}</b></button>${g.secret ? `<span class="gb-lock">🔒 비밀글</span>` : ""}<small>${ago(g.created_at)}</small>
+      <div class="gb-top"><button type="button" class="who" data-u="${esc(g.user_id)}">${avatar(g.nick, g.face, "av sm")}<b>${esc(g.nick)}</b></button>${g.secret ? `<span class="gb-lock" title="비밀글" aria-label="비밀글">${ico("lock")}</span>` : ""}<small>${ago(g.created_at)}</small>
         <span class="gb-acts">${!sub && st.me ? `<button type="button" class="link-btn" data-g="reply" data-id="${g.id}">답글</button>` : ""}${g.user_id === me || st.me ? `<button type="button" class="icon-btn" data-g="del" data-id="${g.id}" aria-label="지우기" title="지우기">${ico("trash")}</button>` : `<button type="button" class="icon-btn" data-g="flag" data-id="${g.id}" aria-label="신고" title="신고">${ico("flag")}</button>`}</span></div>
       <p>${esc(g.body)}</p>
       ${gbReply === g.id ? `<div class="gb-rbox"><input id="gbRIn" maxlength="300" placeholder="답글을 남겨요" /><button type="button" class="pill-btn" data-g="send" data-id="${g.id}">남기기</button></div>` : ""}</li>`;
@@ -2789,12 +2789,12 @@ async function paintCheer(r) {
   const msgs = list.filter((c) => c.body).slice(0, 5).map((c) => `<li><b>${esc(c.nick)}</b><span>${esc(c.body)}</span><small>${ago(c.created_at)}</small></li>`).join("");
   if (PEEK) {
     const mine = list.find((c) => c.user_id === me);
-    box.innerHTML = `<div class="ch-head"><b>👏 응원 ${list.length}</b></div>` + (mine
+    box.innerHTML = `<div class="ch-head"><b>${ico("thumb-up")} 응원 ${list.length}</b></div>` + (mine
       ? `<p class="ch-done">응원했어요 ✓${mine.body ? ` 「${esc(mine.body)}」` : ""} <button type="button" class="link-btn" data-c="undo" data-id="${mine.id}">취소</button></p>`
-      : `<div class="ch-form"><input id="chIn" maxlength="100" placeholder="한 줄 응원 (안 써도 돼요) 예: 멋지다! 나도 읽어 볼래" /><button type="button" class="btn lime" data-c="send">👏 응원하기</button></div>`) +
+      : `<div class="ch-form"><input id="chIn" maxlength="100" placeholder="한 줄 응원 (안 써도 돼요) 예: 멋지다! 나도 읽어 볼래" /><button type="button" class="btn lime" data-c="send">${ico("thumb-up")} 응원하기</button></div>`) +
       (msgs ? `<ul class="ch-list">${msgs}</ul>` : "");
   } else {
-    box.innerHTML = `<div class="ch-head"><b>👏 받은 응원 ${list.length}</b></div>` + (list.length
+    box.innerHTML = `<div class="ch-head"><b>${ico("thumb-up")} 받은 응원 ${list.length}</b></div>` + (list.length
       ? (msgs ? `<ul class="ch-list">${msgs}</ul>` : `<p class="muted ch-none">${list.map((c) => esc(c.nick)).slice(0, 5).join(", ")}님이 응원했어요</p>`)
       : `<p class="muted ch-none">아직 받은 응원이 없어요. 이웃이 책장을 구경하다 응원을 보낼 수 있어요.</p>`);
   }
@@ -2973,7 +2973,7 @@ async function openBlogPost(id, st = null) {
 }
 function paintBlogMeta() {
   const b = blogNow;
-  $("bvMeta").innerHTML = `<button type="button" class="nick-link" data-u="${esc(b.user_id)}">${avatar(b.nick, b.face, "av xs")}${esc(b.nick)}</button> · ${ago(b.created_at)}${b.updated_at && Date.parse(b.updated_at) - Date.parse(b.created_at) > 60000 ? " · 고침" : ""} · ${b.is_public ? `조회 ${b.views || 0}` : "🔒 나만 보기"}`;
+  $("bvMeta").innerHTML = `<button type="button" class="nick-link" data-u="${esc(b.user_id)}">${avatar(b.nick, b.face, "av xs")}${esc(b.nick)}</button> · ${ago(b.created_at)}${b.updated_at && Date.parse(b.updated_at) - Date.parse(b.created_at) > 60000 ? " · 고침" : ""} · ${b.is_public ? `조회 ${b.views || 0}` : `<i class="lk">${ico("lock")}</i>나만 보기`}`;
 }
 function paintBlogPost() {
   const b = blogNow, mine = b.user_id === sync.myId();
@@ -3381,7 +3381,7 @@ $("bellBtn").addEventListener("click", async () => {
   await checkAlerts();
   const seen = Number(localStorage.getItem(seenKey()) || 0);
   $("alList").innerHTML = alerts.map((a) => `<li><button type="button" class="al-row${Date.parse(a.created_at) > seen ? " new" : ""}" data-src="${a.src}" data-ref="${esc(a.ref)}">
-      <span class="al-ic">${{ blog: "📝", guest: "📖", cheer: "👏", rcmt: "🗨️" }[a.src] || "💬"}</span>
+      <span class="al-ic">${ico({ blog: "notebook", guest: "book", cheer: "thumb-up", rcmt: "message-circle" }[a.src] || "message-circle")}</span>
       <span class="al-tx"><span><b>${esc(a.nick || "(알 수 없음)")}</b> 님이 ${a.src === "guest" ? (a.reply ? "방명록에 답글을" : "내 방명록에 글을") : a.src === "cheer" ? "책 기록에 응원을" : a.src === "rcmt" ? (a.reply ? "같이 댓글 단 기록에 댓글을" : "내 기록에 댓글을") : a.reply ? "내 댓글에 답글을" : `내 ${a.src === "blog" ? "블로그 글" : "글"}에 댓글을`} ${a.src === "cheer" ? "보냈어요" : "남겼어요"}</span>
         <small>${a.title ? `「${esc(a.title)}」 · ` : ""}${ago(a.created_at)}</small>${a.body ? `<em>${esc(a.body.length > 60 ? a.body.slice(0, 60) + "…" : a.body)}</em>` : ""}</span></button></li>`).join("")
     || `<li class="muted">최근 30일 동안 새 소식이 없어요</li>`;
@@ -3834,7 +3834,7 @@ async function openAdmUser(uid) {
   admUser = admMembers.find((m) => m.user_id === uid); if (!admUser) return;
   const m = admUser, me = uid === sync.myId();
   $("auHead").innerHTML = `${avatar(m.nick || "?", null, "av")}<div><b>${esc(m.nick || "(별명 없음)")}</b><small>${esc(m.email || "")}</small>
-    <small>가입 ${admDay(m.joined)} · 마지막 로그인 ${admDay(m.last_sign_in)} · 아이 ${m.kids}명 · 책 ${m.books}권 · ${m.is_public ? "책장 공개" : "🔒 나만 보기"}</small></div>`;
+    <small>가입 ${admDay(m.joined)} · 마지막 로그인 ${admDay(m.last_sign_in)} · 아이 ${m.kids}명 · 책 ${m.books}권 · ${m.is_public ? "책장 공개" : `<i class="lk">${ico("lock")}</i>나만 보기`}</small></div>`;
   $("auActs").innerHTML = [m.is_public ? `<button type="button" data-act="shelf">${ico("bookshelf")}책장 보기</button>` : "",
     me ? "" : `<button type="button" data-act="ban" class="${m.banned ? "on" : ""}">${ico("hand-stop")}${m.banned ? "글쓰기 막힘 · 풀기" : "글쓰기 막기"}</button>`,
     me ? "" : `<button type="button" data-act="wipe" class="del">${ico("trash")}쓴 글 전부 지우기</button>`].join("");
@@ -3873,7 +3873,7 @@ function tuGo(n) {
   [...$("tuDots").children].forEach((d, i) => d.classList.toggle("on", i === tuAt));
   $("tuCnt").textContent = `${tuAt + 1} / ${cs.length}`;
   $("tuPrev").style.visibility = tuAt ? "visible" : "hidden";
-  $("tuNext").textContent = tuAt === cs.length - 1 ? (tuAfter ? "시작하기 🍌" : "닫기") : "다음";
+  $("tuNext").textContent = tuAt === cs.length - 1 ? (tuAfter ? "시작하기" : "닫기") : "다음";
 }
 function openTutorial(after = null) { tuAfter = after; tuGo(0); $("tutorial").showModal(); }
 function closeTutorial() { const f = tuAfter; tuAfter = null; $("tutorial").close(); if (PROFILE && PROFILE.tu_seen === false) { PROFILE.tu_seen = true; sync.markTutorialSeen().catch(() => {}); } if (f) setTimeout(f, 150); }
@@ -3887,3 +3887,5 @@ let tuX = null;
 $("tuTrack").addEventListener("touchstart", (e) => { tuX = e.touches[0].clientX; }, { passive: true });
 $("tuTrack").addEventListener("touchend", (e) => { if (tuX == null) return; const dx = e.changedTouches[0].clientX - tuX; tuX = null; if (Math.abs(dx) > 40) tuGo(tuAt + (dx < 0 ? 1 : -1)); });
 $("setTutorial").addEventListener("click", () => { $("settingsDialog").close("away"); openTutorial(); });
+// 방명록 비밀글 자물쇠: 누를 때 한 줄 안내
+$("gbSecret").addEventListener("change", (e) => toast(e.target.checked ? "비밀글: 주인만 볼 수 있어요" : "모두 볼 수 있는 글이에요"));

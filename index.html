@@ -119,7 +119,7 @@
     </section>
 
     <section class="tab" data-tab="board" hidden>
-      <div class="board-head"><h2 class="page-title">게시판</h2><button type="button" class="btn lime" id="bWrite">✏️ 글쓰기</button></div>
+      <div class="board-head"><h2 class="page-title">게시판</h2><button type="button" class="pt-btn" id="bWrite" aria-label="글쓰기" title="글쓰기"><span data-ico="pencil"></span></button></div>
       <div class="seg small" id="boardPick" role="radiogroup" aria-label="게시판 고르기">
         <button type="button" role="radio" data-b="free" aria-checked="true">자유</button>
         <button type="button" role="radio" data-b="books" aria-checked="false">책 추천</button>
@@ -136,8 +136,8 @@
         <ul class="mom-list" id="momFound" hidden></ul>
         <div id="momMain">
           <div class="mom-chips" id="momChips">
-            <button type="button" id="chipGrade" aria-expanded="false">🎒 학년<span id="chipGradeTx"></span> ▾</button>
-            <button type="button" id="chipSame" aria-pressed="false">📚 같은 책 읽은 친구</button>
+            <button type="button" id="chipGrade" aria-expanded="false"><span data-ico="school"></span> 학년<span id="chipGradeTx"></span> ▾</button>
+            <button type="button" id="chipSame" aria-pressed="false"><span data-ico="book"></span> 같은 책 읽은 친구</button>
           </div>
           <div class="grade-pick" id="gradePick" hidden></div>
           <div id="momRes" hidden>
@@ -210,7 +210,7 @@
     <div class="scan-top">
       <button class="icon" id="closeScan" aria-label="닫기">✕</button>
       <span class="hint"><b>바코드 스캔</b><br><span id="scanHint">바코드를 네모 안에 맞춰 주세요</span></span>
-      <button class="icon" id="torchBtn" aria-label="플래시" hidden>🔦</button>
+      <button class="icon" id="torchBtn" aria-label="플래시" hidden><span data-ico="bolt"></span></button>
     </div>
     <div class="scan-bottom">
       <label class="zoom" id="zoomWrap" hidden>
@@ -266,7 +266,7 @@
             <h3 id="rTitleText"></h3>
             <input id="rTitle" class="title-input" placeholder="책 제목" hidden />
             <input id="rAuthor" class="sub-input" placeholder="지은이" hidden />
-            <button type="button" class="btn mini find-btn" id="rFind" hidden>🔍 제목으로 표지·쪽수 찾기</button>
+            <button type="button" class="btn mini find-btn" id="rFind" hidden><span data-ico="search"></span> 제목으로 표지·쪽수 찾기</button>
             <p id="rMeta"></p>
           </div>
         </div>
@@ -295,7 +295,7 @@
           <button type="button" data-d="today">오늘</button>
           <button type="button" data-d="yesterday">어제</button>
           <span class="pick-wrap">
-            <button type="button" data-d="pick" id="datePickBtn" tabindex="-1">📅 날짜 고르기</button>
+            <button type="button" data-d="pick" id="datePickBtn" tabindex="-1">날짜 고르기</button>
             <input type="date" id="rDate" aria-label="읽은 날짜 고르기" />
           </span>
         </div>
@@ -342,11 +342,11 @@
       <h2 class="finish-h">오늘도 한 권 읽었어요</h2>
       <p class="finish-sub">어떻게 마무리할까요?</p>
       <button class="choice dark" value="activity">
-        <span class="ci">✏️</span>
+        <span class="ci"><span data-ico="pencil"></span></span>
         <span class="ct"><b>독후활동 하기</b><small>별점 주고 내 생각 적기 · +50점</small></span><span>›</span>
       </button>
       <button class="choice" value="stamp">
-        <span class="ci">🌸</span>
+        <span class="ci"><span data-ico="star"></span></span>
         <span class="ct"><b>스탬프 바로 받기</b><small>독후활동은 다음에 할게요</small></span><span>›</span>
       </button>
     </form>
@@ -375,7 +375,7 @@
     <form method="dialog" class="page-in">
       <div class="page-top end"><button class="x-btn" value="close" aria-label="닫기">✕</button></div>
       <h2 class="stamp-h">책 한 권 다 읽을 때마다<br>독서 스탬프 하나씩!</h2>
-      <div class="seg small stamp-tabs" id="stampTabs" role="radiogroup" aria-label="스탬프판 고르기"><button type="button" role="radio" data-sh="ko">📕 한글책</button><button type="button" role="radio" data-sh="en">📘 영어책</button></div>
+      <div class="seg small stamp-tabs" id="stampTabs" role="radiogroup" aria-label="스탬프판 고르기"><button type="button" role="radio" data-sh="ko">한글책</button><button type="button" role="radio" data-sh="en">영어책</button></div>
       <div class="stamp-card">
         <div class="stamp-top"><b>독서 스탬프</b><span id="stampCount"></span></div>
         <div class="stamp-bar"><i id="stampBar"></i></div>
@@ -516,9 +516,9 @@
         <h4 id="vSessH">📖 읽은 기록</h4>
         <ol id="vSessions"></ol>
       </div>
-      <button class="btn lime" value="more" id="vMore">➕ 이어서 기록하기</button>
-      <button class="btn ghost v-time" value="time" id="vTime">⏱ 읽은 시간 적기</button>
-      <button class="btn dark" value="activity" id="vActivity">✏️ 독후활동 하기 (+50점)</button>
+      <button class="btn lime" value="more" id="vMore">이어서 기록하기</button>
+      <button class="btn ghost v-time" value="time" id="vTime"><span data-ico="clock"></span> 읽은 시간 적기</button>
+      <button class="btn dark" value="activity" id="vActivity"><span data-ico="pencil"></span> 독후활동 하기 (+50점)</button>
       <dl class="rec-info">
         <dt>별점</dt><dd id="vScore"></dd>
         <dt>내 생각</dt><dd id="vNote"></dd>
@@ -561,7 +561,7 @@
         <textarea id="eText" rows="4"></textarea>
       </label>
       <div class="rt-box" id="eRichWrap" hidden>
-        <div class="rt-bar"><button type="button" class="rt-btn" id="ePhotoAdd">📷 사진</button><small id="ePhotoCount">사진 0/10</small></div>
+        <div class="rt-bar"><button type="button" class="rt-btn" id="ePhotoAdd"><span data-ico="camera"></span> 사진</button><small id="ePhotoCount">사진 0/10</small></div>
         <div class="rt" id="eRich"></div>
         <input type="file" id="ePhotoFile" accept="image/*" multiple hidden />
       </div>
@@ -774,8 +774,8 @@
           <input id="cNewName" class="nm-in" maxlength="8" placeholder="이름 (예: 피아노)" aria-label="새 카테고리 이름" />
         </div>
         <div class="seg small" id="cNewKind" role="radiogroup" aria-label="기록 방식">
-          <button type="button" role="radio" data-kind="time" aria-checked="true">⏱ 한 것 + 시간</button>
-          <button type="button" role="radio" data-kind="note" aria-checked="false">📝 메모만</button>
+          <button type="button" role="radio" data-kind="time" aria-checked="true"><span data-ico="clock"></span> 한 것 + 시간</button>
+          <button type="button" role="radio" data-kind="note" aria-checked="false"><span data-ico="notebook"></span> 메모만</button>
         </div>
         <small class="pick-for" id="cPickFor"></small>
         <div class="emoji-pick icon-pick" id="cEmoji"></div>
@@ -877,7 +877,7 @@
       </div>
       <input id="peTitle" class="title-input" maxlength="100" placeholder="제목" />
       <div class="rt-box">
-        <div class="rt-bar"><button type="button" class="rt-btn" id="pePhotoAdd">📷 사진</button><small id="pePhotoCount">사진 0/10</small></div>
+        <div class="rt-bar"><button type="button" class="rt-btn" id="pePhotoAdd"><span data-ico="camera"></span> 사진</button><small id="pePhotoCount">사진 0/10</small></div>
         <div class="rt" id="peRich"></div>
         <input type="file" id="pePhotoFile" accept="image/*" multiple hidden />
       </div>
@@ -955,7 +955,7 @@
       <h2 class="page-title" id="gbHead">방명록</h2>
       <form class="gb-form" id="gbForm">
         <textarea id="gbIn" maxlength="300" rows="3" placeholder="따뜻한 인사를 남겨 주세요 (300자까지)"></textarea>
-        <div class="gb-fr"><label class="gb-sec-chk"><input type="checkbox" id="gbSecret" /> 🔒 비밀글 <small>(주인만 봐요)</small></label><button class="btn dark" id="gbSend">남기기</button></div>
+        <div class="gb-fr"><label class="gb-sec-chk" title="비밀글 (주인만 봐요)"><input type="checkbox" id="gbSecret" aria-label="비밀글 (주인만 봐요)" /><span class="gs-off" data-ico="lock-open"></span><span class="gs-on" data-ico="lock"></span></label><button class="btn dark" id="gbSend">남기기</button></div>
       </form>
       <ul class="gb-list" id="gbList"></ul>
     </div>
@@ -989,7 +989,7 @@
       <label class="be-cat" id="beCatRow" hidden><span>카테고리</span><select id="beCat"></select></label>
       <input id="beTitle" class="title-input" maxlength="100" placeholder="제목" />
       <div class="rt-box">
-        <div class="rt-bar"><button type="button" class="rt-btn" id="bePhotoAdd">📷 사진</button><button type="button" class="rt-btn" id="beTopicBtn">📚 글감</button><small id="bePhotoCount">사진 0/10</small>
+        <div class="rt-bar"><button type="button" class="rt-btn" id="bePhotoAdd"><span data-ico="camera"></span> 사진</button><button type="button" class="rt-btn" id="beTopicBtn"><span data-ico="book"></span> 글감</button><small id="bePhotoCount">사진 0/10</small>
           <div class="rt-fmt" id="beFmt"><span class="rt-sz" role="group" aria-label="글씨 크기"><button type="button" data-s="1" aria-label="작은 글씨">가</button><button type="button" data-s="2" aria-label="보통 글씨">가</button><button type="button" data-s="3" aria-label="큰 글씨">가</button></span><span class="rt-cl" role="group" aria-label="글씨 색"><button type="button" data-c="0" class="fc-0" aria-label="기본 색"></button><button type="button" data-c="1" class="fc-1" aria-label="주황"></button><button type="button" data-c="2" class="fc-2" aria-label="초록"></button><button type="button" data-c="3" class="fc-3" aria-label="파랑"></button><button type="button" data-c="4" class="fc-4" aria-label="금색"></button></span></div></div>
         <div id="beTopic" class="rt-topic"></div>
         <div class="rt" id="beRich"></div>
@@ -1082,7 +1082,7 @@
     <div class="page-in tu-in">
       <div class="tu-top"><span id="tuCnt">1 / 6</span><button type="button" id="tuSkip">건너뛰기</button></div>
       <div class="tu-view"><div class="tu-track" id="tuTrack">
-        <section class="tu-card"><h3>반가워요! 🍌<br>먼저 이름표를 만들어요</h3><div class="tu-names"><div><span class="tu-ic" style="background:#FFEBDD">👩</span><span><b>엄마 별명</b><small>게시판·블로그·친구 책장에 보이는 이름이에요<br>예: 론찌맘, 아들둘맘</small></span></div>
+        <section class="tu-card"><h3>반가워요!<br>먼저 이름표를 만들어요</h3><div class="tu-names"><div><span class="tu-ic" style="background:#FFEBDD">👩</span><span><b>엄마 별명</b><small>게시판·블로그·친구 책장에 보이는 이름이에요<br>예: 론찌맘, 아들둘맘</small></span></div>
 <div><span class="tu-ic" style="background:#E1F5EE">🧒</span><span><b>아이 별명 + 학년</b><small>아이마다 책장이 따로 생겨요. 실명 말고 별명으로!</small><span class="tu-kids"><i class="on">꽌시 초6</i><i>럭키 초4</i><i>＋</i></span></span></div></div><p>튜토리얼이 끝나면 바로 이름표 만들기로 넘어가요.</p><p class="tu-where">✏️ 나중에 바꾸려면 · 엄마 별명: ⚙️ 설정 → <b>엄마 별명</b><br>· 아이 추가·수정: 홈 위 아이 이름 옆 <b>＋</b> 또는 ⚙️ → <b>자녀 관리</b></p></section>
         <section class="tu-card"><div class="tu-art"><svg width="230" height="180" viewBox="0 0 230 180"><rect x="70" y="8" width="90" height="164" rx="16" fill="#1F2420"/><rect x="76" y="20" width="78" height="140" rx="8" fill="#FBF9F4"/><rect x="86" y="62" width="58" height="34" fill="#fff" stroke="#1F2420" stroke-width="1"/><g stroke="#1F2420" stroke-width="2"><line x1="92" y1="68" x2="92" y2="90"/><line x1="97" y1="68" x2="97" y2="90"/><line x1="100" y1="68" x2="100" y2="90"/><line x1="106" y1="68" x2="106" y2="90"/><line x1="111" y1="68" x2="111" y2="90"/><line x1="115" y1="68" x2="115" y2="90"/><line x1="121" y1="68" x2="121" y2="90"/><line x1="126" y1="68" x2="126" y2="90"/><line x1="131" y1="68" x2="131" y2="90"/><line x1="137" y1="68" x2="137" y2="90"/></g><line x1="80" y1="79" x2="150" y2="79" stroke="#E24B4A" stroke-width="2"/><rect x="88" y="120" width="54" height="22" rx="11" fill="#FFCC00"/><text x="115" y="135" text-anchor="middle" font-size="10" fill="#1E2420">책 스캔</text><text x="190" y="60" font-size="26">📚</text><text x="18" y="120" font-size="26">✨</text></svg></div><h3>찍으면 끝!<br>책 뒤 바코드만 찍어요</h3><p>노란 <b>책 스캔</b> 버튼을 누르고 책 뒷면 바코드에 카메라를 대면 표지·제목·쪽수가 저절로 채워져요.</p><p>누구 기록인지 고르고, 몇 쪽까지 읽었는지만 적으면 기록 끝!</p></section>
         <section class="tu-card"><div class="tu-art tu-art-s"><svg width="230" height="170" viewBox="0 0 230 180"><rect x="55" y="10" width="120" height="160" rx="8" fill="#B9CFE6"/><circle cx="70" cy="25" r="11" fill="#FFEBDD"/><path d="M70 18 63 24h2v7h4v-4h2v4h4v-7h2z" fill="#B95A26"/><circle cx="160" cy="25" r="11" fill="#2F7A45"/><path d="M155 25l3.5 3.5 6.5-7" stroke="#fff" stroke-width="2.5" fill="none"/><circle cx="160" cy="52" r="11" fill="#2F7A45"/><text x="160" y="56.5" text-anchor="middle" font-size="12" fill="#fff">4</text><rect x="61" y="134" width="27" height="26" rx="6" fill="#FBF9F4"/><rect x="65.75" y="152.0" width="20.0" height="5.0" rx="1.25" fill="#2F5D3A"/><rect x="67.0" y="145.75" width="17.5" height="5.0" rx="1.25" fill="#C89B3C"/><rect x="65.75" y="139.5" width="20.0" height="5.0" rx="1.25" fill="#B95A26"/><rect x="130" y="138" width="42" height="22" rx="11" fill="#FBF9F4"/><g transform="translate(132.5 140) scale(0.9)"><circle cx="10" cy="10" r="10" fill="#2F3D7A"/><path d="M10 4.3l1.75 3.6 3.95.55-2.87 2.75.7 3.9L10 13.25 6.47 15.1l.7-3.9L4.3 8.45l3.95-.55z" fill="#fff"/></g><g transform="translate(151.5 140) scale(0.9)"><defs><linearGradient id="tuNg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F3D27A"/><stop offset="1" stop-color="#C9962A"/></linearGradient></defs><circle cx="10" cy="10" r="10" fill="url(#tuNg)"/><circle cx="10" cy="10" r="8.3" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width=".8"/><text x="10" y="13.6" text-anchor="middle" font-size="10" font-weight="800" fill="#6B4A08" font-family="sans-serif">뉴</text></g><rect x="55" y="166" width="120" height="4" fill="#DDE5D3"/><rect x="55" y="166" width="70" height="4" fill="#2F7A45"/></svg></div><h3>책장 표지에 붙는 표시</h3><div class="tu-legend"><span class="tb" style="background:#2F7A45;color:#fff">✓</span><span>끝까지 다 읽은 책 (완독)</span><svg class="tu-ico" viewBox="0 0 18 14" width="22" height="17"><rect x="1" y="10" width="16" height="4" rx="1" fill="#2F5D3A"/><rect x="2" y="5" width="14" height="4" rx="1" fill="#C89B3C"/><rect x="1" y="0" width="16" height="4" rx="1" fill="#B95A26"/></svg><span>다시 읽을 때마다 책이 한 권씩 쌓여요</span><span class="tu-bar"></span><span>읽는 중인 책은 진도 막대</span><span class="tb" style="background:#FFEBDD;color:#B95A26">⌂</span><span>우리 집 책장에 있는 책</span><span class="tu-two"><span class="tb" style="background:#2F7A45;color:#fff">4</span><span class="tb" style="background:#2E6FB0;color:#fff">중</span></span><span>교과서에 실린 책 (학년)</span><svg class="tu-ico" viewBox="0 0 20 20" width="22" height="22"><circle cx="10" cy="10" r="10" fill="#2F3D7A"/><path d="M10 4.3l1.75 3.6 3.95.55-2.87 2.75.7 3.9L10 13.25 6.47 15.1l.7-3.9L4.3 8.45l3.95-.55z" fill="#fff"/></svg><span>미국 학교 추천도서</span><span class="tu-two"><svg class="tu-ico" viewBox="0 0 20 20" width="22" height="22"><g transform="translate(0 0) scale(1.0)"><defs><linearGradient id="tuLg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F3D27A"/><stop offset="1" stop-color="#C9962A"/></linearGradient></defs><circle cx="10" cy="10" r="10" fill="url(#tuLg)"/><circle cx="10" cy="10" r="8.3" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width=".8"/><text x="10" y="13.6" text-anchor="middle" font-size="10" font-weight="800" fill="#6B4A08" font-family="sans-serif">뉴</text></g></svg><svg class="tu-ico" viewBox="0 0 20 20" width="22" height="22"><g transform="translate(0 0) scale(1.0)"><defs><linearGradient id="tuLs" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#E9ECEF"/><stop offset="1" stop-color="#A7AEB6"/></linearGradient></defs><circle cx="10" cy="10" r="10" fill="url(#tuLs)"/><circle cx="10" cy="10" r="8.3" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width=".8"/><text x="10" y="13.6" text-anchor="middle" font-size="10" font-weight="800" fill="#4A525B" font-family="sans-serif">뉴</text></g></svg></span><span>뉴베리 대상(금) · 아너(은)</span></div></section>

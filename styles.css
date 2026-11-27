@@ -1288,8 +1288,13 @@ body.peek #wsOpen { display: none; }
 .gb-form { margin: 6px 0 14px; }
 .gb-form textarea { width: 100%; box-sizing: border-box; border: 0; border-radius: 14px; background: var(--card); box-shadow: var(--inset); padding: 12px 14px; font: inherit; font-size: 15px; resize: vertical; }
 .gb-fr { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; gap: 8px; }
-.gb-sec-chk { font-size: 14px; display: inline-flex; align-items: center; gap: 5px; }
-.gb-sec-chk small { color: var(--muted); }
+.gb-sec-chk { position: relative; width: 44px; height: 44px; border-radius: 50%; display: inline-grid; place-items: center; background: var(--card); box-shadow: var(--raise-s); color: var(--muted); cursor: pointer; }
+.gb-sec-chk input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+.gb-sec-chk .ico { width: 21px; height: 21px; }
+.gb-sec-chk .gs-on, .gb-sec-chk:has(input:checked) .gs-off { display: none; }
+.gb-sec-chk:has(input:checked) .gs-on { display: inline-flex; }
+.gb-sec-chk:has(input:checked) { background: var(--forest, #2F5D3A); color: #fff; }
+.gb-sec-chk:has(input:focus-visible) { outline: 2px solid var(--forest); outline-offset: 2px; }
 .gb-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
 .gb-item { background: var(--card); box-shadow: var(--raise-s); border-radius: 16px; padding: 12px 14px; }
 .gb-item.sub { margin-left: 26px; background: var(--soft); box-shadow: none; }
@@ -1297,7 +1302,8 @@ body.peek #wsOpen { display: none; }
 .gb-top { display: flex; align-items: center; gap: 7px; }
 .gb-top b { font-size: 14px; }
 .gb-top small { font-size: 12px; color: var(--muted); }
-.gb-lock { font-size: 11px; color: #8A3F14; background: #FFEBDD; border-radius: 999px; padding: 1px 7px; }
+.gb-lock { display: inline-flex; color: var(--muted); }
+.gb-lock .ico { width: 14px; height: 14px; }
 .gb-acts { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; }
 .gb-acts .icon-btn { width: 30px; height: 30px; border: 0; background: transparent; color: var(--muted); display: grid; place-items: center; cursor: pointer; }
 .gb-acts .icon-btn .ico { width: 16px; height: 16px; }
@@ -1491,3 +1497,31 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; text-size-adj
 .fp-more .face-grid button { padding: 2px; border-radius: 10px; }
 .fp-more .face-grid svg { max-width: 36px; }
 .fp-more .face-cols button { width: 26px; height: 26px; }
+/* 이모지 → 선 기호 */
+.choice .ci .ico { width: 30px; height: 30px; }
+.icon .ico { width: 22px; height: 22px; }
+.al-ic .ico { width: 20px; height: 20px; color: var(--forest); }
+.gift .ico { width: 26px; height: 26px; color: var(--forest); }
+i.lk { font-style: normal; display: inline-flex; vertical-align: -2px; margin-right: 3px; color: var(--muted); }
+i.lk .ico { width: 13px; height: 13px; }
+.ch-head .ico { width: 17px; height: 17px; vertical-align: -3px; }
+
+/* 파스텔 기호: BI(잉크 선 + 파스텔 바탕) */
+:root { --p-y: #F7E3A0; --p-sg: #D6E2CB; --p-pk: #F8D3CE; --p-bl: #CDE1EB; --p-lv: #E2D8EE; --p-ap: #F3D2B0; --p-mt: #D3E5DF; --p-sd: #E8E3DA; }
+.ico[data-n="pencil"], .ico[data-n="barcode"], .ico[data-n="bolt"], .ico[data-n="star"], .ico[data-n="crown"] { --pt: var(--p-y); }
+.ico[data-n="camera"], .ico[data-n="search"], .ico[data-n="message-circle"], .ico[data-n="device-mobile"] { --pt: var(--p-bl); }
+.ico[data-n="clock"], .ico[data-n="help-circle"] { --pt: var(--p-lv); }
+.ico[data-n="book"], .ico[data-n="notebook"] { --pt: var(--p-sg); }
+.ico[data-n="school"], .ico[data-n="plus"], .ico[data-n="download"], .ico[data-n="upload"] { --pt: var(--p-mt); }
+.ico[data-n="gift"], .ico[data-n="mood-kid"] { --pt: var(--p-pk); }
+.ico[data-n="thumb-up"], .ico[data-n="folder"] { --pt: var(--p-ap); }
+.ico[data-n="lock"], .ico[data-n="lock-open"], .ico[data-n="logout"] { --pt: var(--p-sd); }
+.btn .ico, .rt-btn .ico, .follow-btn .ico, #chipGrade .ico, #chipSame .ico, .al-ic .ico, .gift .ico, .reward-add .ico, .cert-reward .ico, .ch-head .ico, .t-chip .ico, .round-h .ico, .day-item > span:last-child .ico, .seg .ico { background: var(--pt, var(--p-sd)); color: #1E2420; border-radius: 50%; padding: 4px; width: 1.55em; height: 1.55em; vertical-align: -0.48em; margin: -2px 3px 0 0; stroke-width: 1.8; }
+.choice .ci .ico { background: var(--pt); color: #1E2420; border-radius: 16px; padding: 9px; width: 48px; height: 48px; stroke-width: 1.8; }
+.set-row .si { background: none !important; }
+.set-row .si .ico { background: var(--pt); color: #1E2420 !important; border-radius: 12px; padding: 8px; width: 38px; height: 38px; stroke-width: 1.8; }
+.al-ic .ico { width: 32px; height: 32px; padding: 6px; }
+.gift .ico { width: 34px; height: 34px; padding: 6px; }
+.pt-btn { width: 46px; height: 46px; border: 0; border-radius: 14px; padding: 0; display: inline-grid; place-items: center; background: none; cursor: pointer; flex: none; }
+.pt-btn .ico { width: 46px; height: 46px; padding: 11px; border-radius: 14px; background: var(--pt); color: #1E2420; stroke-width: 1.8; box-shadow: var(--raise-s); }
+.pt-btn:active { transform: scale(.95); }
