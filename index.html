@@ -586,6 +586,140 @@
   </dialog>
 
   <!-- 설정 -->
+  <!-- 바탕화면에 고정하기 안내 (카드뉴스) -->
+  <dialog id="a2Dialog" class="a2">
+    <div class="a2-in">
+      <button type="button" class="a2-x" id="a2Close" aria-label="닫기">✕</button>
+      <div class="a2-tabs" id="a2Tabs"><button type="button" data-os="ios">아이폰</button><button type="button" data-os="and">안드로이드</button></div>
+      <div class="a2-wrap" id="a2Wrap">
+<div class="a2c" data-os="ios" data-n="1">
+  <span class="a2-os">아이폰</span><span class="a2-brand"><img src="icon.svg" alt="">바나나북코드</span>
+  <span class="a2-step">1단계</span>
+  <h2><b>사파리</b>로 열어요</h2>
+  <p>카톡에서 열었다면 오른쪽 아래 ⋯ → '사파리로 열기'</p>
+  <div class="a2-phone">
+    <div style="height:100%;background:#F3EFE6;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding-bottom:70px">
+      <img src="icon.svg" alt="" style="width:84px;height:84px;border-radius:20px;box-shadow:0 4px 14px rgba(0,0,0,.12)">
+      <b style="font-size:18px;color:#2F5D3A">바나나북코드</b>
+    </div>
+    <div style="position:absolute;left:0;right:0;bottom:40px;height:62px;background:#F7F7F7;border-top:1px solid #ddd;display:flex;align-items:center;padding:0 12px;gap:10px">
+      <div style="flex:1;height:36px;border-radius:12px;background:#E6E6E9;display:flex;align-items:center;justify-content:center;font-size:13px;color:#333">🔒 kidsbook-theta.vercel.app</div>
+    </div>
+    <div class="a2-ring" style="left:6px;bottom:46px;width:242px;height:50px;border-radius:16px"></div>
+  </div>
+</div>
+
+
+<div class="a2c" data-os="ios" data-n="2">
+  <span class="a2-os">아이폰</span><span class="a2-brand"><img src="icon.svg" alt="">바나나북코드</span>
+  <span class="a2-step">2단계</span>
+  <h2>아래 <b>공유 버튼</b>을 눌러요</h2>
+  <p>네모에 화살표 ↑ 모양이에요 (안 보이면 ⋯ 를 먼저 눌러요)</p>
+  <div class="a2-phone">
+    <div style="height:100%;background:#F3EFE6"></div>
+    <div style="position:absolute;left:0;right:0;bottom:40px;height:62px;background:#F7F7F7;border-top:1px solid #ddd;display:flex;align-items:center;justify-content:space-around;font-size:22px;color:#0A7AFF">
+      <span>‹</span><span>›</span>
+      <svg width="26" height="30" viewBox="0 0 26 30" fill="none" stroke="#0A7AFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 11H5v16h16V11h-3"/><path d="M13 3v16M8 8l5-5 5 5"/></svg>
+      <span>📖</span><span>⧉</span>
+    </div>
+    <div class="a2-ring" style="left:96px;bottom:40px;width:62px;height:62px"></div><span class="a2-hand" style="left:132px;bottom:30px">👆</span>
+  </div>
+</div>
+
+
+<div class="a2c" data-os="ios" data-n="3">
+  <span class="a2-os">아이폰</span><span class="a2-brand"><img src="icon.svg" alt="">바나나북코드</span>
+  <span class="a2-step">3단계</span>
+  <h2><b>'홈 화면에 추가'</b>를 눌러요</h2>
+  <p>메뉴를 위로 조금 올리면 보여요 → 오른쪽 위 '추가'</p>
+  <div class="a2-phone">
+    <div style="height:100%;background:#9A9A9A"></div>
+    <div style="position:absolute;left:0;right:0;bottom:0;height:250px;background:#F2F2F7;border-radius:16px 16px 0 0;padding:14px 12px;display:flex;flex-direction:column;gap:8px;font-size:14px;color:#111">
+      <div style="background:#fff;border-radius:10px;padding:11px 12px;display:flex;justify-content:space-between">복사 <span>⧉</span></div>
+      <div style="background:#fff;border-radius:10px;padding:11px 12px;display:flex;justify-content:space-between">책갈피 추가 <span>📖</span></div>
+      <div style="background:#fff;border-radius:10px;padding:11px 12px;display:flex;justify-content:space-between;font-weight:700">홈 화면에 추가 <span style="border:1.6px solid #111;border-radius:5px;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;font-size:15px">+</span></div>
+    </div>
+    <div class="a2-ring" style="left:4px;bottom:93px;width:246px;height:50px;border-radius:14px"></div>
+  </div>
+</div>
+
+
+<div class="a2c" data-os="ios" data-n="4">
+  <span class="a2-os">아이폰</span><span class="a2-brand"><img src="icon.svg" alt="">바나나북코드</span>
+  <span class="a2-step">끝!</span>
+  <h2>바탕화면에 <b>앱이 생겼어요</b></h2>
+  <p>이제 이 아이콘을 눌러서 들어오면 돼요</p>
+  <div class="a2-phone">
+    <div style="height:100%;background:linear-gradient(160deg,#7FB3D5,#B9A3D9);padding:30px 18px;display:grid;grid-template-columns:repeat(4,1fr);gap:18px 10px;align-content:start">
+      <div style="width:46px;height:46px;border-radius:12px;background:rgba(255,255,255,.45)"></div>
+      <div style="width:46px;height:46px;border-radius:12px;background:rgba(255,255,255,.45)"></div>
+      <div style="width:46px;height:46px;border-radius:12px;background:rgba(255,255,255,.45)"></div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:4px"><img src="icon.svg" alt="" style="width:46px;height:46px;border-radius:12px;box-shadow:0 0 0 3px #FFCC00"><span style="font-size:9px;color:#fff;font-weight:700;white-space:nowrap;width:70px;text-align:center">바나나북코드</span></div>
+      <div style="width:46px;height:46px;border-radius:12px;background:rgba(255,255,255,.45)"></div>
+      <div style="width:46px;height:46px;border-radius:12px;background:rgba(255,255,255,.45)"></div>
+    </div>
+  </div>
+  <span style="position:absolute;right:120px;bottom:240px;font-size:40px">✨</span>
+</div>
+
+
+<div class="a2c" data-os="and" data-n="1">
+  <span class="a2-os">안드로이드</span><span class="a2-brand"><img src="icon.svg" alt="">바나나북코드</span>
+  <span class="a2-step">1단계</span>
+  <h2><b>크롬</b>으로 열고 오른쪽 위 <b>⋮</b></h2>
+  <p>점 세 개 버튼을 눌러요</p>
+  <div class="a2-phone">
+    <div style="height:56px;background:#fff;border-bottom:1px solid #ddd;display:flex;align-items:center;padding:0 10px;gap:8px">
+      <div style="flex:1;height:34px;border-radius:17px;background:#EEF1F4;display:flex;align-items:center;padding:0 10px;font-size:12px;color:#333">kidsbook-theta.vercel.app</div>
+      <span style="font-size:22px;font-weight:900;color:#333">⋮</span>
+    </div>
+    <div style="height:100%;background:#F3EFE6"></div>
+    <div class="a2-ring" style="right:0;top:4px;width:46px;height:46px"></div><span class="a2-hand" style="right:-6px;top:34px">👆</span>
+  </div>
+</div>
+
+
+<div class="a2c" data-os="and" data-n="2">
+  <span class="a2-os">안드로이드</span><span class="a2-brand"><img src="icon.svg" alt="">바나나북코드</span>
+  <span class="a2-step">2단계</span>
+  <h2><b>'홈 화면에 추가'</b>를 눌러요</h2>
+  <p>'앱 설치'라고 나오면 그걸 눌러도 돼요 → '추가'</p>
+  <div class="a2-phone">
+    <div style="height:100%;background:#F3EFE6"></div>
+    <div style="position:absolute;right:8px;top:8px;width:190px;background:#fff;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.25);font-size:13px;color:#222;padding:6px 0">
+      <div style="padding:10px 14px">새 탭</div>
+      <div style="padding:10px 14px">방문 기록</div>
+      <div style="padding:10px 14px">공유…</div>
+      <div style="padding:10px 14px;font-weight:700;background:#FFF6D6">홈 화면에 추가</div>
+      <div style="padding:10px 14px">설정</div>
+    </div>
+    <div class="a2-ring" style="right:4px;top:124px;width:196px;height:46px;border-radius:12px"></div>
+  </div>
+</div>
+
+
+<div class="a2c" data-os="and" data-n="3">
+  <span class="a2-os">안드로이드</span><span class="a2-brand"><img src="icon.svg" alt="">바나나북코드</span>
+  <span class="a2-step">끝!</span>
+  <h2>바탕화면에 <b>앱이 생겼어요</b></h2>
+  <p>이제 이 아이콘을 눌러서 들어오면 돼요</p>
+  <div class="a2-phone">
+    <div style="height:100%;background:linear-gradient(160deg,#8FC9A8,#E8D58A);padding:30px 18px;display:grid;grid-template-columns:repeat(4,1fr);gap:18px 10px;align-content:start">
+      <div style="width:46px;height:46px;border-radius:50%;background:rgba(255,255,255,.45)"></div>
+      <div style="width:46px;height:46px;border-radius:50%;background:rgba(255,255,255,.45)"></div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:4px"><img src="icon.svg" alt="" style="width:46px;height:46px;border-radius:50%;box-shadow:0 0 0 3px #FFCC00"><span style="font-size:9px;color:#fff;font-weight:700;white-space:nowrap;width:70px;text-align:center">바나나북코드</span></div>
+      <div style="width:46px;height:46px;border-radius:50%;background:rgba(255,255,255,.45)"></div>
+    </div>
+  </div>
+  <span style="position:absolute;right:170px;bottom:240px;font-size:40px">✨</span>
+</div>
+      </div>
+      <div class="a2-dots" id="a2Dots"></div>
+      <div class="a2-btns"><button type="button" id="a2Prev">이전</button><button type="button" id="a2Next">다음</button></div>
+      <p class="a2-foot">나중에 설정 › 바탕화면에 고정하기에서 다시 볼 수 있어요</p>
+    </div>
+  </dialog>
+
   <dialog id="settingsDialog" class="bottom">
     <form method="dialog" class="sheet">
       <div class="sheet-top">
@@ -593,6 +727,7 @@
         <b>설정</b>
         <span></span>
       </div>
+      <button type="button" class="set-row" id="setA2hs"><span class="si">📲</span><span class="st"><b>바탕화면에 고정하기</b><small>앱처럼 아이콘으로 바로 열기</small></span><span>›</span></button>
       <button type="button" class="set-row" id="setTutorial"><span class="si">📖</span><span class="st"><b>사용법 다시 보기</b><small>처음에 본 6장짜리 안내</small></span><span>›</span></button>
       <button type="button" class="set-row" id="setNick"><span class="si">✍️</span><span class="st"><b>엄마 별명</b><small id="setNickTxt"></small></span><span>›</span></button>
       <button type="button" class="set-row" id="setKids"><span class="si">👧</span><span class="st"><b>자녀 관리</b><small>닉네임 추가 · 수정 · 삭제</small></span><span>›</span></button>

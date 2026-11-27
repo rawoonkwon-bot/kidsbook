@@ -3210,8 +3210,44 @@ if (PEEK) {
   else if (PROFILE === null) setTimeout(() => { hideWelcome(); openTutorial(() => openNick(true)); }, 900); // 처음 가입: 사용법 → 엄마 별명 → 아이 등록
   else if (!kids.length) setTimeout(() => { hideWelcome(); openKids(true); }, 900);
   else if (PROFILE && PROFILE.tu_seen === false) setTimeout(() => { hideWelcome(); openTutorial(); }, 900); // 이미 가입한 회원: 사용법 한 번
-  else { welcome.addEventListener("click", hideWelcome); setTimeout(hideWelcome, 1300); }
+  else { welcome.addEventListener("click", hideWelcome); setTimeout(hideWelcome, 1300); setTimeout(() => maybeA2(), 1800); }
 }
+
+// ---------- 바탕화면에 고정하기 안내 (카드뉴스) ----------
+// 바탕화면 아이콘(앱)으로 연 게 아니면, 휴대폰에서 처음 한 번만 보여 줌. 닫으면 다시 저절로 뜨지 않음
+const A2_KEY = "kbc:a2hsSeen";
+const isStandalone = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+const a2Os = () => (/android/i.test(navigator.userAgent) ? "and" : "ios");
+let a2 = { os: "ios", at: 0 };
+function a2Cards() { return [...$("a2Wrap").querySelectorAll(`.a2c[data-os="${a2.os}"]`)]; }
+function a2Paint() {
+  const all = $("a2Wrap").querySelectorAll(".a2c"), cs = a2Cards();
+  const sc = $("a2Wrap").clientWidth / 540;
+  all.forEach((c) => { c.hidden = true; c.style.transform = `scale(${sc})`; });
+  cs[a2.at].hidden = false;
+  [...$("a2Tabs").children].forEach((b) => b.classList.toggle("on", b.dataset.os === a2.os));
+  $("a2Dots").innerHTML = cs.map((_, i) => `<i class="${i === a2.at ? "on" : ""}"></i>`).join("");
+  $("a2Prev").disabled = a2.at === 0;
+  $("a2Next").textContent = a2.at === cs.length - 1 ? "다 했어요" : "다음";
+}
+function openA2(os) { a2 = { os: os || a2Os(), at: 0 }; $("a2Dialog").showModal(); a2Paint(); }
+function closeA2() { $("a2Dialog").close(); try { localStorage.setItem(A2_KEY, "1"); } catch {} }
+function maybeA2() {
+  if (PEEK || isStandalone() || !/iphone|ipad|ipod|android/i.test(navigator.userAgent)) return;
+  try { if (localStorage.getItem(A2_KEY)) return; } catch { return; }
+  if (document.querySelector("dialog[open]")) return;
+  openA2();
+}
+$("a2Tabs").addEventListener("click", (e) => { const b = e.target.closest("[data-os]"); if (b) { a2 = { os: b.dataset.os, at: 0 }; a2Paint(); } });
+$("a2Prev").addEventListener("click", () => { if (a2.at > 0) { a2.at--; a2Paint(); } });
+$("a2Next").addEventListener("click", () => { if (a2.at < a2Cards().length - 1) { a2.at++; a2Paint(); } else closeA2(); });
+$("a2Close").addEventListener("click", closeA2);
+$("a2Dialog").addEventListener("cancel", (e) => { e.preventDefault(); closeA2(); });
+// 옆으로 밀어서 넘기기
+{ let x0 = null; $("a2Wrap").addEventListener("touchstart", (e) => { x0 = e.touches[0].clientX; }, { passive: true });
+  $("a2Wrap").addEventListener("touchend", (e) => { if (x0 == null) return; const dx = e.changedTouches[0].clientX - x0; x0 = null;
+    if (dx < -40) $("a2Next").click(); else if (dx > 40 && a2.at > 0) $("a2Prev").click(); }); }
+$("setA2hs").addEventListener("click", () => { $("settingsDialog").close("away"); openA2(); });
 
 // ---------- 연산 프린트 ----------
 // 문제는 math.js 가 문제지 번호로 만들어요 (같은 번호 = 같은 문제). 처음 열 때만 불러옴
