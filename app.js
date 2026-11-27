@@ -184,7 +184,7 @@ function go(tab) {
   if (tab === "stats") { renderStats(); renderBrowse(); }
   if (tab === "port") renderCalendar();
   if (tab === "board") setTimeout(() => renderBoard()); // 게시판 코드가 아래에 있어서 한 박자 뒤에
-  if (tab === "home") setTimeout(() => renderPopular());
+  if (tab === "home") setTimeout(() => { renderPopular(); renderNbRow(); });
   if (tab === "blog") setTimeout(() => renderMyBlog());
   window.scrollTo(0, 0);
   history.replaceState(null, "", location.pathname + location.search + (tab === "home" ? "" : `#${tab}`));
@@ -2314,7 +2314,7 @@ function paintPost() {
 function cmtTree(list, canDel, canReport = true) {
   const ids = new Set(list.map((c) => c.id));
   const top = list.filter((c) => !c.parent_id || !ids.has(c.parent_id));
-  const row = (c, root) => `<li${root !== c.id ? ` class="re"` : ""}><div>${root !== c.id ? `<span class="re-mark">↳</span>` : ""}${avatar(c.nick, c.face, "av xs")}<b>${esc(c.nick)}</b><small>${ago(c.created_at)}</small>
+  const row = (c, root) => `<li${root !== c.id ? ` class="re"` : ""}><div>${root !== c.id ? `<span class="re-mark">↳</span>` : ""}<button type="button" class="who" data-u="${esc(c.user_id)}">${avatar(c.nick, c.face, "av xs")}<b>${esc(c.nick)}</b></button><small>${ago(c.created_at)}</small>
       ${sync.myId() ? `<button type="button" class="re-btn" data-r="${root}" data-n="${esc(c.nick)}">답글</button>` : ""}${canDel(c) ? `<button type="button" class="x" data-c="${c.id}" aria-label="댓글 지우기">✕</button>` : canReport && sync.myId() ? `<button type="button" class="rp-btn" data-rp="${c.id}">신고</button>` : ""}</div><p>${esc(c.body)}</p></li>`;
   return top.map((c) => row(c, c.id) + list.filter((r) => r.parent_id === c.id).map((r) => row(r, c.id)).join("")).join("")
     || `<li class="muted">첫 댓글을 남겨 보세요</li>`;
@@ -2355,6 +2355,7 @@ $("pActions").addEventListener("click", async (e) => {
   }
 });
 $("pComments").addEventListener("click", async (e) => {
+  { const w = e.target.closest(".who[data-u]"); if (w) { openMom(w.dataset.u); return; } }
   const rp = e.target.closest("[data-rp]"); if (rp) { reportIt("comment", rp.dataset.rp); return; }
   const r = e.target.closest("[data-r]"); if (r) { setReTo("p", { id: r.dataset.r, nick: r.dataset.n }); return; }
   const b = e.target.closest("[data-c]"); if (!b || !postNow) return;
@@ -2586,6 +2587,22 @@ async function renderPopular(force = false) {
 }
 $("popRow").addEventListener("click", (e) => { const b = e.target.closest("[data-id]"); if (b) openPost(b.dataset.id); });
 $("popMore").addEventListener("click", () => go("board"));
+// 홈: 요즘 책 읽는 집 (인스타 스토리처럼 얼굴 한 줄, 공개 책장만) → 누르면 그 집 블로그·책장
+let nbAt = 0;
+async function renderNbRow(force = false) {
+  if (PEEK || !AUTH.user || AUTH.offline) { $("hnWrap").hidden = true; return; }
+  if (!force && Date.now() - nbAt < 120000) return;
+  nbAt = Date.now();
+  try {
+    const { list } = await sync.listMoms(0);
+    const show = list.filter((m) => m.kids?.length).slice(0, 15);
+    $("hnWrap").hidden = !show.length;
+    $("hnRow").innerHTML = show.map((m) => `<button type="button" class="nb-face${follows.has(m.user_id) ? " nb" : ""}" data-u="${esc(m.user_id)}" title="${esc(m.nick)}">
+      ${avatar(m.nick, m.face, "av nb-av")}<small>${esc(m.nick)}</small></button>`).join("");
+  } catch { nbAt = 0; $("hnWrap").hidden = true; }
+}
+$("hnRow").addEventListener("click", (e) => { const b = e.target.closest("[data-u]"); if (b) openMom(b.dataset.u); });
+$("hnMore").addEventListener("click", () => { go("stats"); setTimeout(() => $("browseWrap")?.scrollIntoView({ block: "start", behavior: "smooth" }), 150); });
 $("postView").addEventListener("close", () => {
   if (!document.querySelector('.tab[data-tab="home"]').hidden) renderPopular(true); else popAt = 0;
 });
@@ -2689,7 +2706,7 @@ function paintGuest() {
   if (!st.gb) { $("gbList").innerHTML = `<li class="muted">불러오는 중…</li>`; return; }
   const me = sync.myId(), all = st.gb, top = all.filter((g) => !g.parent_id);
   const row = (g, sub) => `<li class="gb-item${sub ? " sub" : ""}">
-      <div class="gb-top">${avatar(g.nick, g.face, "av sm")}<b>${esc(g.nick)}</b>${g.secret ? `<span class="gb-lock">🔒 비밀글</span>` : ""}<small>${ago(g.created_at)}</small>
+      <div class="gb-top"><button type="button" class="who" data-u="${esc(g.user_id)}">${avatar(g.nick, g.face, "av sm")}<b>${esc(g.nick)}</b></button>${g.secret ? `<span class="gb-lock">🔒 비밀글</span>` : ""}<small>${ago(g.created_at)}</small>
         <span class="gb-acts">${!sub && st.me ? `<button type="button" class="link-btn" data-g="reply" data-id="${g.id}">답글</button>` : ""}${g.user_id === me || st.me ? `<button type="button" class="icon-btn" data-g="del" data-id="${g.id}" aria-label="지우기" title="지우기">${ico("trash")}</button>` : `<button type="button" class="icon-btn" data-g="flag" data-id="${g.id}" aria-label="신고" title="신고">${ico("flag")}</button>`}</span></div>
       <p>${esc(g.body)}</p>
       ${gbReply === g.id ? `<div class="gb-rbox"><input id="gbRIn" maxlength="300" placeholder="답글을 남겨요" /><button type="button" class="pill-btn" data-g="send" data-id="${g.id}">남기기</button></div>` : ""}</li>`;
@@ -2709,6 +2726,7 @@ $("gbForm").addEventListener("submit", async (e) => {
   $("gbSend").disabled = false;
 });
 $("gbList").addEventListener("click", async (e) => {
+  { const w = e.target.closest(".who[data-u]"); if (w) { openMom(w.dataset.u); return; } }
   const b = e.target.closest("[data-g]"); if (!b || !gbNow) return;
   const { g, id } = b.dataset;
   if (g === "reply") { gbReply = gbReply === id ? null : id; paintGuest(); }
@@ -2952,6 +2970,7 @@ async function loadBlogCmts() {
   } catch { $("bvComments").innerHTML = `<li class="muted">댓글을 불러오지 못했어요</li>`; }
 }
 $("bvComments").addEventListener("click", async (e) => {
+  { const w = e.target.closest(".who[data-u]"); if (w) { openMom(w.dataset.u); return; } }
   const rp = e.target.closest("[data-rp]"); if (rp) { reportIt("blog_comment", rp.dataset.rp); return; }
   const r = e.target.closest("[data-r]"); if (r) { setReTo("bv", { id: r.dataset.r, nick: r.dataset.n }); return; }
   const b = e.target.closest("[data-c]"); if (!b || !blogNow) return;
@@ -3538,7 +3557,7 @@ async function paintRc() {
     const list = await sync.recComments(r.owner, r.recId);
     if (rcNow !== r) return;
     const me = sync.myId();
-    $("rcList").innerHTML = list.map((c) => `<li><div>${avatar(c.nick, c.face, "av xs")}<b>${esc(c.nick)}</b><small>${ago(c.created_at)}</small>${c.user_id === me || r.owner === me || sync.amAdmin() ? `<button type="button" class="x" data-c="${c.id}" aria-label="댓글 지우기">✕</button>` : ""}</div><p>${esc(c.body)}</p></li>`).join("")
+    $("rcList").innerHTML = list.map((c) => `<li><div><button type="button" class="who" data-u="${esc(c.user_id)}">${avatar(c.nick, c.face, "av xs")}<b>${esc(c.nick)}</b></button><small>${ago(c.created_at)}</small>${c.user_id === me || r.owner === me || sync.amAdmin() ? `<button type="button" class="x" data-c="${c.id}" aria-label="댓글 지우기">✕</button>` : ""}</div><p>${esc(c.body)}</p></li>`).join("")
       || `<li class="muted">첫 댓글을 남겨 보세요</li>`;
     const v = rxState.get(r.recId); if (v) { v.c = list.length; const el = document.querySelector(`#diList [data-rx="${CSS.escape(r.recId)}"]`); if (el) paintRx(el.querySelector(".rx-like"), el.querySelector(".rx-cmt"), v.n, v.mine, v.c); }
   } catch { $("rcList").innerHTML = `<li class="muted">댓글을 불러오지 못했어요. 이 집이 책장을 나만 보기로 바꿨을 수 있어요</li>`; }
@@ -3552,6 +3571,7 @@ $("rcSend").addEventListener("click", async () => {
   $("rcSend").disabled = false;
 });
 $("rcList").addEventListener("click", async (e) => {
+  { const w = e.target.closest(".who[data-u]"); if (w) { openMom(w.dataset.u); return; } }
   const x = e.target.closest("[data-c]"); if (!x || !confirm("이 댓글을 지울까요?")) return;
   try { await sync.deleteRecComment(x.dataset.c); await paintRc(); } catch { toast("지우지 못했어요"); }
 });
