@@ -967,25 +967,41 @@ function renderDayInline() {
   fillReacts($("diList"));
 }
 $("diAdd").addEventListener("click", () => openDay(selDay));
-// 한글책·영어책 제목 줄의 "그날 전체 읽은 시간": 칸에서 나가면 자동 저장 (하루 1개, 비우면 지움)
-function saveTotal(box) {
+// 한글책·영어책 제목 줄의 "그날 전체 읽은 시간": 숫자를 쓰면 바로 저장 (하루 1개, 비우면 지움)
+// quiet: 쓰는 도중 저장 — 화면은 그대로 두고(입력칸 유지) 칸에서 나갈 때 한 번 다시 그림
+function saveTotal(box, quiet) {
   if (PEEK) return;
   const cat = box.dataset.tot, day = box.dataset.day;
   const minutes = (parseInt(box.querySelector(".tot-h").value, 10) || 0) * 60 + (parseInt(box.querySelector(".tot-m").value, 10) || 0);
   const old = journal.find((j) => j.day === day && j.cat === cat && j.total);
-  if ((old?.minutes || 0) === minutes) return; // 바뀐 게 없으면 그대로
-  if (!minutes) { journal = journal.filter((j) => j !== old); toast(`${CAT[cat].name} 읽은 시간을 지웠어요`); }
-  else {
-    if (old) old.minutes = minutes;
+  const changed = (old?.minutes || 0) !== minutes;
+  if (changed) {
+    if (!minutes) journal = journal.filter((j) => j !== old);
+    else if (old) old.minutes = minutes;
     else journal.push({ id: crypto.randomUUID?.() || String(Date.now()), day, cat, what: "", minutes, text: "", total: true });
-    toast(`✓ ${CAT[cat].name} ${fmtMin(minutes)} 저장했어요`);
+    saveJournal();
   }
-  saveJournal(); render(); if (openDayKey && $("dayDialog").open) fillDay(openDayKey);
+  if (quiet) { if (changed) box.dataset.dirty = "1"; return; }
+  if (!changed && !box.dataset.dirty) return; // 바뀐 게 없으면 그대로
+  delete box.dataset.dirty;
+  toast(minutes ? `✓ ${CAT[cat].name} ${fmtMin(minutes)} 저장했어요` : `${CAT[cat].name} 읽은 시간을 지웠어요`);
+  render(); if (openDayKey && $("dayDialog").open) fillDay(openDayKey);
 }
-// 시간 칸 → 분 칸으로 옮길 때는 저장하지 않고, 두 칸 밖으로 나가면 저장
+let totTimer = null;
+document.addEventListener("input", (e) => {
+  const box = e.target.closest?.("[data-tot]"); if (!box) return;
+  clearTimeout(totTimer); totTimer = setTimeout(() => saveTotal(box, true), 500);
+});
+// 앱을 내리거나 다른 화면으로 가도 쓰던 숫자는 저장
+document.addEventListener("visibilitychange", () => {
+  const box = document.activeElement?.closest?.("[data-tot]");
+  if (document.hidden && box) { clearTimeout(totTimer); saveTotal(box, true); }
+});
+// 시간 칸 → 분 칸으로 옮길 때는 다시 그리지 않고, 두 칸 밖으로 나가면 정리
 document.addEventListener("focusout", (e) => {
   const box = e.target.closest?.("[data-tot]"); if (!box) return;
   if (e.relatedTarget && box.contains(e.relatedTarget)) return;
+  clearTimeout(totTimer);
   setTimeout(() => saveTotal(box), 0);
 });
 document.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.closest?.("[data-tot] input")) { e.preventDefault(); e.target.blur(); } });
@@ -3479,7 +3495,7 @@ function renderSnu() {
 function paintSnu(i) {
   const [, , cat, y0, y1, ny, best, cols] = SNU[i];
   const cs = cols.length > 4 ? `${cols.slice(0, 4).join(", ")} 외 ${cols.length - 4}곳` : cols.join(", ");
-  $("sSnu").innerHTML = `<h4>🎓 서울대 신입생 추천 · ${esc(cat)}</h4>
+  $("sSnu").innerHTML = `<h4 class="us-h"><svg class="snu-mk" viewBox="0 0 30 20" width="27" height="18" aria-hidden="true"><rect width="30" height="20" rx="5" fill="#1F3A6E"/><text x="15" y="14.2" text-anchor="middle" font-size="10.5" font-weight="800" fill="#fff" font-family="sans-serif" letter-spacing=".3">SNU</text></svg> 서울대 신입생 추천 · ${esc(cat)}</h4>
     <div class="sn-g"><div><b>${ny}년</b><small>추천 받은 해</small></div><div><b>${best ? `${best}위` : "–"}</b><small>TOP 순위 최고</small></div><div><b>${cols.length}곳</b><small>단과대 TOP3</small></div></div>
     <p>${y0 === y1 ? `${y0}년` : `${y0}~${y1}년`}${cs ? ` · ${esc(cs)}` : ""}</p>`;
   $("sSnu").hidden = false;

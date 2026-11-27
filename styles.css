@@ -1339,7 +1339,8 @@ body.peek #wsOpen { display: none; }
 .tb-row .tb-card { display: flex; align-items: center; gap: 10px; margin: 0; padding: 8px 10px; border-radius: 14px; background: transparent; box-shadow: none; border: 1px solid rgba(0, 0, 0, .08); min-width: 0; }
 .tb-row .tb-ic { width: 30px; height: 30px; border-radius: 9px; flex: none; }
 .tb-row .tb-ic .ico { width: 17px; height: 17px; }
-.tb-row .snu-ic { background: #E3E9F4; font-size: 16px; }
+.tb-row .snu-ic { background: #E3E9F4; display: flex; align-items: center; justify-content: center; }
+.snu-mk { display: block; flex: none; }
 .tb-row .tb-txt b { font-size: 13.5px; font-weight: 500; white-space: nowrap; letter-spacing: -.3px; }
 /* 서울대 추천도서 */
 .snu-tabs { grid-template-columns: repeat(5, 1fr); }
