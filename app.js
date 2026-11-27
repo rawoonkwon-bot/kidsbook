@@ -3653,7 +3653,7 @@ $("snuList").addEventListener("click", (e) => {
 
 
 // ---------- 미국 학교 추천 (ALA 노터블 · 텍사스 블루보닛 · 플로리다 선샤인, 최근 3년) ----------
-var US = null, US_COVER = {}, US_INTRO = {}, US_T = new Map(), US_I = new Map(), usTab = "전체";
+var US = null, US_COVER = {}, US_INTRO = {}, US_LEX = {}, US_T = new Map(), US_I = new Map(), usTab = "전체";
 function FLAG_(w) { w = w || 16; return `<svg class="us-star" viewBox="0 0 20 20" width="${w}" height="${w}" aria-hidden="true"><circle cx="10" cy="10" r="10" fill="#2F3D7A"/><path d="M10 4.3l1.75 3.6 3.95.55-2.87 2.75.7 3.9L10 13.25 6.47 15.1l.7-3.9L4.3 8.45l3.95-.55z" fill="#fff"/></svg>`; }
 // 뉴베리 대상 = 금색 동그라미 '뉴', 아너 = 은색 동그라미 '뉴', 나머지 미국 추천 = 남색 별
 function NB_(w, gold) { w = w || 16; const [a, b, ink] = gold ? ["#F3D27A", "#C9962A", "#6B4A08"] : ["#E9ECEF", "#A7AEB6", "#4A525B"]; return `<svg class="us-star" viewBox="0 0 20 20" width="${w}" height="${w}" aria-hidden="true"><defs><linearGradient id="nb${gold ? "g" : "s"}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient></defs><circle cx="10" cy="10" r="10" fill="url(#nb${gold ? "g" : "s"})"/><circle cx="10" cy="10" r="8.3" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width=".8"/><text x="10" y="13.6" text-anchor="middle" font-size="10" font-weight="800" fill="${ink}" font-family="sans-serif">뉴</text></svg>`; }
@@ -3667,7 +3667,7 @@ const usMarkName = (i) => { const s = US[i][3], n = s.some((x) => x.startsWith("
 const usKey = (t) => nT(String(t || "").replace(/^\s*(the|a|an)\s+/i, ""));
 const usLast = (a) => nT(String(a || "").replace(/\s+jr\.?$/i, "").split(/[\s,]+/).filter(Boolean).pop());
 function usLoaded(m) {
-  US = m.US; US_COVER = m.US_COVER || {}; US_INTRO = m.US_INTRO || {}; US_T.clear(); US_I.clear();
+  US = m.US; US_COVER = m.US_COVER || {}; US_INTRO = m.US_INTRO || {}; US_LEX = m.US_LEX || {}; US_T.clear(); US_I.clear();
   for (const k in US_COVER) if (US_COVER[k][1]) US_I.set(US_COVER[k][1], Number(k));
   US.forEach(([t], i) => {
     const ks = new Set([usKey(t), ...String(t).split(":").map(usKey).filter((k) => k.length >= 6)]);
@@ -3689,6 +3689,15 @@ function usHit(isbn, title, authors) {
 const usNb = (i) => US[i][3].find((x) => x.startsWith("뉴베리")) || "";
 const usYear = (i) => Math.max(...US[i][3].map((x) => Number((x.match(/\d{4}/) || [0])[0])));
 const usBandOk = (i, tab) => tab === "전체" || (tab === "뉴베리" ? !!usNb(i) : US[i][2].split(" ").some((b) => tab === "3–5학년" ? b === "35" || b === "36" : b === "68"));
+// 렉사일 띠: 숫자가 낮을수록 연한 색. 모르는 책은 회색 띠에 학년
+const usLexN = (i) => { const m = /^(?:HL|AD|GN)?(\d+)$/.exec(US_LEX[i] || ""); return m ? Number(m[1]) : null; };
+const usLexTxt = (i) => (US_LEX[i] ? (US_LEX[i] === "NP" ? "NP" : `${US_LEX[i]}L`) : "");
+function usLexBand(i) {
+  const n = usLexN(i), t = usLexTxt(i);
+  if (!t) return `<span class="lex-band none">${usBandTxt(i).replace("~", "–") || "뉴베리"}</span>`;
+  const lv = n == null ? 0 : n < 500 ? 1 : n < 700 ? 2 : n < 900 ? 3 : n < 1100 ? 4 : 5;
+  return `<span class="lex-band l${lv}">${t}</span>`;
+}
 const usBandTxt = (i) => { const b = US[i][2].split(" "); if (!b.some((x) => /\d/.test(x))) return ""; return b.includes("68") && (b.includes("35") || b.includes("36")) ? "3~8학년" : b.includes("68") ? "6~8학년" : b.includes("36") && !b.includes("35") ? "3~6학년" : "3~5학년"; };
 const usSrcName = (s) => s.replace(/^ALA (\d+)/, "ALA 노터블 $1").replace(/^텍사스 /, "텍사스 블루보닛 ").replace(/^플로리다 /, "플로리다 선샤인 ");
 function usMine() {
@@ -3703,18 +3712,20 @@ function renderUs() {
     return `<button type="button" role="tab" data-c="${c}" aria-selected="${c === usTab}"><b>${c}</b><small>${ix.filter((i) => mine.has(i)).length}/${ix.length}</small></button>`;
   }).join("");
   const list = US.map((x, i) => i).filter((i) => usBandOk(i, usTab));
-  list.sort((p, q) => (mine.has(q) - mine.has(p)) || (usTab === "뉴베리" ? usYear(q) - usYear(p) : 0) || (!!US_COVER[q]?.[0] - !!US_COVER[p]?.[0]));
+  // 렉사일 낮은 책부터, 렉사일을 모르는 책은 뒤에 (학년 낮은 순 → 표지 있는 책 먼저)
+  const bandRank = (i) => (US[i][2].includes("35") ? 0 : US[i][2].includes("36") ? 1 : US[i][2].includes("68") ? 2 : 3);
+  list.sort((p, q) => ((usLexN(p) ?? 9999) - (usLexN(q) ?? 9999)) || (bandRank(p) - bandRank(q)) || (!!US_COVER[q]?.[0] - !!US_COVER[p]?.[0]));
   $("usCount").textContent = `${usTab} ${list.length}권 · 읽은 책 ${list.filter((i) => mine.has(i)).length}권`;
   $("usList").innerHTML = list.map((i) => {
     const [t, a] = US[i], r = mine.get(i), c = r?.cover || US_COVER[i]?.[0];
     return `<li data-i="${i}" title="${esc(t)} · ${esc(a)}">
       ${c ? `<img class="cover" src="${esc(c)}" alt="${esc(t)}" loading="lazy">` : `<div class="cover tb-nocover"><b>${esc(t)}</b><small>${esc(a)}</small></div>`}
-      ${r ? `<span class="done-badge" aria-label="기록한 책">✓</span>` : ""}${usNb(i) ? `<span class="us-badge">${usMark(i, 18)}</span>` : ""}</li>`;
+      ${r ? `<span class="done-badge" aria-label="기록한 책">✓</span>` : ""}${usNb(i) ? `<span class="us-badge">${usMark(i, 18)}</span>` : ""}${usLexBand(i)}</li>`;
   }).join("");
 }
 function paintUs(i) {
   const [t, a, , srcs] = US[i], q = encodeURIComponent(`${t} ${a}`);
-  $("sSnu").innerHTML = `<h4 class="us-h">${usMark(i, 18)} 미국 학교 추천${usBandTxt(i) ? ` · ${usBandTxt(i)}` : ""}</h4>${US_INTRO[i] ? `<p class="us-intro">${esc(US_INTRO[i])}</p>` : ""}
+  $("sSnu").innerHTML = `<h4 class="us-h">${usMark(i, 18)} 미국 학교 추천${usBandTxt(i) ? ` · ${usBandTxt(i)}` : ""}</h4>${US_INTRO[i] ? `<p class="us-intro">${esc(US_INTRO[i])}</p>` : ""}${usLexTxt(i) ? `<p class="us-lex">렉사일 <b>${usLexTxt(i)}</b> <small>참고용</small></p>` : ""}
     <ul class="us-src">${srcs.map((s) => `<li>${esc(usSrcName(s))}</li>`).join("")}</ul>
     <div class="us-links"><a href="https://www.google.com/search?q=${q}%20AR%20book%20level%20site%3Aarbookfind.com" target="_blank" rel="noopener">AR 찾기 ↗</a><a href="https://www.google.com/search?q=${q}%20lexile" target="_blank" rel="noopener">렉사일 찾기 ↗</a></div>`;
   $("sSnu").hidden = false;

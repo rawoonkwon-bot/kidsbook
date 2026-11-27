@@ -1569,3 +1569,15 @@ i.lk .ico { width: 13px; height: 13px; }
 .er-list img { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; flex: none; }
 .er-list span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
 .er-list button.on { box-shadow: 0 0 0 2px var(--forest); }
+/* 미국 추천: 렉사일 띠 (표지 아래) */
+.lex-band { position: absolute; left: 0; right: 0; bottom: 0; height: 18px; display: grid; place-items: center; font-size: 11px; font-weight: 800; letter-spacing: .2px; color: #1E2420; background: rgba(232,227,218,.95); }
+.lex-band.none { font-weight: 600; color: #6C6F68; }
+.lex-band.l0 { background: #E2D8EE; }
+.lex-band.l1 { background: #D3E5DF; }
+.lex-band.l2 { background: #CDE1EB; }
+.lex-band.l3 { background: #F7E3A0; }
+.lex-band.l4 { background: #F3D2B0; }
+.lex-band.l5 { background: #F8D3CE; }
+.tb-shelf li:has(.lex-band) .us-badge { bottom: 22px; }
+.us-lex { margin: 4px 0 6px; font-size: 13px; }
+.us-lex small { color: var(--muted); font-size: 11px; }
