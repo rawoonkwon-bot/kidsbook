@@ -1504,6 +1504,8 @@ const scanner = new Scanner({
   video: $("video"),
   roiEl: $("roi"),
   onStatus: (msg) => ($("scanHint").textContent = msg),
+  // 화면 아래 작은 글씨: 안 찍힐 때 원인을 알 수 있게 (분석한 장 수 · 밝기 · 읽힌 값)
+  onInfo: (i) => { $("engine").textContent = `${scanner.engine} · 카메라 ${i.video} · 분석 ${i.frames}장${i.light ? (i.light.dark ? " · 어두움" : i.light.glare ? " · 반사" : " · 밝기 좋음") : ""}${i.seen ? ` · 읽힘 ${i.seen}` : ""}`; },
   onDetect: (info) => {
     beep();
     $("roi").classList.add("hit");
@@ -1513,7 +1515,7 @@ const scanner = new Scanner({
 async function openScanner() {
   $("scanner").hidden = false;
   $("roi").classList.remove("hit");
-  $("scanHint").textContent = "바코드를 네모 안에 맞춰 주세요";
+  $("scanHint").textContent = "한 뼘쯤 떨어져서 바코드를 네모에 맞춰요";
   $("engine").textContent = "카메라 준비 중…";
   try {
     await scanner.start();
@@ -3520,16 +3522,21 @@ $("snuList").addEventListener("click", (e) => {
 
 
 // ---------- 미국 학교 추천 (ALA 노터블 · 텍사스 블루보닛 · 플로리다 선샤인, 최근 3년) ----------
-var US = null, US_COVER = {}, US_T = new Map(), US_I = new Map(), usTab = "전체";
+var US = null, US_COVER = {}, US_INTRO = {}, US_T = new Map(), US_I = new Map(), usTab = "전체";
 function FLAG_(w) { w = w || 16; return `<svg class="us-star" viewBox="0 0 20 20" width="${w}" height="${w}" aria-hidden="true"><circle cx="10" cy="10" r="10" fill="#2F3D7A"/><path d="M10 4.3l1.75 3.6 3.95.55-2.87 2.75.7 3.9L10 13.25 6.47 15.1l.7-3.9L4.3 8.45l3.95-.55z" fill="#fff"/></svg>`; }
 // 뉴베리 대상 = 금색 동그라미 '뉴', 아너 = 은색 동그라미 '뉴', 나머지 미국 추천 = 남색 별
 function NB_(w, gold) { w = w || 16; const [a, b, ink] = gold ? ["#F3D27A", "#C9962A", "#6B4A08"] : ["#E9ECEF", "#A7AEB6", "#4A525B"]; return `<svg class="us-star" viewBox="0 0 20 20" width="${w}" height="${w}" aria-hidden="true"><defs><linearGradient id="nb${gold ? "g" : "s"}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient></defs><circle cx="10" cy="10" r="10" fill="url(#nb${gold ? "g" : "s"})"/><circle cx="10" cy="10" r="8.3" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width=".8"/><text x="10" y="13.6" text-anchor="middle" font-size="10" font-weight="800" fill="${ink}" font-family="sans-serif">뉴</text></svg>`; }
-function usMark(i, w) { const s = US[i][3]; return s.some((x) => x.startsWith("뉴베리 대상")) ? NB_(w, true) : s.some((x) => x.startsWith("뉴베리 아너")) ? NB_(w, false) : FLAG_(w); }
-const usMarkName = (i) => { const s = US[i][3]; return s.some((x) => x.startsWith("뉴베리 대상")) ? "뉴베리 대상" : s.some((x) => x.startsWith("뉴베리 아너")) ? "뉴베리 아너" : "미국 학교 추천"; };
+// 뉴베리이면서 다른 미국 추천 목록에도 있으면 '뉴' + 별 둘 다
+function usMark(i, w) {
+  const s = US[i][3], nb = s.some((x) => x.startsWith("뉴베리 대상")) ? NB_(w, true) : s.some((x) => x.startsWith("뉴베리 아너")) ? NB_(w, false) : "";
+  const us = s.some((x) => !x.startsWith("뉴베리")) ? FLAG_(w) : "";
+  return nb && us ? `<span class="us-pair">${nb}${us}</span>` : nb || us;
+}
+const usMarkName = (i) => { const s = US[i][3], n = s.some((x) => x.startsWith("뉴베리 대상")) ? "뉴베리 대상" : s.some((x) => x.startsWith("뉴베리 아너")) ? "뉴베리 아너" : ""; return [n, s.some((x) => !x.startsWith("뉴베리")) ? "미국 학교 추천" : ""].filter(Boolean).join(" · "); };
 const usKey = (t) => nT(String(t || "").replace(/^\s*(the|a|an)\s+/i, ""));
 const usLast = (a) => nT(String(a || "").replace(/\s+jr\.?$/i, "").split(/[\s,]+/).filter(Boolean).pop());
 function usLoaded(m) {
-  US = m.US; US_COVER = m.US_COVER || {}; US_T.clear(); US_I.clear();
+  US = m.US; US_COVER = m.US_COVER || {}; US_INTRO = m.US_INTRO || {}; US_T.clear(); US_I.clear();
   for (const k in US_COVER) if (US_COVER[k][1]) US_I.set(US_COVER[k][1], Number(k));
   US.forEach(([t], i) => {
     const ks = new Set([usKey(t), ...String(t).split(":").map(usKey).filter((k) => k.length >= 6)]);
@@ -3576,7 +3583,7 @@ function renderUs() {
 }
 function paintUs(i) {
   const [t, a, , srcs] = US[i], q = encodeURIComponent(`${t} ${a}`);
-  $("sSnu").innerHTML = `<h4 class="us-h">${usMark(i, 18)} 미국 학교 추천${usBandTxt(i) ? ` · ${usBandTxt(i)}` : ""}</h4>
+  $("sSnu").innerHTML = `<h4 class="us-h">${usMark(i, 18)} 미국 학교 추천${usBandTxt(i) ? ` · ${usBandTxt(i)}` : ""}</h4>${US_INTRO[i] ? `<p class="us-intro">${esc(US_INTRO[i])}</p>` : ""}
     <ul class="us-src">${srcs.map((s) => `<li>${esc(usSrcName(s))}</li>`).join("")}</ul>
     <div class="us-links"><a href="https://www.google.com/search?q=${q}%20AR%20book%20level%20site%3Aarbookfind.com" target="_blank" rel="noopener">AR 찾기 ↗</a><a href="https://www.google.com/search?q=${q}%20lexile" target="_blank" rel="noopener">렉사일 찾기 ↗</a></div>`;
   $("sSnu").hidden = false;
@@ -3584,7 +3591,7 @@ function paintUs(i) {
 function usChip(i) {
   const c = $("sUs"); if (!c) return;
   c.hidden = i < 0; c.dataset.i = i;
-  if (i >= 0) c.innerHTML = `${usMark(i, 15)}<span>${usNb(i) ? usNb(i).replace(/ \d{4}$/, "") : "미국 추천"}</span>`;
+  if (i >= 0) c.innerHTML = `${usMark(i, 15)}<span>${usMarkName(i).replace("미국 학교 추천", "미국 추천")}</span>`;
 }
 $("sUs").addEventListener("click", () => { const i = Number($("sUs").dataset.i); if (i < 0) return; if ($("sSnu").hidden) paintUs(i); else $("sSnu").hidden = true; });
 $("usOpen").addEventListener("click", async () => {
