@@ -2724,7 +2724,7 @@ async function loadGuest(st) {
 }
 function gbPreview(st) {
   const top = (st.gb || []).filter((g) => !g.parent_id);
-  const head = `<div class="pop-head"><h3 class="sec-title">방명록 ${st.gb ? `<small class="muted">${top.length}</small>` : ""}</h3><button type="button" class="link-btn" data-act="guest">${st.me ? "전체보기 ›" : "✍️ 남기기"}</button></div>`;
+  const head = `<div class="pop-head"><h3 class="sec-title">방명록 ${st.gb ? `<small class="muted">${top.length}</small>` : ""}</h3><button type="button" class="link-btn" data-act="guest">${st.me ? "전체보기 ›" : `${ico("pencil")} 남기기`}</button></div>`;
   if (!st.gb) return head + `<p class="muted bl-msg sm">불러오는 중…</p>`;
   if (!top.length) return head + `<p class="muted bl-msg sm">${st.me ? "아직 방명록이 없어요. 이웃이 인사를 남기면 여기에 보여요." : "첫 인사를 남겨 보세요 😊"}</p>`;
   return head + `<ul class="gb-mini">${top.slice(0, 2).map((g) => `<li><button type="button" data-act="guest">${avatar(g.nick, g.face, "av sm")}<span><b>${esc(g.nick)}</b>${g.secret ? " 🔒" : ""}<em>${esc(g.body.length > 50 ? g.body.slice(0, 50) + "…" : g.body)}</em></span></button></li>`).join("")}</ul>`;
