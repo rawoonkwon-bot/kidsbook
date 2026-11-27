@@ -412,7 +412,15 @@ const paintShelf = () => {
   $("rDone").nextElementSibling.textContent = chosenShelf === "focus" ? "다 들음" : "완독";
 };
 let preferShelf = null; // 포트폴리오 날짜 시트에서 스캔하면 그 책장을 먼저 골라 둠
-$("shelfPick").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) { chosenShelf = b.dataset.shelf; paintShelf(); } });
+let shelfManual = false; // 엄마가 책장을 직접 누르면 그 뒤로는 자동으로 바꾸지 않음
+$("shelfPick").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) { chosenShelf = b.dataset.shelf; shelfManual = true; paintShelf(); } });
+// 직접 입력: 제목을 적는 동안 한글/영어에 맞춰 책장이 따라감 (집중듣기는 그대로)
+$("rTitle").addEventListener("input", () => {
+  const v = $("rTitle").value.trim();
+  if (shelfManual || chosenShelf === "focus" || !/[A-Za-z가-힣]/.test(v)) return;
+  const s = hasHangul(v) ? "ko" : "en";
+  if (s !== chosenShelf) { chosenShelf = s; paintShelf(); }
+});
 
 function paintDate() {
   const t = localDay(), y = daysAgo(1);
@@ -482,7 +490,11 @@ function openRecord({ existing = null, isbn = null, book = null, self = false, r
   $("rDesc").textContent = desc; $("rDesc").classList.remove("open");
   $("rDescHead").hidden = !desc;
 
-  chosenShelf = existing ? shelfOf(existing) : (notFocus && preferShelf === "focus" ? null : preferShelf) || (title ? (hasHangul(title) ? "ko" : "en") : (rec.isbn?.startsWith("97911") || rec.isbn?.startsWith("97889") ? "ko" : "en"));
+  // 책장 미리 고르기: 집중듣기 칸에서 왔으면 집중듣기, 아니면 제목 글자(한글/영어)가 먼저, 제목이 없을 때만 포트폴리오 칸 → ISBN 앞자리
+  const byTitle = title ? (hasHangul(title) ? "ko" : "en") : null;
+  shelfManual = false;
+  chosenShelf = existing ? shelfOf(existing) : (!notFocus && preferShelf === "focus") ? "focus"
+    : byTitle || (preferShelf && preferShelf !== "focus" ? preferShelf : null) || (rec.isbn?.startsWith("97911") || rec.isbn?.startsWith("97889") ? "ko" : "en");
   paintShelf();
   rDay = returnDay || localDay(); paintDate();
 
@@ -817,6 +829,8 @@ function fillView(r) {
   $("vNote").textContent = r.note || "적지 않았어요";
   paintCheer(r);
   $("vCat").value = BOOK_CATS.includes(r.category) ? r.category : "";
+  [...$("vShelf").children].forEach((x) => x.setAttribute("aria-checked", String(x.dataset.shelf === shelfOf(r))));
+  [...$("vShelf").children].forEach((x) => { x.disabled = !!PEEK; });
   $("vTotalRow").hidden = !!r.totalPages;
   $("vTotal").value = "";
 }
@@ -825,6 +839,15 @@ $("vHome").addEventListener("change", () => {
   if ($("vHome").checked) viewing.home = true; else delete viewing.home;
   saveRecords(); render();
   toast($("vHome").checked ? "우리 집 책장에 넣었어요" : "우리 집 책장에서 뺐어요");
+});
+$("vShelf").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-shelf]"); if (!b || !viewing || PEEK) return;
+  const to = b.dataset.shelf, from = shelfOf(viewing); if (to === from) return;
+  // 같은 책을 읽기·집중듣기로 따로 기록할 수 있어서, 옮길 쪽에 이미 같은 책이 있으면 막음
+  const twin = viewing.isbn && records.find((x) => x !== viewing && x.kid === viewing.kid && x.isbn === viewing.isbn && (x.shelf === "focus") === (to === "focus"));
+  if (twin) { toast(`이미 ${SHELVES[to]}에 같은 책 기록이 있어요`); return; }
+  viewing.shelf = to; saveRecords(); render(); fillView(viewing);
+  toast(`${SHELVES[to]} 책장으로 옮겼어요`);
 });
 $("vCat").addEventListener("change", () => { if (!viewing) return; viewing.category = $("vCat").value; saveRecords(); render(); toast("분야를 바꿨어요"); });
 $("vTotalSave").addEventListener("click", () => {
