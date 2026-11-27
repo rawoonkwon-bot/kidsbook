@@ -78,6 +78,14 @@ export default async function handler(req, res) {
   const nlKey = (process.env.NL_CERT_KEY || "").trim();
   if (!kakaoKey && !aladinKey && !nlKey) return res.status(501).json({ error: "no api key set" });
 
+  // 빠른 조회(fast=1): 카카오만 바로 돌려줌 → 앱이 제목·표지를 먼저 보여 주고, 쪽수는 전체 조회로 나중에 채움
+  if (req.query.fast && kakaoKey) {
+    const kb = await fromKakao(isbn, kakaoKey).catch(() => null);
+    if (!kb) return res.status(404).json({ error: "not found" });
+    res.setHeader("Cache-Control", "public, s-maxage=86400, stale-while-revalidate=604800");
+    return res.status(200).json(kb);
+  }
+
   // 세 곳에 동시에 묻기
   const [k, a, n] = await Promise.allSettled([
     kakaoKey ? fromKakao(isbn, kakaoKey) : Promise.resolve(null),
