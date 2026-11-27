@@ -198,25 +198,20 @@ const ringSvg = (frac) => {
     ${frac > 0 ? `<circle cx="42" cy="42" r="${r}" fill="none" stroke="#9DBE10" stroke-width="7" stroke-linecap="round" stroke-dasharray="${(c * Math.min(1, frac)).toFixed(1)} ${c.toFixed(1)}"/>` : ""}</svg>`;
 };
 
-// 읽은 횟수 막대: 1~4는 막대, 5번마다 네 막대 + 겨자색 사선 한 묶음 (최대 20)
+// 읽은 횟수: 책 쌓기 (한 번 = 한 권, 다섯 권까지)
 function tallySvg(n) {
-  n = Math.min(n, 20);
-  const g = Math.floor(n / 5), rem = n % 5;
-  let x = 3, body = "";
-  for (let i = 0; i < g; i++) {
-    for (let k = 0; k < 4; k++) body += `<path d="M${x + k * 3.2} 3.5v9" stroke="#2F5D3A"/>`;
-    body += `<path d="M${x - 1.5} 11l12.6 -6" stroke="#C89B3C"/>`;
-    x += 16;
-  }
-  for (let k = 0; k < rem; k++) body += `<path d="M${x + k * 3.2} 3.5v9" stroke="#2F5D3A"/>`;
-  const w = Math.round((rem ? x + (rem - 1) * 3.2 : x - 6.4) + 3);
-  return `<svg class="tally" viewBox="0 0 ${w} 16" width="${w}" height="16" fill="none" stroke-width="2" stroke-linecap="round" aria-hidden="true">${body}</svg>`;
+  n = Math.max(1, Math.min(n, 5));
+  const C = ["#2F5D3A", "#C89B3C", "#B95A26", "#3E6E8E", "#8A5A9E"], h = n * 5 - 1;
+  let body = "";
+  for (let i = 0; i < n; i++) body += `<rect x="${i % 2 ? 2 : 1}" y="${h - (i + 1) * 5 + 1}" width="${i % 2 ? 14 : 16}" height="4" rx="1" fill="${C[i]}"/>`;
+  return `<svg class="tally" viewBox="0 0 18 ${h}" width="18" height="${h}" aria-hidden="true">${body}</svg>`;
 }
 const cardHtml = (r) => `
     <li data-id="${r.id}" tabindex="0" role="button" aria-label="${esc(r.title)} 기록 보기${timesRead(r) ? ` · ${timesRead(r)}번 읽음` : ""}" title="${esc(r.title)}">
       ${imgOr(r.cover, r.title, "cover")}
       ${r.done ? `<span class="done-badge" aria-label="완독">✓</span>` : r.totalPages ? `<div class="pbar"><i style="width:${pct(r)}%"></i></div>` : ""}
       ${timesRead(r) ? `<span class="tally-wrap">${tallySvg(timesRead(r))}</span>` : ""}
+      ${(() => { const u = usHit(r.isbn, r.title, r.authors); return u >= 0 ? `<span class="us-badge" aria-label="${usMarkName(u)}">${usMark(u, 18)}</span>` : ""; })()}
       ${r.home ? `<span class="home-badge" aria-label="우리 집 책장에 있는 책"><svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M6 1.2 1 5.6h1.6V11h2.9V7.6h1V11h2.9V5.6H11z" fill="currentColor"/></svg></span>` : ""}
     </li>`;
 
@@ -285,7 +280,7 @@ const recsOf = (isbn) => { const all = isbn ? records.filter((r) => r.isbn === i
 const bookOfRec = (r) => (r ? { title: r.title, authors: r.authors ? [r.authors] : [], publisher: r.publisher, category: r.category, pages: r.totalPages, cover: r.cover, description: r.description } : null);
 // 교과서 수록도서에서 열 때(info): 기록하기 없이 책 소개 + 읽은 친구들 별점만
 function sheetMode(info) {
-  $("sSnu").hidden = true;
+  $("sSnu").hidden = true; usChip(-1);
   $("sSelf").hidden = $("sNote").hidden = $("sOk").hidden = $("sTiming").hidden = info;
   $("sRates").hidden = !info; if (info) $("sRates").innerHTML = `<small>읽은 친구들의 별점을 불러오는 중…</small>`;
 }
@@ -304,6 +299,7 @@ async function openSheet(isbn, scanInfo, opts = {}) {
   sheetMode(!!opts.info);
   if (opts.info) paintRates(isbn, opts.title);
   if (opts.snu != null) paintSnu(opts.snu);
+  if (opts.us != null) paintUs(opts.us);
   const { read: existing, fo: foRec } = recsOf(isbn);
   const ex0 = existing || foRec; // 화면에 보여 줄 내 기록
   sheet = { isbn, book: null, existing, fo: foRec };
@@ -341,6 +337,7 @@ async function openSheet(isbn, scanInfo, opts = {}) {
     return;
   }
   const b = book || {};
+  if (opts.us == null) usChip(usHit(isbn, ex0?.title || b.title, ex0?.authors || b.authors));
   $("sCat").textContent = b.category || ex0?.category || (hasHangul(b.title || ex0?.title) ? "한글책" : "영어책");
   $("sTitle").textContent = ex0?.title || b.title;
   $("sAuthor").textContent = `〈작가〉 ${ex0?.authors || (b.authors || []).join(", ") || "모름"}`;
@@ -3505,6 +3502,94 @@ $("snuList").addEventListener("click", (e) => {
   paintRates("", t);
 });
 
+
+// ---------- 미국 학교 추천 (ALA 노터블 · 텍사스 블루보닛 · 플로리다 선샤인, 최근 3년) ----------
+var US = null, US_COVER = {}, US_T = new Map(), US_I = new Map(), usTab = "전체";
+function FLAG_(w) { w = w || 16; return `<svg class="us-star" viewBox="0 0 20 20" width="${w}" height="${w}" aria-hidden="true"><circle cx="10" cy="10" r="10" fill="#2F3D7A"/><path d="M10 4.3l1.75 3.6 3.95.55-2.87 2.75.7 3.9L10 13.25 6.47 15.1l.7-3.9L4.3 8.45l3.95-.55z" fill="#fff"/></svg>`; }
+// 뉴베리 대상 = 금색 동그라미 '뉴', 아너 = 은색 동그라미 '뉴', 나머지 미국 추천 = 남색 별
+function NB_(w, gold) { w = w || 16; const [a, b, ink] = gold ? ["#F3D27A", "#C9962A", "#6B4A08"] : ["#E9ECEF", "#A7AEB6", "#4A525B"]; return `<svg class="us-star" viewBox="0 0 20 20" width="${w}" height="${w}" aria-hidden="true"><defs><linearGradient id="nb${gold ? "g" : "s"}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient></defs><circle cx="10" cy="10" r="10" fill="url(#nb${gold ? "g" : "s"})"/><circle cx="10" cy="10" r="8.3" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width=".8"/><text x="10" y="13.6" text-anchor="middle" font-size="10" font-weight="800" fill="${ink}" font-family="sans-serif">뉴</text></svg>`; }
+function usMark(i, w) { const s = US[i][3]; return s.some((x) => x.startsWith("뉴베리 대상")) ? NB_(w, true) : s.some((x) => x.startsWith("뉴베리 아너")) ? NB_(w, false) : FLAG_(w); }
+const usMarkName = (i) => { const s = US[i][3]; return s.some((x) => x.startsWith("뉴베리 대상")) ? "뉴베리 대상" : s.some((x) => x.startsWith("뉴베리 아너")) ? "뉴베리 아너" : "미국 학교 추천"; };
+const usKey = (t) => nT(String(t || "").replace(/^\s*(the|a|an)\s+/i, ""));
+const usLast = (a) => nT(String(a || "").replace(/\s+jr\.?$/i, "").split(/[\s,]+/).filter(Boolean).pop());
+function usLoaded(m) {
+  US = m.US; US_COVER = m.US_COVER || {}; US_T.clear(); US_I.clear();
+  for (const k in US_COVER) if (US_COVER[k][1]) US_I.set(US_COVER[k][1], Number(k));
+  US.forEach(([t], i) => {
+    const ks = new Set([usKey(t), ...String(t).split(":").map(usKey).filter((k) => k.length >= 6)]);
+    for (const k of ks) { if (!US_T.has(k)) US_T.set(k, []); US_T.get(k).push(i); }
+  });
+}
+// 이 책이 미국 학교 추천 목록에 있나? (바코드가 같거나, 영어 제목 + 지은이 성이 같으면)
+function usHit(isbn, title, authors) {
+  if (!US) return -1;
+  if (isbn && US_I.has(isbn)) return US_I.get(isbn);
+  if (/[가-힣]/.test(title || "")) return -1;
+  const au = nT(Array.isArray(authors) ? authors.join(" ") : authors);
+  const ks = [usKey(title), ...String(title || "").split(":").map(usKey).filter((k) => k.length >= 6)];
+  for (const k of ks) for (const i of US_T.get(k) || []) {
+    if (au ? au.includes(usLast(US[i][1])) : k.length >= 10) return i;
+  }
+  return -1;
+}
+const usNb = (i) => US[i][3].find((x) => x.startsWith("뉴베리")) || "";
+const usYear = (i) => Math.max(...US[i][3].map((x) => Number((x.match(/\d{4}/) || [0])[0])));
+const usBandOk = (i, tab) => tab === "전체" || (tab === "뉴베리" ? !!usNb(i) : US[i][2].split(" ").some((b) => tab === "3–5학년" ? b === "35" || b === "36" : b === "68"));
+const usBandTxt = (i) => { const b = US[i][2].split(" "); if (!b.some((x) => /\d/.test(x))) return ""; return b.includes("68") && (b.includes("35") || b.includes("36")) ? "3~8학년" : b.includes("68") ? "6~8학년" : b.includes("36") && !b.includes("35") ? "3~6학년" : "3~5학년"; };
+const usSrcName = (s) => s.replace(/^ALA (\d+)/, "ALA 노터블 $1").replace(/^텍사스 /, "텍사스 블루보닛 ").replace(/^플로리다 /, "플로리다 선샤인 ");
+function usMine() {
+  const hit = new Map();
+  for (const r of records) { const i = usHit(r.isbn, r.title, r.authors); if (i >= 0 && !hit.has(i)) hit.set(i, r); }
+  return hit;
+}
+function renderUs() {
+  const mine = usMine();
+  $("usTabs").innerHTML = ["전체", "3–5학년", "6–8학년", "뉴베리"].map((c) => {
+    const ix = US.map((x, i) => i).filter((i) => usBandOk(i, c));
+    return `<button type="button" role="tab" data-c="${c}" aria-selected="${c === usTab}"><b>${c}</b><small>${ix.filter((i) => mine.has(i)).length}/${ix.length}</small></button>`;
+  }).join("");
+  const list = US.map((x, i) => i).filter((i) => usBandOk(i, usTab));
+  list.sort((p, q) => (mine.has(q) - mine.has(p)) || (usTab === "뉴베리" ? usYear(q) - usYear(p) : 0) || (!!US_COVER[q]?.[0] - !!US_COVER[p]?.[0]));
+  $("usCount").textContent = `${usTab} ${list.length}권 · 읽은 책 ${list.filter((i) => mine.has(i)).length}권`;
+  $("usList").innerHTML = list.map((i) => {
+    const [t, a] = US[i], r = mine.get(i), c = r?.cover || US_COVER[i]?.[0];
+    return `<li data-i="${i}" title="${esc(t)} · ${esc(a)}">
+      ${c ? `<img class="cover" src="${esc(c)}" alt="${esc(t)}" loading="lazy">` : `<div class="cover tb-nocover"><b>${esc(t)}</b><small>${esc(a)}</small></div>`}
+      ${r ? `<span class="done-badge" aria-label="기록한 책">✓</span>` : ""}${usNb(i) ? `<span class="us-badge">${usMark(i, 18)}</span>` : ""}</li>`;
+  }).join("");
+}
+function paintUs(i) {
+  const [t, a, , srcs] = US[i], q = encodeURIComponent(`${t} ${a}`);
+  $("sSnu").innerHTML = `<h4 class="us-h">${usMark(i, 18)} 미국 학교 추천${usBandTxt(i) ? ` · ${usBandTxt(i)}` : ""}</h4>
+    <ul class="us-src">${srcs.map((s) => `<li>${esc(usSrcName(s))}</li>`).join("")}</ul>
+    <div class="us-links"><a href="https://www.google.com/search?q=${q}%20AR%20book%20level%20site%3Aarbookfind.com" target="_blank" rel="noopener">AR 찾기 ↗</a><a href="https://www.google.com/search?q=${q}%20lexile" target="_blank" rel="noopener">렉사일 찾기 ↗</a></div>`;
+  $("sSnu").hidden = false;
+}
+function usChip(i) {
+  const c = $("sUs"); if (!c) return;
+  c.hidden = i < 0; c.dataset.i = i;
+  if (i >= 0) c.innerHTML = `${usMark(i, 15)}<span>${usNb(i) ? usNb(i).replace(/ \d{4}$/, "") : "미국 추천"}</span>`;
+}
+$("sUs").addEventListener("click", () => { const i = Number($("sUs").dataset.i); if (i < 0) return; if ($("sSnu").hidden) paintUs(i); else $("sSnu").hidden = true; });
+$("usOpen").addEventListener("click", async () => {
+  if (!US) { try { usLoaded(await import("./us.js")); } catch { toast("목록을 불러오지 못했어요"); return; } }
+  renderUs(); $("usPage").showModal(); $("usPage").scrollTop = 0;
+});
+$("usClose").addEventListener("click", () => $("usPage").close());
+$("usTabs").addEventListener("click", (e) => { const b = e.target.closest("[data-c]"); if (!b) return; usTab = b.dataset.c; renderUs(); });
+$("usList").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-i]"); if (!b) return;
+  const i = Number(b.dataset.i), [t, a] = US[i], r = usMine().get(i);
+  const isbn = r?.isbn || US_COVER[i]?.[1], cover = r?.cover || US_COVER[i]?.[0] || "";
+  if (isbn) { openSheet(isbn, null, { info: true, title: t, author: a, cover, us: i }); return; }
+  sheet = { isbn: "", book: null, existing: null, fo: null }; sheetMode(true);
+  $("sCat").textContent = "미국 학교 추천"; $("sTitle").textContent = t; $("sAuthor").textContent = `〈작가〉 ${a}`;
+  $("sPages").textContent = ""; $("sDesc").textContent = ""; $("sMine").hidden = true;
+  setImg($("sCover"), cover); paintUs(i); $("scanSheet").showModal();
+  paintRates("", t);
+});
+// 책장 표지의 작은 국기 · 스캔 칩에 쓰려고 미리 불러 둬요
+import("./us.js").then((m) => { usLoaded(m); try { render(); } catch {} }).catch(() => {});
 
 // ---------- 하트 · 댓글 (인스타처럼 간결한 기호) ----------
 function HEART_() { return `<svg class="rx-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.3s-7.6-4.5-9.4-9.1C1.4 8 3.5 4.4 7.1 4.4c2.1 0 3.7 1.1 4.9 2.9 1.2-1.8 2.8-2.9 4.9-2.9 3.6 0 5.7 3.6 4.5 6.8-1.8 4.6-9.4 9.1-9.4 9.1z"/></svg>`; }

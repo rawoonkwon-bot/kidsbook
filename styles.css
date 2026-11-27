@@ -636,7 +636,7 @@ body.peek #dayCats, body.peek .day-sub, body.peek .day-actions, body.peek .day-i
 
 /* 다시 읽기: 읽은 횟수 막대 */
 .shelf li { position: relative; }
-.tally-wrap { position: absolute; left: 4px; bottom: 8px; background: rgba(251, 249, 244, .94); border-radius: 999px; padding: 1px 5px; display: flex; box-shadow: 0 1px 3px rgba(0,0,0,.18); }
+.tally-wrap { position: absolute; left: 4px; bottom: 8px; background: rgba(251, 249, 244, .94); border-radius: 6px; padding: 3px 4px; display: flex; box-shadow: 0 1px 3px rgba(0,0,0,.18); }
 .tally { display: block; }
 .v-times { display: flex; align-items: center; gap: 8px; margin: 6px 0 2px; font-size: 14px; font-weight: 700; color: var(--forest); }
 .v-times:empty { display: none; }
@@ -1393,7 +1393,6 @@ body.peek #wsOpen { display: none; }
 .rc-list { max-height: 50vh; overflow: auto; }
 
 /* 연산 학습지 뽑기: 홈 버튼 줄 아래 한 줄 */
-.tb-row .ws-card { grid-column: 1 / -1; }
 .tb-row .ws-ic { background: #F9DCCF; color: #B95A26; }
 .tb-row .ws-ic svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; }
 /* 그날 하루 전체 하트 · 댓글 */
@@ -1417,3 +1416,19 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; text-size-adj
 /* 댓글·방명록의 얼굴·별명을 누르면 그 집으로 */
 .who { border: 0; background: none; padding: 0; margin: 0; font: inherit; color: inherit; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
 .who b { font-weight: 800; }
+
+/* 미국 학교 추천 */
+.us-flag { display: block; border-radius: 2px; box-shadow: 0 0 0 .5px rgba(0,0,0,.18); }
+.tb-row .us-ic { background: #E8EBF3; display: flex; align-items: center; justify-content: center; }
+.us-title { display: flex; align-items: center; gap: 8px; }
+.us-tabs { grid-template-columns: repeat(4, 1fr); }
+.shelf .us-badge { position: absolute; right: 4px; bottom: 8px; border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,.28); line-height: 0; }
+.us-star { display: block; flex: none; }
+.us-chip { display: inline-flex; align-items: center; gap: 5px; margin-top: 8px; padding: 4px 10px 4px 7px; white-space: nowrap; border-radius: 999px; border: 1px solid #D5DAE8; background: #F3F5FA; color: #2F3D7A; font-size: 12px; font-weight: 600; vertical-align: 1px; cursor: pointer; }
+.us-chip[hidden] { display: none; }
+.s-snu .us-h { display: flex; align-items: center; gap: 7px; color: #2F3D7A; }
+.us-src { margin: 8px 0 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 6px; }
+.us-src li { background: #fff; border-radius: 999px; padding: 4px 10px; font-size: 12.5px; }
+.us-links { display: flex; gap: 8px; margin-top: 10px; }
+.us-links a { flex: 1; text-align: center; padding: 9px 0; font-size: 13.5px; font-weight: 600; text-decoration: none; color: #2F3D7A; background: #fff; border-radius: 12px; border: 1px solid #D5DAE8; }
+.s-note:empty { display: none; }
