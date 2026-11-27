@@ -1,5 +1,5 @@
 import { Scanner, warmUpDetector } from "./scanner.js";
-import { lookupBook } from "./lookup.js";
+import { lookupBook, lookupQuick } from "./lookup.js";
 import { toIsbn13 } from "./isbn.js";
 import * as sync from "./sync.js";
 import { ico, toIcon, ICON_EMOJI, PICK } from "./icons.js";
@@ -313,13 +313,34 @@ async function openSheet(isbn, scanInfo, opts = {}) {
   $("sOk").disabled = true; $("sOk").textContent = "확인";
   $("scanSheet").showModal();
 
-  let { book, ms, cached } = await lookupBook(isbn, { needDescription: true });
+  // 제목·표지를 먼저 보여 주고(빠른 조회), 쪽수·소개는 전체 조회가 끝나면 채움
+  const full = lookupBook(isbn, { needDescription: true });
+  let fullDone = false; full.then(() => { fullDone = true; }, () => {});
+  if (!ex0) lookupQuick(isbn).then((qb) => {
+    if (!qb || fullDone || !sheet || sheet.isbn !== isbn || sheet.book) return;
+    sheet.book = qb; sheet.partial = true;
+    $("sCat").textContent = qb.category || (hasHangul(qb.title) ? "한글책" : "영어책");
+    $("sTitle").textContent = qb.title;
+    $("sAuthor").textContent = `〈작가〉 ${(qb.authors || []).join(", ") || "모름"}`;
+    $("sPages").textContent = qb.pages ? `〈페이지〉 ${qb.pages} pages` : "〈페이지〉 찾는 중…";
+    setImg($("sCover"), qb.cover);
+    if (qb.description) $("sDesc").textContent = qb.description;
+    if (opts.us == null) usChip(usHit(isbn, qb.title, qb.authors));
+    $("sOk").disabled = false;
+  });
+  let { book, ms, cached } = await full;
   // 어디에도 없으면, 다른 회원이 직접 등록해 둔 책인지 확인
   if (!book && !PEEK) book = await sync.sharedBook(isbn).catch(() => null);
   // 쪽수만 없으면, 다른 회원이 적어 둔 쪽수로 채움
   else if (book && !book.pages && !PEEK) { const sb = await sync.sharedBook(isbn).catch(() => null); if (sb?.pages) book = { ...book, pages: sb.pages, pagesBy: "member" }; }
+  if (!book && sheet?.partial && sheet.isbn === isbn) book = sheet.book; // 전체 조회가 실패해도 먼저 찾은 정보는 살림
+  // 제목만 보고 먼저 [확인]을 눌러 기록 화면으로 갔다면, 늦게 온 쪽수를 그 화면에 채워 줌
+  if ((!sheet || sheet.isbn !== isbn) && book && rec && rec.isbn === isbn && !rec.existing) {
+    rec.book = { ...(rec.book || {}), ...book };
+    if (book.pages && !$("rTotal").value) { $("rTotal").value = book.pages; $("rTotal").dispatchEvent(new Event("input", { bubbles: true })); }
+  }
   if (!sheet || sheet.isbn !== isbn) return;
-  sheet.book = book;
+  sheet.book = book; sheet.partial = false;
   const parts = [];
   if (scanInfo) parts.push(`인식 ${(scanInfo.ms / 1000).toFixed(2)}초`);
   parts.push(cached ? "저장된 정보" : `조회 ${(ms / 1000).toFixed(2)}초${book ? ` · ${book.source}` : ""}`);

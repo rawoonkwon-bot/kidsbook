@@ -107,6 +107,28 @@ async function fromKakao(isbn, signal) {
   return b;
 }
 
+/**
+ * 빠른 조회: 제목·지은이·표지만 먼저 (카카오 빠른 조회 · Google · Open Library 중 먼저 온 것)
+ * 쪽수·소개는 lookupBook 이 이어서 채움. 못 찾으면 null
+ */
+export async function lookupQuick(isbn) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 2500);
+  try {
+    const kakao = (async () => {
+      const res = await fetch(`/api/book?isbn=${isbn}&fast=1`, { signal: ctrl.signal });
+      if (!res.ok) throw new Error(`kakao ${res.status}`);
+      const b = await res.json();
+      if (!b.title) throw new Error("not found");
+      return b;
+    })();
+    const ps = [kakao, fromGoogleBooks(isbn, ctrl.signal), fromOpenLibrary(isbn, ctrl.signal)];
+    ps.forEach((p) => p.catch(() => {}));
+    return await (isKorean(isbn) ? kakao.catch(() => Promise.any(ps)) : Promise.any(ps));
+  } catch { return null; }
+  finally { clearTimeout(timer); ctrl.abort(); }
+}
+
 // 979-11, 978-89로 시작하면 한국에서 발행된 책
 const isKorean = (isbn) => isbn.startsWith("97911") || isbn.startsWith("97889");
 
